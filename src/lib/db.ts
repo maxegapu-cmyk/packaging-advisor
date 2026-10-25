@@ -89,6 +89,8 @@ const MIGRATIONS: string[] = [
    );
    CREATE INDEX IF NOT EXISTS idx_events_invite ON events(invite_id, type, created_at);
    CREATE INDEX IF NOT EXISTS idx_boards_project ON boards(project_id, version);`,
+  // v2: package structure (form, size, finish) per product, as JSON. Empty = category default.
+  `ALTER TABLE projects ADD COLUMN pack TEXT NOT NULL DEFAULT '';`,
 ];
 
 let db: DatabaseSync | null = null;

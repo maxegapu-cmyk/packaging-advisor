@@ -1,11 +1,16 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { Direction } from "@/lib/board/schema";
 import type { Lang } from "@/lib/i18n";
-import { BackFace, FrontFace, paletteVars, SideFace, TopFace } from "./BoxFaces";
+import { DEFAULT_PACK, toPx } from "@/lib/pack";
+import { netSize, Package3D } from "./pack/Package3D";
+import { Orbit, REST_ANGLE, reducedMotion } from "./pack/orbit";
+import { Stage3D } from "./pack/Stage3D";
 
 const FOLD_MS = 2800;
+const HERO_FIT = 300;
+const HERO_PACK = { ...DEFAULT_PACK, w: 120, h: 156, d: 48 };
 const CYCLE_MS = 4200;
 
 /** Printer's registration mark, drawn at the corners of the press sheet. */
@@ -53,6 +58,29 @@ function ColorStrip({ d }: { d: Direction }) {
 export function HeroSection({ directions, brand, lang, children }: { directions: Direction[]; brand: string; lang: Lang; children: ReactNode }) {
   const [i, setI] = useState(1);
   const [auto, setAuto] = useState(true);
+  const px = toPx(HERO_PACK, HERO_FIT);
+  const net = netSize(px);
+  const netZoom = Math.min(0.9, 500 / net.w, 480 / net.h);
+  const [orbit] = useState(() => new Orbit({ x: 0, y: 0 }, netZoom));
+  const [flat, setFlat] = useState(true);
+  const started = useRef(false);
+
+  // The flat dieline folds itself into a box while the camera swings round.
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    if (reducedMotion()) {
+      setFlat(false);
+      orbit.set(REST_ANGLE, 1);
+      return;
+    }
+    const t = setTimeout(() => {
+      setFlat(false);
+      orbit.tween(REST_ANGLE, FOLD_MS, 1);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [orbit]);
+
   useEffect(() => {
     if (!auto) return;
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
@@ -85,27 +113,9 @@ export function HeroSection({ directions, brand, lang, children }: { directions:
         <div className="hero-copy">{children}</div>
         <div className="hero-visual">
           <DielineDrawing />
-          <div className="dl-scene" aria-hidden="true">
-            <div className="dl-rig">
-              <div className="dl-face dl-front" style={paletteVars(d)}>
-                <FrontFace d={d} brand={brand} />
-                <div className="dl-face dl-left">
-                  <SideFace d={d} brand={brand} variant="left" />
-                </div>
-                <div className="dl-face dl-right">
-                  <SideFace d={d} brand={brand} variant="right" />
-                  <div className="dl-face dl-back">
-                    <BackFace />
-                  </div>
-                </div>
-                <div className="dl-face dl-top">
-                  <TopFace d={d} brand={brand} />
-                </div>
-                <div className="dl-face dl-bottom" />
-              </div>
-            </div>
-            <div className="dl-shadow" />
-          </div>
+          <Stage3D orbit={orbit} label={lang === "en" ? `Sample box, ${d.name.en}. Drag to turn.` : `示例包装盒：${d.name.zh}。拖动旋转。`} className="hero-stage" onInteract={() => setAuto(false)}>
+            <Package3D d={d} brand={brand} spec={HERO_PACK} fit={HERO_FIT} open={flat} orbit={orbit} />
+          </Stage3D>
           <div className="hero-dirs" role="group" aria-label="示例方向 Sample directions">
             {directions.map((x, j) => (
               <button

@@ -87,3 +87,25 @@ test("JSON is extracted from fences, surrounding prose and trailing commas", () 
   assert.throws(() => extractJson('{"a": {"b": 1}'), /incomplete/);
   assert.throws(() => extractJson("no json here"), /no JSON/);
 });
+
+test("pack: normalize and fit to pixels", async () => {
+  const { normalizePack, toPx, DEFAULT_PACK, formatSize } = await import("../src/lib/pack");
+  assert.deepEqual(normalizePack("not json"), DEFAULT_PACK);
+  assert.deepEqual(normalizePack(undefined), DEFAULT_PACK);
+  assert.equal(normalizePack('{"form":"tin","w":80,"h":100}').d, 80);
+  const px = toPx({ form: "carton", w: 340, h: 260, d: 220, finish: "matte" }, 200);
+  assert.ok(px.w <= 200 && px.h <= 200 && px.w > px.h);
+  assert.equal(formatSize({ form: "tin", w: 86, h: 120, d: 86, finish: "matte" }), "Ø86 × 120 mm");
+});
+
+test("render brief protects structure and states the studio lighting, in both languages", async () => {
+  const { renderBrief } = await import("../src/lib/renderBrief");
+  const d = DEMO_BOARD.directions[1];
+  const b = renderBrief(d, { form: "tin", w: 86, h: 120, d: 86, finish: "foil" }, DEMO_BOARD.meta.product, "山径");
+  assert.match(b.zh, /Ø86 × 120 mm/);
+  assert.match(b.zh, /不改动/);
+  assert.match(b.zh, /无缝棚拍/);
+  assert.match(b.zh, /烫金/);
+  assert.match(b.en, /seamless studio/);
+  for (const s of d.palette) assert.ok(b.zh.includes(s.hex) && b.en.includes(s.hex));
+});

@@ -3,15 +3,16 @@ import { randomId, randomToken } from "./crypto";
 import type { Board } from "./board/schema";
 import type { Category } from "./categories";
 import { readUpload, writeUpload } from "./uploads";
+import { defaultPack, normalizePack, type PackSpec } from "./pack";
 
-export type Project = { id: string; inviteId: number; title: string; category: Category; brand: string; description: string; mustText: string; createdAt: string };
+export type Project = { id: string; inviteId: number; title: string; category: Category; brand: string; description: string; mustText: string; pack: PackSpec; createdAt: string };
 export type Upload = { id: string; projectId: string; kind: "product" | "reference"; note: string; file: string; mime: string };
 export type BoardRecord = { id: string; projectId: string; version: number; data: Board; modelLabel: string; note: string; shareToken: string | null; picked: string | null; createdAt: string };
 
-type ProjectRow = { id: string; invite_id: number; title: string; category: Category; brand: string; description: string; must_text: string; created_at: string };
+type ProjectRow = { id: string; invite_id: number; title: string; category: Category; brand: string; description: string; must_text: string; pack?: string; created_at: string };
 type BoardRow = { id: string; project_id: string; version: number; data: string; model_label: string; note: string; share_token: string | null; picked: string | null; created_at: string };
 
-const toProject = (r: ProjectRow): Project => ({ id: r.id, inviteId: r.invite_id, title: r.title, category: r.category, brand: r.brand, description: r.description, mustText: r.must_text, createdAt: r.created_at });
+const toProject = (r: ProjectRow): Project => ({ id: r.id, inviteId: r.invite_id, title: r.title, category: r.category, brand: r.brand, description: r.description, mustText: r.must_text, pack: normalizePack(r.pack, defaultPack(r.category)), createdAt: r.created_at });
 const toBoard = (r: BoardRow): BoardRecord => ({ id: r.id, projectId: r.project_id, version: r.version, data: JSON.parse(r.data), modelLabel: r.model_label, note: r.note, shareToken: r.share_token, picked: r.picked, createdAt: r.created_at });
 
 export function createProject(inviteId: number, p: { title: string; category: Category; brand: string; description: string; mustText: string }): Project {
@@ -25,6 +26,15 @@ export function createProject(inviteId: number, p: { title: string; category: Ca
 export function getProject(id: string): Project | null {
   const r = getDb().prepare("SELECT * FROM projects WHERE id = ?").get(id) as ProjectRow | undefined;
   return r ? toProject(r) : null;
+}
+
+/** Saves the package structure (form, size, finish) shown on the boards of this product. */
+export function setPack(projectId: string, spec: unknown): PackSpec {
+  const project = getProject(projectId);
+  if (!project) throw new Error("project not found");
+  const pack = normalizePack(spec, project.pack);
+  getDb().prepare("UPDATE projects SET pack = ? WHERE id = ?").run(JSON.stringify(pack), projectId);
+  return pack;
 }
 
 /** Testers only see their own projects; admins see all. */

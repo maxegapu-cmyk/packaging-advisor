@@ -2,16 +2,34 @@ import type { Lang, Pair } from "@/lib/i18n";
 import { UI } from "@/lib/i18n";
 import { DEMO_BOARD } from "@/lib/llm/demo";
 import { Bi } from "./Bi";
-import { Box3D, BoxSync } from "./Box3D";
+import { Box3D, BoxSync, PackProvider, SpaceIcon } from "./Box3D";
 import { paletteVars } from "./BoxFaces";
 import { Brandmark } from "./Brandmark";
 import { ColorBar } from "./ColorBar";
 import { HeroSection } from "./DielineHero";
 import { FaceLayout } from "./FaceLayout";
+import { PackBar } from "./PackBar";
+import { SpaceShowcase } from "./SpaceShowcase";
+import { defaultPack } from "@/lib/pack";
 
 const C = {
   navHow: { zh: "怎么用", en: "How it works" },
   navSample: { zh: "示例", en: "Sample" },
+  navSpace: { zh: "3D 空间", en: "3D space" },
+  ctaSpace: { zh: "进入 3D 空间", en: "Enter the 3D space" },
+  spaceKicker: { zh: "核心功能", en: "The core" },
+  spaceH: { zh: "像拿在手里一样看包装。", en: "See the packaging as if it were in your hand." },
+  spaceSub: {
+    zh: "三个方向都画在真实的盒型上：直立盒、天地盖礼盒、圆罐，按你的尺寸。转一圈、打开盖子、展开刀模，在下单打样之前就把问题看出来。",
+    en: "All three directions are drawn on a real structure (tuck carton, lid-and-base gift box or round tin) at your size. Turn it, open the lid, unfold the net, and spot problems before you pay for a proof.",
+  },
+  spacePoints: [
+    { t: { zh: "720° 无死角", en: "720°, no blind spots" }, d: { zh: "上下左右整圈翻转，连底部都能看；双指或滚轮缩放。", en: "Turn it all the way round in every direction, bottom included; pinch or scroll to zoom." } },
+    { t: { zh: "细节镜头", en: "Detail shots" }, d: { zh: "一点就推近到正面、侧面、背面、开盒内部，并说明这里该怎么做。", en: "One tap moves in on the front, side, back or inside, with a note on what goes there." } },
+    { t: { zh: "工艺与背景", en: "Finish and backdrop" }, d: { zh: "哑光、亮面、纸感、烫金；棚拍、白底、品牌色、暗场。", en: "Matte, gloss, textured paper, foil; studio, white, brand color, dark." } },
+    { t: { zh: "主图测试", en: "Listing test" }, d: { zh: "同时看 800×800 白底主图和搜索结果里的缩略图，品牌名是否还看得清。", en: "See the 800×800 white main image and the search-results thumbnail side by side." } },
+    { t: { zh: "渲染简报", en: "Render brief" }, d: { zh: "一键复制给设计师或出图工具：结构、配色、材质、灯光按电商棚拍标准写好。", en: "Copy a brief for a designer or image tool: structure, colors, material and light to an e-commerce studio standard." } },
+  ],
   navBoard: { zh: "交付内容", en: "What you get" },
   heroA: { zh: "一张产品照片，", en: "One product photo." },
   heroB: { zh: "三个包装方向。", en: "Three packaging directions." },
@@ -20,12 +38,11 @@ const C = {
     en: "For sellers without an in-house designer: colors, layouts, packaging copy and a wording check, in one brief a designer can act on.",
   },
   ctaSignIn: { zh: "用邀请码登录", en: "Sign in with your invite code" },
-  ctaSample: { zh: "看示例", en: "See the sample" },
   testNote: { zh: "测试版，凭邀请码使用。", en: "Test version, invite only." },
   howH: { zh: "三步完成", en: "How it works" },
   steps: [
     { t: { zh: "上传", en: "Upload" }, d: { zh: "一两张产品照片，加上你喜欢的参考图（可选）。", en: "One or two product photos, plus references you like (optional)." } },
-    { t: { zh: "比较", en: "Compare" }, d: { zh: "三个真正不同的方向：稳妥、有识别度、大胆。拖动盒子，从各个角度看。", en: "Three genuinely different routes: safe, distinctive, bold. Drag the boxes to see every side." } },
+    { t: { zh: "比较", en: "Compare" }, d: { zh: "三个真正不同的方向：稳妥、有识别度、大胆。在 3D 空间里转动、打开、展开。", en: "Three genuinely different routes: safe, distinctive, bold. Turn, open and unfold them in the 3D space." } },
     { t: { zh: "交出", en: "Hand off" }, d: { zh: "选定一个方向，把一句话指令或分享链接发给设计师。", en: "Pick one and send your designer the one-line instruction or a share link." } },
   ],
   boardH: { zh: "方案板里有什么", en: "What's in a board" },
@@ -38,11 +55,11 @@ const C = {
     { t: { zh: "设计师指令", en: "Designer instruction" }, d: { zh: "一句话说清选哪个方向、怎么做。", en: "One sentence on which direction and how to execute it." } },
   ],
   sampleH: { zh: "示例：明前龙井", en: "Sample: Longjing green tea" },
-  sampleSub: { zh: "同一款茶，三条路线。三个盒子会一起转，方便对比。", en: "One tea, three routes. The boxes rotate together so you can compare." },
+  sampleSub: { zh: "同一款茶，三条路线。换个盒型试试，三个盒子会一起转，方便对比。", en: "One tea, three routes. Try another structure; the boxes turn together so you can compare." },
   catsH: { zh: "首批品类", en: "First categories" },
   notH: { zh: "我们不做的事", en: "What it doesn't do" },
   nots: [
-    { zh: "不出印刷刀模和印刷文件。", en: "No dielines or print-ready files." },
+    { zh: "不出可生产的刀模和印刷文件：展开图只是结构示意。", en: "No production dielines or print files: the unfolded net is a sketch." },
     { zh: "不替代打样：屏幕色与印刷色会有差异。", en: "No substitute for proofing: screen and print colors differ." },
     { zh: "不构成合规审查：标签信息以占位符提示。", en: "No compliance review: label details are placeholders." },
     { zh: "不复制别人的设计：参考图只借鉴思路。", en: "No copying: references inform ideas, not artwork." },
@@ -108,6 +125,9 @@ function Topbar({ lang, langSwitch }: { lang: Lang; langSwitch: React.ReactNode 
         <Bi p={UI.appName} lang={lang} as="strong" />
       </a>
       <nav className="topnav" aria-label="页面导航 Page">
+        <a href="#space">
+          <Bi p={C.navSpace} lang={lang} />
+        </a>
         <a href="#how">
           <Bi p={C.navHow} lang={lang} />
         </a>
@@ -151,12 +171,32 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
           <a className="btn btn-sheet btn-large" href="/login">
             <Bi p={C.ctaSignIn} lang={lang} />
           </a>
-          <a className="btn btn-sheet-ghost btn-large" href="#sample">
-            <Bi p={C.ctaSample} lang={lang} />
+          <a className="btn btn-sheet-ghost btn-large btn-icon" href="/space/demo">
+            <SpaceIcon />
+            <Bi p={C.ctaSpace} lang={lang} />
           </a>
         </div>
         <Bi p={C.testNote} lang={lang} as="p" className="hero-note" />
       </HeroSection>
+
+      <section id="space" className="space-band">
+        <div className="space-inner">
+          <div className="space-copy">
+            <Bi p={C.spaceKicker} lang={lang} as="p" className="space-kicker" />
+            <Bi p={C.spaceH} lang={lang} as="h2" className="space-h" />
+            <Bi p={C.spaceSub} lang={lang} as="p" className="space-sub" />
+            <ul className="space-points">
+              {C.spacePoints.map((x, i) => (
+                <li key={i}>
+                  <Bi p={x.t} lang={lang} as="h3" />
+                  <Bi p={x.d} lang={lang} as="p" />
+                </li>
+              ))}
+            </ul>
+          </div>
+          <SpaceShowcase d={rec} brand={demo.meta.brand} lang={lang} href={`/space/demo?d=${rec.id}`} />
+        </div>
+      </section>
 
       <section id="how" className="band">
         <Bi p={C.howH} lang={lang} as="h2" className="band-h" />
@@ -210,12 +250,13 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
           <Bi p={C.sampleH} lang={lang} as="h2" className="band-h" />
           <Bi p={C.sampleSub} lang={lang} as="p" className="band-sub" />
         </div>
-        <BoxSync label={one(UI.rotateTogether)} hint={one(UI.dragHint)}>
+        <PackProvider initial={defaultPack("tea")} studioBase="/space/demo">
+        <BoxSync label={one(UI.rotateTogether)} hint={one(UI.dragHint)} toolbar={<PackBar lang={lang} />}>
           <div className="sample-grid">
             {demo.directions.map((d) => (
               <div className={d.id === demo.recommendation.pick ? "sample is-recommended" : "sample"} key={d.id}>
                 <div className="sample-stage" style={paletteVars(d)}>
-                  <Box3D d={d} brand={demo.meta.brand} label={`${d.id} ${one(d.name)}`} />
+                  <Box3D d={d} brand={demo.meta.brand} lang={lang} label={`${d.id} ${one(d.name)}`} />
                 </div>
                 <div className="sample-name">
                   <span className="dir-id">{d.id}</span>
@@ -227,6 +268,7 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
             ))}
           </div>
         </BoxSync>
+        </PackProvider>
         <div className="sample-quote">
           <Bi p={UI.forDesigner} lang={lang} as="p" className="label" />
           <Bi p={demo.recommendation.designerInstruction} lang={lang} as="p" className="quote" />

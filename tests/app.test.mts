@@ -182,3 +182,19 @@ test("the daily limit stops testers but not admins", async () => {
   const ok = await generateBoard(project.id, { id: invite.id, isAdmin: true });
   assert.equal(getBoard(ok.id)?.version, 6);
 });
+
+test("package structure defaults by category and saves only valid values", async () => {
+  const { setPack, getProject } = await import("../src/lib/projects");
+  const [{ invite }] = createInvites(1);
+  const tea = createProject(invite.id, { title: "龙井", category: "tea", brand: "", description: "", mustText: "" });
+  assert.equal(tea.pack.form, "tin");
+  const appliance = createProject(invite.id, { title: "电水壶", category: "appliance", brand: "", description: "", mustText: "" });
+  assert.equal(appliance.pack.form, "carton");
+
+  const saved = setPack(tea.id, { form: "gift", w: 9999, h: "120", d: -4, finish: "chrome" });
+  assert.deepEqual(saved, { form: "gift", w: 500, h: 120, d: 30, finish: "matte" });
+  assert.deepEqual(getProject(tea.id)!.pack, saved);
+
+  // A tin's depth always equals its diameter.
+  assert.equal(setPack(tea.id, { form: "tin", w: 90, h: 130, d: 40 }).d, 90);
+});

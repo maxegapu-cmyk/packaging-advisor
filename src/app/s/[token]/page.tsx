@@ -4,7 +4,8 @@ import { BoardView } from "@/components/BoardView";
 import { Brandmark } from "@/components/Brandmark";
 import { UI } from "@/lib/i18n";
 import { initApp } from "@/lib/init";
-import { getBoardByShareToken } from "@/lib/projects";
+import { getBoardByShareToken, getProject } from "@/lib/projects";
+import { defaultPack } from "@/lib/pack";
 import { getLang } from "../../_server/session";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +27,13 @@ export default async function SharedBoardPage({ params }: { params: Promise<{ to
         <T k="sharedBoard" lang={lang} className="muted" />
       </header>
       <main className="page">
-        <BoardView board={board.data} lang={lang} pickedId={board.picked} />
+        <BoardView
+          board={board.data}
+          lang={lang}
+          pickedId={board.picked}
+          pack={getProject(board.projectId)?.pack ?? defaultPack(board.data.meta.category)}
+          studioBase={`/s/${token}/space`}
+        />
       </main>
     </>
   );

@@ -1,23 +1,68 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Direction } from "@/lib/board/schema";
-import { BackFace, FrontFace, paletteVars, SideFace, TopFace } from "./BoxFaces";
+import type { Pair } from "@/lib/i18n";
+import { DEFAULT_PACK, type PackSpec } from "@/lib/pack";
+import { Orbit } from "./pack/orbit";
+import { Package3D } from "./pack/Package3D";
+import { Stage3D } from "./pack/Stage3D";
 
-export type Angle = { x: number; y: number };
-export const REST_ANGLE: Angle = { x: -16, y: -34 };
+export { REST_ANGLE, type Angle } from "./pack/orbit";
 
-type Sync = { angle: Angle; setAngle: (a: Angle) => void; synced: boolean };
+/* ------------------------------------------------------------------ Package structure */
+
+type PackCtxValue = {
+  spec: PackSpec;
+  setSpec: (s: PackSpec) => void;
+  saving: "idle" | "saving" | "saved" | "error";
+  /** Link to the full-screen 3D space for a direction, when there is one. */
+  studioHref?: (directionId: string) => string;
+};
+const PackCtx = createContext<PackCtxValue | null>(null);
+
+export function usePack(): PackCtxValue {
+  return useContext(PackCtx) ?? { spec: DEFAULT_PACK, setSpec: () => {}, saving: "idle" };
+}
+
+/**
+ * Holds the package structure for every box below it. With `saveUrl`, changes are saved
+ * (debounced) so the board, the 3D space and share links all show the same structure.
+ */
+export function PackProvider({ initial, saveUrl, studioBase, children }: { initial: PackSpec; saveUrl?: string; studioBase?: string; children: ReactNode }) {
+  const [spec, setLocal] = useState(initial);
+  const [saving, setSaving] = useState<PackCtxValue["saving"]>("idle");
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const setSpec = (s: PackSpec) => {
+    setLocal(s);
+    if (!saveUrl) return;
+    clearTimeout(timer.current);
+    setSaving("saving");
+    timer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(saveUrl, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(s) });
+        setSaving(res.ok ? "saved" : "error");
+      } catch {
+        setSaving("error");
+      }
+    }, 500);
+  };
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const studioHref = studioBase ? (id: string) => `${studioBase}${studioBase.includes("?") ? "&" : "?"}d=${encodeURIComponent(id)}` : undefined;
+  return <PackCtx.Provider value={{ spec, setSpec, saving, studioHref }}>{children}</PackCtx.Provider>;
+}
+
+/* ------------------------------------------------------------------ Rotate together */
+
+type Sync = { orbit: Orbit; synced: boolean };
 const SyncCtx = createContext<Sync | null>(null);
 
-const clampX = (x: number) => Math.max(-70, Math.min(70, x));
-
-/** Lets several boxes rotate together, for side-by-side comparison. */
-export function BoxSync({ children, label, hint }: { children: ReactNode; label: string; hint: string }) {
-  const [angle, setAngle] = useState<Angle>(REST_ANGLE);
+/** Lets several boxes share one camera, for side-by-side comparison. */
+export function BoxSync({ children, label, hint, toolbar }: { children: ReactNode; label: string; hint: string; toolbar?: ReactNode }) {
+  const [orbit] = useState(() => new Orbit());
   const [synced, setSynced] = useState(true);
   return (
-    <SyncCtx.Provider value={{ angle, setAngle, synced }}>
+    <SyncCtx.Provider value={{ orbit, synced }}>
       <div className="sync-bar">
         <label className="switch">
           <input type="checkbox" checked={synced} onChange={(e) => setSynced(e.currentTarget.checked)} />
@@ -25,91 +70,48 @@ export function BoxSync({ children, label, hint }: { children: ReactNode; label:
           <span>{label}</span>
         </label>
         <span className="sync-hint">{hint}</span>
+        {toolbar}
       </div>
       {children}
     </SyncCtx.Provider>
   );
 }
 
-/** A packaging box in CSS 3D. Drag (or use arrow keys) to rotate; double-click to reset. */
-export function Box3D({ d, brand, label }: { d: Direction; brand: string; label: string }) {
-  const sync = useContext(SyncCtx);
-  const [local, setLocal] = useState<Angle>(REST_ANGLE);
-  const shared = sync?.synced ?? false;
-  const angle = shared && sync ? sync.angle : local;
-  // When "rotate together" is switched off, each box stays where the shared view left it.
-  const sharedAngle = sync?.angle;
-  useEffect(() => {
-    if (!shared && sharedAngle) setLocal(sharedAngle);
-  }, [shared]); // eslint-disable-line react-hooks/exhaustive-deps
-  const setAngle = useCallback(
-    (a: Angle) => {
-      if (shared && sync) sync.setAngle(a);
-      else setLocal(a);
-    },
-    [shared, sync],
-  );
-  const drag = useRef<{ px: number; py: number; a: Angle } | null>(null);
-  const [dragging, setDragging] = useState(false);
+const SPACE_LABEL: Pair = { zh: "3D 空间", en: "3D space" };
 
+export function SpaceIcon() {
   return (
-    <div
-      className={`box3d-stage${dragging ? " is-dragging" : ""}`}
-      role="img"
-      aria-label={label}
-      tabIndex={0}
-      onPointerDown={(e) => {
-        e.currentTarget.setPointerCapture(e.pointerId);
-        drag.current = { px: e.clientX, py: e.clientY, a: angle };
-        setDragging(true);
-      }}
-      onPointerMove={(e) => {
-        const s = drag.current;
-        if (!s) return;
-        setAngle({ x: clampX(s.a.x - (e.clientY - s.py) * 0.35), y: s.a.y + (e.clientX - s.px) * 0.45 });
-      }}
-      onPointerUp={() => {
-        drag.current = null;
-        setDragging(false);
-      }}
-      onPointerCancel={() => {
-        drag.current = null;
-        setDragging(false);
-      }}
-      onDoubleClick={() => setAngle(REST_ANGLE)}
-      onKeyDown={(e) => {
-        const step = 12;
-        const moves: Record<string, Angle> = {
-          ArrowLeft: { x: angle.x, y: angle.y - step },
-          ArrowRight: { x: angle.x, y: angle.y + step },
-          ArrowUp: { x: clampX(angle.x + step), y: angle.y },
-          ArrowDown: { x: clampX(angle.x - step), y: angle.y },
-        };
-        if (moves[e.key]) {
-          e.preventDefault();
-          setAngle(moves[e.key]);
-        } else if (e.key === "Home" || e.key === "0") setAngle(REST_ANGLE);
-      }}
-    >
-      <div className="box3d" style={{ ...paletteVars(d), transform: `rotateX(${angle.x}deg) rotateY(${angle.y}deg)` }}>
-        <div className="bf bf-front">
-          <FrontFace d={d} brand={brand} />
-        </div>
-        <div className="bf bf-back">
-          <BackFace />
-        </div>
-        <div className="bf bf-right">
-          <SideFace d={d} brand={brand} variant="right" />
-        </div>
-        <div className="bf bf-left">
-          <SideFace d={d} brand={brand} variant="left" />
-        </div>
-        <div className="bf bf-top">
-          <TopFace d={d} brand={brand} />
-        </div>
-        <div className="bf bf-bottom" />
-      </div>
-      <div className="box3d-shadow" aria-hidden="true" />
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+      <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" />
+      <path d="M12 12l8-4.5M12 12v9M12 12L4 7.5" />
+    </svg>
+  );
+}
+
+/** A package on a board sheet or the landing page: drag to turn, shares the camera when synced. */
+export function Box3D({ d, brand, label, fit = 200, spaceLabel = SPACE_LABEL, lang = "bi" }: { d: Direction; brand: string; label: string; fit?: number; spaceLabel?: Pair; lang?: "bi" | "zh" | "en" }) {
+  const sync = useContext(SyncCtx);
+  const { spec, studioHref } = usePack();
+  const [own] = useState(() => new Orbit());
+  const shared = !!sync?.synced;
+  // When "rotate together" is switched off, each box starts from where the shared view was.
+  useEffect(() => {
+    if (sync && !sync.synced) own.set(sync.orbit.angle, sync.orbit.zoom);
+  }, [sync?.synced]); // eslint-disable-line react-hooks/exhaustive-deps
+  const orbit = shared && sync ? sync.orbit : own;
+  const href = studioHref?.(d.id);
+  return (
+    <div className="box3d">
+      <Stage3D orbit={orbit} label={label}>
+        <Package3D d={d} brand={brand} spec={spec} fit={fit} orbit={orbit} />
+      </Stage3D>
+      {href ? (
+        <a className="space-btn" href={href}>
+          <SpaceIcon />
+          {lang === "en" ? spaceLabel.en : spaceLabel.zh}
+          {lang === "bi" ? <span className="bi-en">{spaceLabel.en}</span> : null}
+        </a>
+      ) : null}
     </div>
   );
 }

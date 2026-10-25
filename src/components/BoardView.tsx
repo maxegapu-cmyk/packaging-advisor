@@ -3,11 +3,13 @@ import type { Board, Direction } from "@/lib/board/schema";
 import { CATEGORIES, isCategory } from "@/lib/categories";
 import { plain, UI, type Lang } from "@/lib/i18n";
 import { Bi, T } from "./Bi";
-import { Box3D, BoxSync } from "./Box3D";
+import { Box3D, BoxSync, PackProvider } from "./Box3D";
 import { InnerAndManual, paletteVars } from "./BoxFaces";
 import { ColorBar } from "./ColorBar";
 import { CopyButton } from "./CopyButton";
 import { FaceLayout } from "./FaceLayout";
+import { PackBar } from "./PackBar";
+import { DEFAULT_PACK, type PackSpec } from "@/lib/pack";
 
 const ROUTE_KEY = { safe: "routeSafe", distinctive: "routeDistinctive", bold: "routeBold" } as const;
 const LEVEL_KEY = { high: "levelHigh", medium: "levelMedium", low: "levelLow" } as const;
@@ -37,7 +39,7 @@ export function DirectionSheet({ d, board, lang, picked, actions }: { d: Directi
       </header>
 
       <div className="stage">
-        <Box3D d={d} brand={brand} label={`${d.id} ${plain(d.name, lang)}: ${plain(UI.boxOf, lang)}`} />
+        <Box3D d={d} brand={brand} lang={lang} label={`${d.id} ${plain(d.name, lang)}: ${plain(UI.boxOf, lang)}`} />
         <InnerAndManual d={d} brand={brand} />
       </div>
 
@@ -101,12 +103,21 @@ export function BoardView({
   pickedId,
   directionActions,
   headerExtra,
+  pack = DEFAULT_PACK,
+  packSaveUrl,
+  studioBase,
 }: {
   board: Board;
   lang: Lang;
   pickedId?: string | null;
   directionActions?: (d: Direction) => ReactNode;
   headerExtra?: ReactNode;
+  /** Package structure the boxes are drawn on. */
+  pack?: PackSpec;
+  /** Where structure changes are saved; without it they stay on the page. */
+  packSaveUrl?: string;
+  /** Base link to the full-screen 3D space; `d=<direction>` is appended. */
+  studioBase?: string;
 }) {
   const cat = isCategory(board.meta.category) ? CATEGORIES[board.meta.category] : null;
   const rec = board.recommendation;
@@ -143,13 +154,15 @@ export function BoardView({
       </section>
 
       <section aria-label={plain(UI.directions, lang)}>
-        <BoxSync label={plain(UI.rotateTogether, lang)} hint={plain(UI.dragHint, lang)}>
-          <div className="sheets">
-            {board.directions.map((d) => (
-              <DirectionSheet key={d.id} d={d} board={board} lang={lang} picked={pickedId === d.id} actions={directionActions?.(d)} />
-            ))}
-          </div>
-        </BoxSync>
+        <PackProvider initial={pack} saveUrl={packSaveUrl} studioBase={studioBase}>
+          <BoxSync label={plain(UI.rotateTogether, lang)} hint={plain(UI.dragHint, lang)} toolbar={<PackBar lang={lang} />}>
+            <div className="sheets">
+              {board.directions.map((d) => (
+                <DirectionSheet key={d.id} d={d} board={board} lang={lang} picked={pickedId === d.id} actions={directionActions?.(d)} />
+              ))}
+            </div>
+          </BoxSync>
+        </PackProvider>
       </section>
 
       <div className="lower">

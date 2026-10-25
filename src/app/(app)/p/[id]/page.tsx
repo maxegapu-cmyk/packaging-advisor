@@ -73,6 +73,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         board={board.data}
         lang={lang}
         pickedId={board.picked}
+        pack={project.pack}
+        packSaveUrl={`/api/projects/${project.id}/pack`}
+        studioBase={`/space/${project.id}?v=${board.id}`}
         headerExtra={
           <div className="form" style={{ gap: 10, justifyItems: "end" }}>
             <p className="muted" style={{ fontSize: 13 }}>
