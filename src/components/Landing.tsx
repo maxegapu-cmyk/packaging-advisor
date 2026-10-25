@@ -3,9 +3,11 @@ import { UI } from "@/lib/i18n";
 import { DEMO_BOARD } from "@/lib/llm/demo";
 import { Bi } from "./Bi";
 import { Box3D, BoxSync } from "./Box3D";
+import { paletteVars } from "./BoxFaces";
 import { Brandmark } from "./Brandmark";
 import { ColorBar } from "./ColorBar";
-import { DielineHero } from "./DielineHero";
+import { HeroSection } from "./DielineHero";
+import { FaceLayout } from "./FaceLayout";
 
 const C = {
   navHow: { zh: "怎么用", en: "How it works" },
@@ -50,6 +52,54 @@ const C = {
   footer: { zh: "概念方向示意，非印刷稿。", en: "Concept directions, not print files." },
 } satisfies Record<string, unknown>;
 
+const CATS = [
+  { zh: "茶叶", en: "Tea", color: "#E8ECE6", key: "#3F7A4F" },
+  { zh: "地方特产", en: "Local specialties", color: "#F1E6CF", key: "#B9802F" },
+  { zh: "化妆品", en: "Cosmetics", color: "#F4E3E1", key: "#B9566A" },
+  { zh: "家用电器", en: "Home appliances", color: "#E3E8EE", key: "#3A5878" },
+];
+
+/** Small drawings for the three steps. */
+function StepArt({ n, directions }: { n: number; directions: { palette: { hex: string }[] }[] }) {
+  if (n === 0)
+    return (
+      <svg className="step-art" viewBox="0 0 160 96" aria-hidden="true">
+        <rect x="34" y="8" width="92" height="80" rx="6" fill="#fff" stroke="#000" strokeWidth="1.2" />
+        <rect x="42" y="16" width="76" height="56" fill="#ECEFE9" />
+        <rect x="66" y="26" width="28" height="40" rx="3" fill="#6F8A5E" />
+        <rect x="66" y="32" width="28" height="6" fill="#2A2E2B" opacity="0.7" />
+        <circle cx="80" cy="80" r="3" fill="#000" />
+        <path d="M128 24l14-10M128 40h16" stroke="#E4007F" strokeWidth="1.4" strokeDasharray="3 2" />
+      </svg>
+    );
+  if (n === 1)
+    return (
+      <svg className="step-art" viewBox="0 0 160 96" aria-hidden="true">
+        {directions.slice(0, 3).map((d, i) => (
+          <g key={i} transform={`translate(${14 + i * 46} ${18 + (i === 1 ? -6 : 0)})`}>
+            <path d="M0 10l14-8h24l-14 8z" fill={d.palette[0].hex} stroke="#000" strokeWidth="0.8" />
+            <path d="M24 10l14-8v52l-14 8z" fill={d.palette[2].hex} stroke="#000" strokeWidth="0.8" />
+            <rect x="0" y="10" width="24" height="52" fill={d.palette[0].hex} stroke="#000" strokeWidth="0.8" />
+            <rect x="0" y="10" width="7" height="52" fill={d.palette[2].hex} />
+          </g>
+        ))}
+      </svg>
+    );
+  return (
+    <svg className="step-art" viewBox="0 0 160 96" aria-hidden="true">
+      <rect x="40" y="6" width="68" height="84" fill="#fff" stroke="#000" strokeWidth="1.2" />
+      <rect x="34" y="0" width="80" height="96" fill="none" stroke="#E4007F" strokeWidth="1.2" strokeDasharray="4 3" />
+      <rect x="48" y="16" width="52" height="8" fill="#3F7A4F" />
+      <path d="M48 34h52M48 42h44M48 50h48M48 58h30" stroke="#000" strokeWidth="1.2" opacity="0.5" />
+      <rect x="48" y="68" width="10" height="10" fill="#E8ECE6" stroke="#000" strokeWidth="0.6" />
+      <rect x="60" y="68" width="10" height="10" fill="#1F2A24" />
+      <rect x="72" y="68" width="10" height="10" fill="#3F7A4F" />
+      <rect x="84" y="68" width="10" height="10" fill="#C9A14A" />
+      <path d="M116 48h30m-8-6l8 6-8 6" fill="none" stroke="#000" strokeWidth="1.4" />
+    </svg>
+  );
+}
+
 function Topbar({ lang, langSwitch }: { lang: Lang; langSwitch: React.ReactNode }) {
   return (
     <header className="topbar topbar-landing">
@@ -81,40 +131,39 @@ function Topbar({ lang, langSwitch }: { lang: Lang; langSwitch: React.ReactNode 
 export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.ReactNode }) {
   const demo = DEMO_BOARD;
   const one = (p: Pair) => (lang === "en" ? p.en : p.zh);
+  const rec = demo.directions.find((d) => d.id === demo.recommendation.pick) ?? demo.directions[0];
   return (
     <div className="landing">
       <Topbar lang={lang} langSwitch={langSwitch} />
 
-      <section className="hero">
-        <div className="hero-copy">
-          <h1 className="hero-h">
-            <span className="hero-line">{one(C.heroA)}</span>
-            <span className="hero-line">{one(C.heroB)}</span>
-            {lang === "bi" ? (
-              <span className="hero-en">
-                {C.heroA.en} {C.heroB.en}
-              </span>
-            ) : null}
-          </h1>
-          <Bi p={C.heroSub} lang={lang} as="p" className="hero-sub" />
-          <div className="hero-ctas">
-            <a className="btn btn-primary btn-large" href="/login">
-              <Bi p={C.ctaSignIn} lang={lang} />
-            </a>
-            <a className="btn btn-ghost btn-large" href="#sample">
-              <Bi p={C.ctaSample} lang={lang} />
-            </a>
-          </div>
-          <Bi p={C.testNote} lang={lang} as="p" className="hero-note" />
+      <HeroSection directions={demo.directions} brand={demo.meta.brand} lang={lang}>
+        <h1 className="hero-h">
+          <span className="hero-line">{one(C.heroA)}</span>
+          <span className="hero-line">{one(C.heroB)}</span>
+          {lang === "bi" ? (
+            <span className="hero-en">
+              {C.heroA.en} {C.heroB.en}
+            </span>
+          ) : null}
+        </h1>
+        <Bi p={C.heroSub} lang={lang} as="p" className="hero-sub" />
+        <div className="hero-ctas">
+          <a className="btn btn-sheet btn-large" href="/login">
+            <Bi p={C.ctaSignIn} lang={lang} />
+          </a>
+          <a className="btn btn-sheet-ghost btn-large" href="#sample">
+            <Bi p={C.ctaSample} lang={lang} />
+          </a>
         </div>
-        <DielineHero directions={demo.directions} brand={demo.meta.brand} lang={lang} />
-      </section>
+        <Bi p={C.testNote} lang={lang} as="p" className="hero-note" />
+      </HeroSection>
 
       <section id="how" className="band">
         <Bi p={C.howH} lang={lang} as="h2" className="band-h" />
         <ol className="how">
           {C.steps.map((s, i) => (
             <li key={i}>
+              <StepArt n={i} directions={demo.directions} />
               <span className="how-n">{i + 1}</span>
               <Bi p={s.t} lang={lang} as="h3" />
               <Bi p={s.d} lang={lang} as="p" />
@@ -125,13 +174,34 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
 
       <section id="board" className="band">
         <Bi p={C.boardH} lang={lang} as="h2" className="band-h" />
-        <div className="items">
-          {C.items.map((it, i) => (
-            <div className="item" key={i}>
-              <Bi p={it.t} lang={lang} as="h3" />
-              <Bi p={it.d} lang={lang} as="p" />
+        <div className="board-intro">
+          <figure className="specimen" aria-hidden="true">
+            <div className="specimen-top">
+              <span className="dir-id">{demo.recommendation.pick}</span>
+              <strong>{one(rec.name)}</strong>
+              <span className="tag tag-accent">{one(UI.recommended)}</span>
             </div>
-          ))}
+            <div className="specimen-body">
+              <FaceLayout d={rec} lang={lang} title="" />
+              <div className="specimen-side">
+                <ColorBar palette={rec.palette} lang={lang === "bi" ? "zh" : lang} label="" />
+                <div className="specimen-claim">
+                  <span className="tag">{one(UI.levelHigh)}</span>
+                  <q>{demo.claimCheck[1]?.text}</q>
+                  <span className="specimen-arrow">{one(UI.saferWording)}</span>
+                  <span>{one(demo.claimCheck[1]?.safer ?? { zh: "", en: "" })}</span>
+                </div>
+              </div>
+            </div>
+          </figure>
+          <div className="items">
+            {C.items.map((it, i) => (
+              <div className="item" key={i}>
+                <Bi p={it.t} lang={lang} as="h3" />
+                <Bi p={it.d} lang={lang} as="p" />
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -144,7 +214,9 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
           <div className="sample-grid">
             {demo.directions.map((d) => (
               <div className={d.id === demo.recommendation.pick ? "sample is-recommended" : "sample"} key={d.id}>
-                <Box3D d={d} brand={demo.meta.brand} label={`${d.id} ${one(d.name)}`} />
+                <div className="sample-stage" style={paletteVars(d)}>
+                  <Box3D d={d} brand={demo.meta.brand} label={`${d.id} ${one(d.name)}`} />
+                </div>
                 <div className="sample-name">
                   <span className="dir-id">{d.id}</span>
                   <Bi p={d.name} lang={lang} as="h3" />
@@ -165,13 +237,13 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
         <div>
           <Bi p={C.catsH} lang={lang} as="h2" className="band-h" />
           <ul className="cats">
-            {[
-              { zh: "茶叶", en: "Tea" },
-              { zh: "地方特产", en: "Local specialties" },
-              { zh: "化妆品", en: "Cosmetics" },
-              { zh: "家用电器", en: "Home appliances" },
-            ].map((c) => (
-              <Bi key={c.zh} p={c} lang={lang} as="li" />
+            {CATS.map((c) => (
+              <li key={c.zh} className="cat">
+                <span className="cat-chip" style={{ background: c.color }} aria-hidden="true">
+                  <i style={{ background: c.key }} />
+                </span>
+                <Bi p={c} lang={lang} />
+              </li>
             ))}
           </ul>
         </div>

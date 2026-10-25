@@ -4,7 +4,7 @@ import { CATEGORIES, isCategory } from "@/lib/categories";
 import { plain, UI, type Lang } from "@/lib/i18n";
 import { Bi, T } from "./Bi";
 import { Box3D, BoxSync } from "./Box3D";
-import { InnerAndManual } from "./BoxFaces";
+import { InnerAndManual, paletteVars } from "./BoxFaces";
 import { ColorBar } from "./ColorBar";
 import { CopyButton } from "./CopyButton";
 import { FaceLayout } from "./FaceLayout";
@@ -22,7 +22,7 @@ export function DirectionSheet({ d, board, lang, picked, actions }: { d: Directi
   const recommended = board.recommendation.pick === d.id;
   const brand = board.meta.brand.startsWith("[") ? "" : board.meta.brand;
   return (
-    <article className={`sheet${recommended ? " is-recommended" : ""}${picked ? " is-picked" : ""}`} aria-labelledby={`dir-${d.id}`}>
+    <article className={`sheet${recommended ? " is-recommended" : ""}${picked ? " is-picked" : ""}`} aria-labelledby={`dir-${d.id}`} style={paletteVars(d)}>
       <header className="sheet-head">
         <div className="sheet-tags">
           <span className="dir-id">{d.id}</span>
