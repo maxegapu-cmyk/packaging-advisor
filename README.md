@@ -16,7 +16,7 @@ This version is the MVP for 20 testers, starting with tea, local specialties, co
 | 公开首页 Landing page | 访客在首页看到产品介绍、刀模折成盒子的动画和可旋转的示例方案 | Visitors see the pitch, a dieline-to-box animation and a rotatable sample |
 | 邀请码登录 Invite sign-in | 每位测试者一个邀请码，无需注册 | One code per tester, no sign-up |
 | 三个方向 Three directions | 稳妥耐看 / 有识别度（推荐）/ 大胆探索，每条含色彩卡、四载体版式、视觉锚点、风格 DNA、草图、适用与风险 | Safe / distinctive (recommended) / bold, each with color card, four-carrier layout, anchor, style DNA, sketch, fit and risk |
-| 3D 空间 3D space | 核心功能。每个方向画在真实盒型上：直立盒（可展开成刀模）、天地盖礼盒（可开盖看内部）、圆罐（标签环绕、可开盖），按卖家填写的毫米尺寸。720° 翻转、双指/滚轮缩放、惯性旋转、自动旋转、五个视角、细节镜头（附方案板说明）、四种工艺（哑光/亮面/纸感/烫金）、四种背景、主图与搜索缩略图测试、一键复制渲染简报。参考了得物 App 的 3D 商品展示 | Core feature. Each direction on a real structure: tuck carton (unfolds to its net), lid-and-base gift box (opens to show inside), round tin (wrap-around label, lid lifts), at the seller's size in mm. 720° turning, pinch/scroll zoom, inertia, turntable, five views, detail shots (with the board's notes), four finishes (matte/gloss/paper/foil), four backdrops, a main-image and search-thumbnail test, and a copyable render brief. Inspired by Dewu's 3D product view |
+| 3D 空间 3D space | 核心功能，three.js 物理渲染，材质与灯光按商品摄影标准。每个方向画在真实盒型上：直立盒（可展开成刀模）、天地盖礼盒（可开盖看内部）、圆罐（标签环绕、可开盖），按卖家填写的毫米尺寸。720° 翻转、双指/滚轮缩放、惯性旋转、自动旋转、五个视角、细节镜头（附方案板说明）、四种工艺（哑光/亮面/纸感/烫金）、四种背景、主图与搜索缩略图测试、一键复制渲染简报。参考了得物 App 的 3D 商品展示与 Pacdora 的包装 3D 预览；可导出高清 PNG | Core feature, physically based three.js rendering lit like product photography. Each direction on a real structure: tuck carton (unfolds to its net), lid-and-base gift box (opens to show inside), round tin (wrap-around label, lid lifts), at the seller's size in mm. 720° turning, pinch/scroll zoom, inertia, turntable, five views, detail shots (with the board's notes), four finishes (matte/gloss/paper/foil), four backdrops, a main-image and search-thumbnail test, and a copyable render brief. Inspired by Dewu's 3D product view and Pacdora's packaging previews; exports a high-resolution PNG |
 | 方案板 Board | 可拖动旋转的立体包装盒（三个方向可同步旋转对比）、色彩面积条、正面版式图、内包装与说明书小样；中英双语，可切换 | Rotatable 3D boxes (synced for comparison), color area bars, front-layout drawings, inner pack and manual; bilingual, switchable |
 | 只改一个维度 Single-dimension revision | 配色、版式、字体、图像或锚点，其余保持不变（由代码保证） | Color, layout, type, imagery or anchor; everything else is kept, enforced in code |
 | 包装文案与核查 Copy and claim check | 只依据卖家提供的事实撰写；标出"医用级""降三高"等风险措辞并给出替代说法 | Written only from the seller's facts; flags risky claims and suggests safer wording |
@@ -129,7 +129,9 @@ tests/              测试 Tests
 ## 3D 空间 · The 3D space
 
 - 地址 Routes：`/space/demo`（公开示例 public sample）、`/space/<产品 id>`（登录后 signed in，改动自动保存 changes save）、`/s/<分享码>/space`（设计师只读 designer, read-only）。
-- 纯 CSS 3D，无 WebGL、无额外依赖；每个面按相机角度实时打光（`src/components/pack/light.ts`）。 Pure CSS 3D, no WebGL and no extra dependencies; each face is lit from the camera angle.
+- 使用 three.js 物理渲染（`src/components/three/`）：摄影棚柔光箱与轮廓灯组成的环境光照（反射真实）、Khronos PBR Neutral 色调映射（印刷色准确）、0.45 mm 卡纸厚度与纸芯毛边、纸纤维微表面、覆膜清漆反光、按烫金掩膜生成的金属烫金、马口铁卷边与罐盖、柔和接触阴影。 Rendered with three.js PBR: a studio of softboxes and strip lights for real reflections, Khronos PBR Neutral tone mapping for true print colors, 0.45 mm board thickness with raw edges, paper-fibre micro-surface, laminate clearcoat, real metallic foil from a stamped mask, tinplate beads and lid, soft contact shadows.
+- 印刷图稿按每毫米最高 16 像素在浏览器中绘制（`art.ts`），可导出 2400 像素宽的 PNG。 Print artwork is drawn in the browser at up to 16 px/mm, and a 2400 px-wide PNG can be exported.
+- 浏览器不支持 WebGL 时，自动退回 CSS 3D 版本（`PackageCSS.tsx`）。 Without WebGL it falls back to the CSS 3D version.
 - 盒型与尺寸按产品保存，方案板、3D 空间和分享链接显示一致。 Structure and size are saved per product, so the board, the 3D space and share links match.
 - 渲染简报按 skill-home 中 `ecommerce-3d-render-assistant` 的棚拍规则生成。 The render brief follows the studio rules of the `ecommerce-3d-render-assistant` skill from skill-home.
 
@@ -139,4 +141,4 @@ tests/              测试 Tests
 - 正面草图使用等宽字符绘制，中文字符宽度不一，对齐只是示意。 The ASCII front sketch is approximate with Chinese characters.
 - 完整概念效果图（第二阶段）尚未包含。 Full concept mockups (Phase 2) are not included yet.
 - 展开的刀模只是结构示意，不能用于生产。 The unfolded net is a structural sketch, not a production dieline.
-- 3D 空间需要较新的浏览器（Chrome/Edge 111+、Safari 16.4+、Firefox 128+）。 The 3D space needs a recent browser.
+- 3D 空间需要支持 WebGL 2 的浏览器（近五年的主流浏览器均可）；低端手机上首次加载需 1–2 秒。 The 3D space needs WebGL 2 (any mainstream browser of the last five years); first load takes 1–2 s on low-end phones.

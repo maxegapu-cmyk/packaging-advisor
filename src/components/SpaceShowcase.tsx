@@ -81,7 +81,7 @@ export function SpaceShowcase({ d, brand, lang, href }: { d: Direction; brand: s
             take();
             const next = !open;
             setOpen(next);
-            if (form === "carton") orbit.tween(next ? { x: 0, y: 0 } : REST_ANGLE, next ? 1300 : 2200, next ? 0.6 : 1);
+            if (form === "carton") orbit.tween(next ? { x: 0, y: 0 } : REST_ANGLE, next ? 1300 : 2200, 1);
             else orbit.tween(next ? { x: -40, y: -24 } : REST_ANGLE, 1000, next ? 0.92 : 1);
           }}
         >

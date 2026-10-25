@@ -785,3 +785,12 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--i
 @media (max-width: 680px) {
   .showcase-stage .pk-rig { scale: 0.7; }
 }
+
+/* three.js package view */
+.gl-wrap { position: absolute; inset: 0; }
+.gl-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 0.6s ease; }
+.gl-wrap.is-ready .gl-canvas { opacity: 1; }
+.gl-loader { position: absolute; left: 50%; top: 50%; width: 36px; height: 36px; margin: -18px 0 0 -18px; border-radius: 50%; border: 2px solid rgb(0 0 0 / 0.1); border-top-color: var(--magenta); animation: gl-spin 0.9s linear infinite; }
+@keyframes gl-spin { to { transform: rotate(360deg); } }
+.lt-main canvas, .lt-img canvas { display: block; width: 100%; height: 100%; }
+.st-dock-btn:disabled { opacity: 0.5; cursor: progress; }

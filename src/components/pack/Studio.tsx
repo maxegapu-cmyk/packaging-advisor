@@ -14,14 +14,14 @@ import {
   FORM_PRESET,
   FORMS,
   formatSize,
-  toPx,
   type Form,
   type PackSpec,
 } from "@/lib/pack";
 import { renderBrief } from "@/lib/renderBrief";
 import { paletteVars } from "../BoxFaces";
 import { CopyButton } from "../CopyButton";
-import { netSize, Package3D } from "./Package3D";
+import { Package3D } from "./Package3D";
+import type { PackScene } from "../three/engine";
 import { Orbit, REST_ANGLE, reducedMotion, VIEWS, type Angle } from "./orbit";
 import { Stage3D } from "./Stage3D";
 import { FormGlyph } from "./FormGlyph";
@@ -58,6 +58,8 @@ const S = {
   notSaved: { zh: "示例：改动不会保存", en: "Sample: changes aren't saved" },
   adjust: { zh: "调整", en: "Adjust" },
   close: { zh: "关闭", en: "Close" },
+  export: { zh: "导出图片", en: "Export image" },
+  exporting: { zh: "正在导出…", en: "Exporting…" },
   recommended: { zh: "推荐", en: "Recommended" },
   mm: { zh: "毫米", en: "mm" },
   disclaimer: { zh: "立体示意用于比较方向，不是印刷效果；颜色以打样为准。", en: "A 3D sketch for comparing directions, not a print proof; confirm colors with a proof." },
@@ -82,26 +84,26 @@ function detailsFor(form: Form): Detail[] {
   const finish = (d: Direction) => d.styleDna.finish;
   if (form === "gift")
     return [
-      { id: "lid", label: { zh: "盖面主视觉", en: "Lid artwork" }, angle: { x: -64, y: -8 }, zoom: 1.35, text: front },
-      { id: "band", label: { zh: "侧边与字体", en: "Band and type" }, angle: { x: -10, y: -22 }, zoom: 1.7, text: type },
-      { id: "inside", label: { zh: "开盒内部", en: "Inside" }, angle: { x: -46, y: -20 }, zoom: 0.95, open: true, text: inner },
-      { id: "anchor", label: { zh: "视觉锚点", en: "Visual anchor" }, angle: { x: -30, y: 28 }, zoom: 1.2, text: anchor },
-      { id: "finish", label: { zh: "工艺", en: "Finish" }, angle: { x: -38, y: -48 }, zoom: 1.5, text: finish },
+      { id: "lid", label: { zh: "盖面主视觉", en: "Lid artwork" }, angle: { x: -64, y: -8 }, zoom: 1.16, text: front },
+      { id: "band", label: { zh: "侧边与字体", en: "Band and type" }, angle: { x: -10, y: -22 }, zoom: 1.31, text: type },
+      { id: "inside", label: { zh: "开盒内部", en: "Inside" }, angle: { x: -46, y: -20 }, zoom: 0.98, open: true, text: inner },
+      { id: "anchor", label: { zh: "视觉锚点", en: "Visual anchor" }, angle: { x: -30, y: 28 }, zoom: 1.09, text: anchor },
+      { id: "finish", label: { zh: "工艺", en: "Finish" }, angle: { x: -38, y: -48 }, zoom: 1.23, text: finish },
     ];
   if (form === "tin")
     return [
-      { id: "label", label: { zh: "罐身标签", en: "Label" }, angle: { x: -6, y: -22 }, zoom: 1.45, text: front },
-      { id: "side", label: { zh: "侧面信息", en: "Side panel" }, angle: { x: -6, y: -150 }, zoom: 1.45, text: back },
-      { id: "lid", label: { zh: "罐盖", en: "Lid" }, angle: { x: -68, y: -22 }, zoom: 1.4, text: anchor },
-      { id: "seal", label: { zh: "开罐内封", en: "Inner seal" }, angle: { x: -44, y: -22 }, zoom: 0.9, open: true, text: inner },
-      { id: "finish", label: { zh: "工艺", en: "Finish" }, angle: { x: -14, y: 30 }, zoom: 1.6, text: finish },
+      { id: "label", label: { zh: "罐身标签", en: "Label" }, angle: { x: -6, y: -22 }, zoom: 1.2, text: front },
+      { id: "side", label: { zh: "侧面信息", en: "Side panel" }, angle: { x: -6, y: -150 }, zoom: 1.2, text: back },
+      { id: "lid", label: { zh: "罐盖", en: "Lid" }, angle: { x: -68, y: -22 }, zoom: 1.18, text: anchor },
+      { id: "seal", label: { zh: "开罐内封", en: "Inner seal" }, angle: { x: -44, y: -22 }, zoom: 0.95, open: true, text: inner },
+      { id: "finish", label: { zh: "工艺", en: "Finish" }, angle: { x: -14, y: 30 }, zoom: 1.27, text: finish },
     ];
   return [
-    { id: "front", label: { zh: "正面主视觉", en: "Front artwork" }, angle: { x: -4, y: -8 }, zoom: 1.4, text: front },
-    { id: "spine", label: { zh: "品牌侧面", en: "Brand side" }, angle: { x: -6, y: 72 }, zoom: 1.45, text: anchor },
-    { id: "back", label: { zh: "背面信息", en: "Back panel" }, angle: { x: -6, y: 180 }, zoom: 1.35, text: back },
-    { id: "top", label: { zh: "顶部开口", en: "Top flap" }, angle: { x: -70, y: -24 }, zoom: 1.4, text: type },
-    { id: "finish", label: { zh: "工艺", en: "Finish" }, angle: { x: -20, y: -52 }, zoom: 1.7, text: finish },
+    { id: "front", label: { zh: "正面主视觉", en: "Front artwork" }, angle: { x: -4, y: -8 }, zoom: 1.18, text: front },
+    { id: "spine", label: { zh: "品牌侧面", en: "Brand side" }, angle: { x: -6, y: 72 }, zoom: 1.2, text: anchor },
+    { id: "back", label: { zh: "背面信息", en: "Back panel" }, angle: { x: -6, y: 180 }, zoom: 1.16, text: back },
+    { id: "top", label: { zh: "顶部开口", en: "Top flap" }, angle: { x: -70, y: -24 }, zoom: 1.18, text: type },
+    { id: "finish", label: { zh: "工艺", en: "Finish" }, angle: { x: -20, y: -52 }, zoom: 1.31, text: finish },
   ];
 }
 
@@ -116,6 +118,12 @@ function L({ p, lang, className }: { p: Pair; lang: Lang; className?: string }) 
       <span className="bi-en">{p.en}</span>
     </span>
   );
+}
+/** Mixes two hex colors (t = share of b). */
+function mix(a: string, b: string, t: number): string {
+  const p = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const [x, y] = [p(a), p(b)];
+  return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(",")})`;
 }
 const one = (p: Pair, lang: Lang) => (lang === "en" ? p.en : p.zh);
 const both = (p: Pair, lang: Lang) => (lang === "bi" ? `${p.zh} ${p.en}` : one(p, lang));
@@ -146,6 +154,12 @@ function Icon({ name }: { name: string }) {
     ),
     sliders: <path d="M4 7h10M18 7h2M4 17h4M12 17h8M14 5v4M8 15v4" />,
     x: <path d="M6 6l12 12M18 6L6 18" />,
+    download: (
+      <>
+        <path d="M12 4v11M7 10l5 5 5-5" />
+        <path d="M5 19h14" />
+      </>
+    ),
   };
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -212,7 +226,6 @@ export function Studio({
   );
 
   const [orbit] = useState(() => new Orbit({ x: 0, y: 0 }, 0.7, { free: true }));
-  const [thumbOrbit] = useState(() => new Orbit());
   const [open, setOpen] = useState(spec.form === "carton");
   const [spinning, setSpinning] = useState(false);
   const [backdrop, setBackdrop] = useState("studio");
@@ -232,16 +245,67 @@ export function Studio({
     return () => ro.disconnect();
   }, []);
   const narrow = stage.w < 640;
-  const fit = Math.max(170, Math.min(stage.w * (narrow ? 0.66 : 0.48), stage.h * (narrow ? 0.5 : 0.52), 440));
-  const px = toPx(spec, fit);
-  const net = netSize(px);
-  // Leave room for the listing panel at the right when the net is laid flat.
-  const netZoom = Math.min(1.1, ((narrow ? stage.w : stage.w - 300) * 0.9) / net.w, (stage.h * 0.72) / net.h);
+  const fit = Math.max(170, Math.min(stage.w * (narrow ? 0.6 : 0.44), stage.h * (narrow ? 0.46 : 0.47), 420));
 
   useEffect(() => orbit.onSpin(setSpinning), [orbit]);
 
-  // Thumbnail follows the main camera's turn but stays at a normal tilt and size.
-  useEffect(() => orbit.subscribe((o) => thumbOrbit.set({ x: Math.max(-40, Math.min(20, o.angle.x)), y: o.angle.y }, 1)), [orbit, thumbOrbit]);
+  // Listing test: copy the rendered view into a white main image and a search-size thumbnail.
+  const engine = useRef<PackScene | null>(null);
+  const ltMain = useRef<HTMLCanvasElement>(null);
+  const ltSmall = useRef<HTMLCanvasElement>(null);
+  const lastSnap = useRef(0);
+  const trailing = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const snapshot = useCallback((src: HTMLCanvasElement) => {
+    const now = performance.now();
+    clearTimeout(trailing.current);
+    if (now - lastSnap.current < 120) {
+      // the drawing buffer is gone after this frame; ask for one more render to copy from
+      trailing.current = setTimeout(() => engine.current?.refresh(), 140);
+      return;
+    }
+    lastSnap.current = now;
+    const side = Math.min(src.width, src.height) * 0.86;
+    const sx = (src.width - side) / 2;
+    const sy = (src.height - side) / 2;
+    for (const c of [ltMain.current, ltSmall.current]) {
+      const ctx = c?.getContext("2d");
+      if (!c || !ctx) continue;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(src, sx, sy, side, side, 0, 0, c.width, c.height);
+    }
+  }, []);
+  const [exporting, setExporting] = useState(false);
+  const exportImage = async () => {
+    const e = engine.current;
+    if (!e || exporting) return;
+    setExporting(true);
+    try {
+      const paint = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+        if (backdrop === "white") {
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, w, h);
+          return;
+        }
+        const g = ctx.createRadialGradient(w * 0.42, h * 0.34, 0, w * 0.42, h * 0.34, Math.max(w, h) * 0.95);
+        const stops: [number, string][] =
+          backdrop === "dark" ? [[0, "#3b3b3b"], [0.58, "#171717"], [1, "#0a0a0a"]] : backdrop === "brand" ? [[0, mix(ground, "#ffffff", 0.45)], [0.52, ground], [1, mix(ground, "#000000", 0.28)]] : [[0, "#ffffff"], [0.42, "#f2f2f0"], [1, "#d9d9d5"]];
+        for (const [o, c] of stops) g.addColorStop(o, c);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, w, h);
+      };
+      const blob = await e.exportImage(Math.max(2, Math.min(3, 2400 / Math.max(stage.w, 1))), paint);
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${one(board.meta.product, lang)}-${d.id}.png`.replace(/[\\/:*?"<>|\s]+/g, "_");
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // Entrance: a carton assembles from its flat net; other forms swing into view.
   const entered = useRef(false);
@@ -254,7 +318,7 @@ export function Studio({
       return;
     }
     if (spec.form === "carton") {
-      orbit.set({ x: 0, y: 0 }, netZoom);
+      orbit.set({ x: 0, y: 0 }, 1);
       const t = setTimeout(() => {
         setOpen(false);
         orbit.tween(REST_ANGLE, 2300, 1);
@@ -279,7 +343,7 @@ export function Studio({
     setDetail(null);
     const next = !open;
     setOpen(next);
-    if (spec.form === "carton") orbit.tween(next ? { x: 0, y: 0 } : REST_ANGLE, next ? 1400 : 2300, next ? netZoom : 1);
+    if (spec.form === "carton") orbit.tween(next ? { x: 0, y: 0 } : REST_ANGLE, next ? 1400 : 2300, 1);
     else orbit.tween(next ? { x: -42, y: -24 } : REST_ANGLE, 1100, next ? 0.95 : 1);
   };
 
@@ -336,7 +400,18 @@ export function Studio({
 
       <div className="st-stage" ref={stageRef}>
         <Stage3D orbit={orbit} label={`${one(S.space, lang)}: ${one(d.name, lang)}`} touch="none" wheelZoom className="st-canvas" onInteract={interact}>
-          <Package3D d={d} brand={brand} spec={spec} fit={fit} open={open} orbit={orbit} />
+          <Package3D
+            d={d}
+            brand={brand}
+            spec={spec}
+            fit={fit}
+            open={open}
+            orbit={orbit}
+            quality="high"
+            loader
+            onEngine={(e) => (engine.current = e)}
+            afterRender={snapshot}
+          />
         </Stage3D>
 
         <div className={`st-hint${hint ? " is-on" : ""}`} aria-hidden={!hint}>
@@ -410,6 +485,11 @@ export function Studio({
           >
             <Icon name="reset" />
           </button>
+          <span className="st-sep" aria-hidden="true" />
+          <button type="button" className="st-dock-btn" onClick={exportImage} disabled={exporting} title={both(S.export, lang)}>
+            <Icon name="download" />
+            <span className="st-dock-text">{one(exporting ? S.exporting : S.export, lang)}</span>
+          </button>
           <button type="button" className="st-dock-btn st-adjust" onClick={() => setPanel(!panel)} aria-expanded={panel}>
             <Icon name="sliders" />
             <span className="st-dock-text">{one(S.adjust, lang)}</span>
@@ -426,16 +506,12 @@ export function Studio({
             </div>
             <div className="st-listing-body">
               <div className="lt-main">
-                <Stage3D orbit={thumbOrbit} label={one(S.listing, lang)} className="lt-stage">
-                  <Package3D d={d} brand={brand} spec={spec} fit={92} orbit={thumbOrbit} />
-                </Stage3D>
+                <canvas ref={ltMain} width={232} height={232} aria-label={both(S.listing, lang)} />
               </div>
               <div className="lt-grid" aria-hidden="true">
                 <ListingTile />
                 <ListingTile mine>
-                  <Stage3D orbit={thumbOrbit} label="" className="lt-stage lt-stage-sm">
-                    <Package3D d={d} brand={brand} spec={spec} fit={46} orbit={thumbOrbit} />
-                  </Stage3D>
+                  <canvas ref={ltSmall} width={112} height={112} />
                 </ListingTile>
                 <ListingTile />
                 <ListingTile />

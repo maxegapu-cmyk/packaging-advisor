@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { Direction } from "@/lib/board/schema";
 import type { Lang } from "@/lib/i18n";
-import { DEFAULT_PACK, toPx } from "@/lib/pack";
-import { netSize, Package3D } from "./pack/Package3D";
+import { DEFAULT_PACK } from "@/lib/pack";
+import { Package3D } from "./pack/Package3D";
 import { Orbit, REST_ANGLE, reducedMotion } from "./pack/orbit";
 import { Stage3D } from "./pack/Stage3D";
 
@@ -58,15 +58,13 @@ function ColorStrip({ d }: { d: Direction }) {
 export function HeroSection({ directions, brand, lang, children }: { directions: Direction[]; brand: string; lang: Lang; children: ReactNode }) {
   const [i, setI] = useState(1);
   const [auto, setAuto] = useState(true);
-  const px = toPx(HERO_PACK, HERO_FIT);
-  const net = netSize(px);
-  const netZoom = Math.min(0.9, 500 / net.w, 480 / net.h);
-  const [orbit] = useState(() => new Orbit({ x: 0, y: 0 }, netZoom));
+  const [orbit] = useState(() => new Orbit({ x: 0, y: 0 }, 1));
   const [flat, setFlat] = useState(true);
   const started = useRef(false);
 
-  // The flat dieline folds itself into a box while the camera swings round.
-  useEffect(() => {
+  // The flat dieline folds itself into a box while the camera swings round,
+  // starting once the renderer has drawn its first frame.
+  const fold = () => {
     if (started.current) return;
     started.current = true;
     if (reducedMotion()) {
@@ -74,12 +72,11 @@ export function HeroSection({ directions, brand, lang, children }: { directions:
       orbit.set(REST_ANGLE, 1);
       return;
     }
-    const t = setTimeout(() => {
+    setTimeout(() => {
       setFlat(false);
       orbit.tween(REST_ANGLE, FOLD_MS, 1);
-    }, 500);
-    return () => clearTimeout(t);
-  }, [orbit]);
+    }, 350);
+  };
 
   useEffect(() => {
     if (!auto) return;
@@ -114,7 +111,7 @@ export function HeroSection({ directions, brand, lang, children }: { directions:
         <div className="hero-visual">
           <DielineDrawing />
           <Stage3D orbit={orbit} label={lang === "en" ? `Sample box, ${d.name.en}. Drag to turn.` : `示例包装盒：${d.name.zh}。拖动旋转。`} className="hero-stage" onInteract={() => setAuto(false)}>
-            <Package3D d={d} brand={brand} spec={HERO_PACK} fit={HERO_FIT} open={flat} orbit={orbit} />
+            <Package3D d={d} brand={brand} spec={HERO_PACK} fit={HERO_FIT} open={flat} orbit={orbit} onReady={fold} />
           </Stage3D>
           <div className="hero-dirs" role="group" aria-label="示例方向 Sample directions">
             {directions.map((x, j) => (
