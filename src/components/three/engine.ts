@@ -15,7 +15,8 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import type { Direction } from "@/lib/board/schema";
 import type { PackSpec } from "@/lib/pack";
-import { drawFace, drawSeal, fiberTexture, foilRoughMetal, rolesOf, type ArtInput, type FaceKind } from "./art";
+import { drawFace, drawSeal, fiberNormal, fiberTexture, foilRoughMetal, rolesOf, type ArtInput, type FaceKind } from "./art";
+import { backdropLook, studioEquirect, sweepGeometry, type Backdrop } from "./studio";
 
 const U = 0.01; // scene units per millimetre (1 unit = 100 mm)
 const RAD = Math.PI / 180;
@@ -34,35 +35,11 @@ export function webglAvailable(): boolean {
 
 /* ================================================================ Studio lighting */
 
-/** A photo studio as an environment: dim room, big key softbox, strip rims, top light. */
-function studioEnvironment(renderer: THREE.WebGLRenderer): THREE.Texture {
-  const env = new THREE.Scene();
-  const room = new THREE.Mesh(new THREE.BoxGeometry(20, 12, 20), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.3, 0.3, 0.31), side: THREE.BackSide }));
-  room.position.y = 4;
-  env.add(room);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.42, 0.42, 0.41) }));
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -1.99;
-  env.add(floor);
-  const panel = (w: number, h: number, intensity: number, pos: [number, number, number], warm = 0) => {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(intensity, intensity * (1 - warm * 0.03), intensity * (1 - warm * 0.08)), side: THREE.DoubleSide }));
-    m.position.set(...pos);
-    m.lookAt(0, 0.6, 0);
-    env.add(m);
-  };
-  panel(5, 3.6, 7, [-5.5, 5, 4.5], 1); // key softbox, upper left front
-  panel(1.0, 7, 9, [6.5, 2.5, -3.5]); // right rim strip
-  panel(1.0, 7, 6, [-6.5, 2.5, -4]); // left rim strip
-  panel(8, 4, 2.2, [0, 9.5, 0]); // overhead
-  panel(7, 3, 2.0, [2, 1.8, 8]); // soft front fill
+/** The shared studio (see studio.ts), prefiltered for the live renderer. */
+function studioEnvironment(renderer: THREE.WebGLRenderer, equirect: THREE.DataTexture): THREE.Texture {
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const rt = pmrem.fromScene(env, 0.035);
+  const rt = pmrem.fromEquirectangular(equirect);
   pmrem.dispose();
-  env.traverse((o) => {
-    const m = o as THREE.Mesh;
-    m.geometry?.dispose();
-    (m.material as THREE.Material | undefined)?.dispose?.();
-  });
   return rt.texture;
 }
 
@@ -192,20 +169,22 @@ type Kit = {
 };
 
 const FINISH = {
-  matte: { rough: 0.74, bump: 0.6, clearcoat: 0, ccRough: 0.1, sheen: 0.15 },
-  gloss: { rough: 0.42, bump: 0.2, clearcoat: 1, ccRough: 0.04, sheen: 0 },
-  paper: { rough: 0.9, bump: 2.4, clearcoat: 0, ccRough: 0.1, sheen: 0.35 },
-  foil: { rough: 0.72, bump: 0.6, clearcoat: 0, ccRough: 0.1, sheen: 0.12 },
+  matte: { rough: 0.74, bump: 0.22, clearcoat: 0, ccRough: 0.1, sheen: 0.15 },
+  gloss: { rough: 0.42, bump: 0.08, clearcoat: 1, ccRough: 0.04, sheen: 0 },
+  paper: { rough: 0.9, bump: 0.7, clearcoat: 0, ccRough: 0.1, sheen: 0.35 },
+  foil: { rough: 0.72, bump: 0.22, clearcoat: 0, ccRough: 0.1, sheen: 0.12 },
 } as const;
 
 function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: number, metalPrint: boolean): Kit {
   const disposables: { dispose: () => void }[] = [];
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  const fiber = new THREE.CanvasTexture(fiberTexture());
+  const fiber = new THREE.CanvasTexture(fiberNormal());
   fiber.wrapS = fiber.wrapT = THREE.RepeatWrapping;
+  fiber.colorSpace = THREE.NoColorSpace;
   fiber.anisotropy = aniso;
   disposables.push(fiber);
   const f = FINISH[a.finish];
+  const nScale = (k: number) => new THREE.Vector2(k, k);
   const roles = rolesOf(a.d);
 
   const canvasTex = (c: HTMLCanvasElement, srgb: boolean) => {
@@ -229,8 +208,8 @@ function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: number, met
       map: canvasTex(art.color, true),
       roughness: metalPrint ? 0.34 : f.rough,
       metalness: metalPrint ? 0.18 : 0,
-      bumpMap: metalPrint ? null : fib,
-      bumpScale: f.bump,
+      normalMap: metalPrint ? null : fib,
+      normalScale: nScale(f.bump),
       clearcoat: metalPrint ? Math.max(0.6, f.clearcoat) : f.clearcoat,
       clearcoatRoughness: metalPrint ? 0.08 : f.ccRough,
       sheen: metalPrint ? 0 : f.sheen,
@@ -249,8 +228,12 @@ function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: number, met
   };
 
   const edge = new THREE.MeshStandardMaterial({ color: "#ECE7DC", roughness: 0.95, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
-  const inside = new THREE.MeshStandardMaterial({ color: "#D9D4C8", roughness: 0.92, bumpMap: fiber, bumpScale: 1.6 });
-  const lining = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(roles.ground).lerp(new THREE.Color("#ffffff"), 0.15), roughness: 0.85, bumpMap: fiber, bumpScale: 1, sheen: 0.3 });
+  const insideFiber = fiber.clone();
+  insideFiber.repeat.set(4, 4);
+  insideFiber.needsUpdate = true;
+  disposables.push(insideFiber);
+  const inside = new THREE.MeshStandardMaterial({ color: "#D9D4C8", roughness: 0.92, normalMap: insideFiber, normalScale: nScale(0.6) });
+  const lining = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(roles.ground).lerp(new THREE.Color("#ffffff"), 0.15), roughness: 0.85, normalMap: insideFiber, normalScale: nScale(0.35), sheen: 0.3 });
   const velvet = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(roles.ink).lerp(new THREE.Color(roles.key), 0.35), roughness: 1, sheen: 1, sheenRoughness: 0.55, sheenColor: new THREE.Color(roles.key).lerp(new THREE.Color("#ffffff"), 0.4) });
   const bareMetal = new THREE.MeshPhysicalMaterial({ color: "#D7D9D8", metalness: 1, roughness: 0.22 });
   disposables.push(edge, inside, lining, velvet, bareMetal);
@@ -283,10 +266,27 @@ function step(t: Tween, now: number): boolean {
 
 /* ================================================================ Builders */
 
+/** A numbered part in the anatomy view: where its pin sits and what the model says about it. */
+export type Pin = { n: number; label: Pair; detail: Pair; obj: THREE.Object3D; at: THREE.Vector3; normal?: THREE.Vector3; /** inside the package: listed, not pinned */ hidden?: boolean };
+export type PinOnScreen = { n: number; x: number; y: number; visible: boolean };
+type Pair = { zh: string; en: string };
+
+/** Overshooting spring ease, staggered per part: the way the anatomy skill releases assemblies. */
+function springAt(x: number, k: number, stagger = 0.13): number {
+  const t = Math.min(1, Math.max(0, (x - k * stagger) / 0.62));
+  const c1 = 1.25;
+  const c3 = c1 + 1;
+  return t === 0 ? 0 : 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+}
+const mmOf = (units: number) => Math.round(units / U);
+
 type Built = {
   root: THREE.Group;
-  /** Bounding radius and target height for camera framing, given open progress 0..1. */
-  frame: (p: number) => { r: number; y: number };
+  /** Bounding radius and target height for camera framing, given open progress and anatomy 0..1. */
+  frame: (p: number, x: number) => { r: number; y: number };
+  /** Anatomy: pull the package apart (0 = assembled, 1 = apart). Called after `apply`. */
+  explode: (x: number) => void;
+  pins: Pin[];
   /** Apply open progress (carton: unfold; gift / tin: lid off). Returns shadow opacity factor. */
   apply: (p: number) => number;
   /** Carton uses staged folding; others a single value. */
@@ -295,9 +295,77 @@ type Built = {
   lines?: THREE.LineBasicMaterial;
 };
 
+/**
+ * A board panel as it really is: very slightly bowed outward (about 0.3–0.6 mm over a big
+ * panel) and with its edges softened, by tilting the shading normals over the last
+ * millimetre, so folds catch a thin highlight instead of reading as CG-sharp corners.
+ */
+function boardPanel(pw: number, ph: number, t: number): THREE.BufferGeometry {
+  const sx = Math.max(4, Math.min(20, Math.round(pw / (8 * U))));
+  const sy = Math.max(4, Math.min(20, Math.round(ph / (8 * U))));
+  const g = new THREE.BoxGeometry(pw, ph, t, sx, sy, 1);
+  const pos = g.attributes.position as THREE.BufferAttribute;
+  const nor = g.attributes.normal as THREE.BufferAttribute;
+  const e = Math.min(1.1 * U, pw * 0.08, ph * 0.08); // softened edge width
+  // Move the vertex row next to each edge to `e` from it, so the softened rim stays narrow.
+  const remap = (v: number, half: number, seg: number) => {
+    const a = Math.abs(v);
+    if (a >= half - 1e-7) return v;
+    const step = (2 * half) / seg;
+    return Math.sign(v) * ((a * (half - e)) / (half - step));
+  };
+  const bulge = Math.min(0.6 * U, Math.min(pw, ph) * 0.006);
+  for (let i = 0; i < pos.count; i++) {
+    let x = pos.getX(i);
+    let y = pos.getY(i);
+    x = remap(x, pw / 2, sx);
+    y = remap(y, ph / 2, sy);
+    const bx = 1 - Math.pow((2 * x) / pw, 2);
+    const by = 1 - Math.pow((2 * y) / ph, 2);
+    pos.setXYZ(i, x, y, pos.getZ(i) + bulge * Math.max(0, bx) * Math.max(0, by));
+    // outer face: tilt normals at the rim toward the edge
+    if (nor.getZ(i) > 0.9) {
+      const ex = Math.abs(x) >= pw / 2 - 1e-7 ? Math.sign(x) : 0;
+      const ey = Math.abs(y) >= ph / 2 - 1e-7 ? Math.sign(y) : 0;
+      const n = new THREE.Vector3(ex * 0.75, ey * 0.75, 1).normalize();
+      nor.setXYZ(i, n.x, n.y, n.z);
+    }
+  }
+  pos.needsUpdate = true;
+  nor.needsUpdate = true;
+  return g;
+}
+
+/**
+ * One single-material mesh per geometry group, under a group. The path tracer assigns
+ * materials per mesh, so multi-material meshes (a box with a printed face) are split here.
+ */
+function splitMesh(geo: THREE.BufferGeometry, mats: THREE.Material[]): THREE.Group {
+  const g = new THREE.Group();
+  if (!geo.index) {
+    const n = geo.getAttribute("position").count;
+    geo.setIndex(Array.from({ length: n }, (_, i) => i));
+  }
+  const index = geo.index!.array;
+  const groups = geo.groups.length ? geo.groups : [{ start: 0, count: index.length, materialIndex: 0 }];
+  const byMat = new Map<number, number[]>();
+  for (const gr of groups) {
+    const list = byMat.get(gr.materialIndex ?? 0) ?? [];
+    for (let i = gr.start; i < Math.min(index.length, gr.start + gr.count); i++) list.push(index[i]);
+    byMat.set(gr.materialIndex ?? 0, list);
+  }
+  for (const [mi, idx] of byMat) {
+    const sub = new THREE.BufferGeometry();
+    for (const name of Object.keys(geo.attributes)) sub.setAttribute(name, geo.getAttribute(name));
+    sub.setIndex(idx);
+    const m = new THREE.Mesh(sub, mats[mi] ?? mats[0]);
+    g.add(m);
+  }
+  return g;
+}
+
 function box(w: number, h: number, t: number, mats: THREE.Material[]) {
-  const g = new THREE.BoxGeometry(w, h, t);
-  return new THREE.Mesh(g, mats);
+  return splitMesh(new THREE.BoxGeometry(w, h, t), mats);
 }
 
 /** Tuck carton with hinged panels, staged fold (sides → back → flaps → top/bottom). */
@@ -313,19 +381,18 @@ function buildCarton(spec: PackSpec, k: Kit): Built {
   const I = k.inside;
   // BoxGeometry material order: +x, -x, +y, -y, +z (outer, printed), -z (inside)
   const panel = (pw: number, ph: number, outer: THREE.Material, anchor: "c" | "l" | "r" | "t" | "b") => {
-    const m = box(pw, ph, t, [E, E, E, E, outer, I]);
+    const geo = boardPanel(pw, ph, t);
     const ox = anchor === "l" ? pw / 2 : anchor === "r" ? -pw / 2 : 0;
     const oy = anchor === "b" ? ph / 2 : anchor === "t" ? -ph / 2 : 0;
-    m.geometry.translate(ox, oy, -t / 2);
-    m.castShadow = true;
-    return m;
+    geo.translate(ox, oy, -t / 2);
+    return splitMesh(geo, [E, E, E, E, outer, I]);
   };
   const flapMat = k.tex("flap", 60, 60);
   const shapeFlap = (shape: THREE.Shape) => {
     const geo = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false, curveSegments: 10 });
     geo.translate(0, 0, -t);
     // Extrude groups: 0 = caps, 1 = sides
-    return new THREE.Mesh(geo, [flapMat, E]);
+    return splitMesh(geo, [flapMat, E]);
   };
   const lineMat = new THREE.LineBasicMaterial({ color: 0xe4007f, transparent: true, opacity: 0, depthTest: true });
   const outline = (pw: number, ph: number, ox: number, oy: number) => {
@@ -445,15 +512,37 @@ function buildCarton(spec: PackSpec, k: Kit): Built {
     return Math.max(0, fs * 1.4 - 0.4);
   };
   const folded = 0.5 * Math.max(h, Math.hypot(w, d)) * 1.04;
+  // Anatomy: the top opens and its tuck and dust flaps stand up, so the closure reads.
+  const explode = (x: number) => {
+    if (x <= 0) return;
+    const [, , ffl, ftb] = stages.map((s) => s.v);
+    const top = springAt(x, 0);
+    const flap = springAt(x, 1);
+    topH.rotation.x = (-Math.PI / 2) * ftb * (1 - 0.62 * top);
+    tuckT.rotation.x = (-Math.PI / 2) * ffl * (1 - 0.8 * flap);
+    for (const fl of [dustL.top, dustR.top]) fl.rotation.x = (-Math.PI / 2) * ffl * (1 - 0.75 * springAt(x, 2));
+    for (const fl of [tuckT, dustL.top, dustR.top]) fl.visible = true;
+  };
+  const S = spec;
+  const pins: Pin[] = [
+    { n: 1, label: { zh: "正面", en: "Front panel" }, detail: { zh: `${S.w} × ${S.h} mm，350 g 白卡（约 0.45 mm）四色印刷`, en: `${S.w} × ${S.h} mm, 350 g white board (about 0.45 mm), four-colour print` }, obj: frontG, at: new THREE.Vector3(-w * 0.18, h * 0.12, 0.001), normal: new THREE.Vector3(0, 0, 1) },
+    { n: 2, label: { zh: "侧面", en: "Side panel" }, detail: { zh: `${S.d} × ${S.h} mm，压痕折成 90°`, en: `${S.d} × ${S.h} mm, creased and folded to 90°` }, obj: rightH, at: new THREE.Vector3(d / 2, -h * 0.2, 0.001), normal: new THREE.Vector3(0, 0, 1) },
+    { n: 3, label: { zh: "顶盖", en: "Top panel" }, detail: { zh: `${S.w} × ${S.d} mm，开合的盖`, en: `${S.w} × ${S.d} mm, the opening lid` }, obj: topH, at: new THREE.Vector3(-w * 0.25, d / 2, 0.001), normal: new THREE.Vector3(0, 0, 1) },
+    { n: 4, label: { zh: "插舌", en: "Tuck flap" }, detail: { zh: `深 ${mmOf(tuck)} mm，插进盒内把盖锁住`, en: `${mmOf(tuck)} mm deep, tucks inside to lock the lid` }, obj: tuckT, at: new THREE.Vector3(w * 0.2, tuck * 0.55, 0.001), normal: new THREE.Vector3(0, 0, 1) },
+    { n: 5, label: { zh: "防尘翼", en: "Dust flaps" }, detail: { zh: `高 ${mmOf(dust)} mm，挡住盖两侧的缝`, en: `${mmOf(dust)} mm high, close the gaps at the lid's sides` }, obj: dustR.top, at: new THREE.Vector3(0, dust * 0.5, 0.001), normal: new THREE.Vector3(0, 0, 1) },
+    { n: 6, label: { zh: "糊口", en: "Glue flap" }, detail: { zh: `宽 ${mmOf(g)} mm，在盒内与背面粘合`, en: `${mmOf(g)} mm wide, glued to the back inside the box` }, obj: glueH, at: new THREE.Vector3(-g / 2, 0, -0.001), hidden: true },
+  ];
   return {
     root,
     staged: true,
     stages,
     lines: lineMat,
     apply,
-    frame: () => {
+    explode,
+    pins,
+    frame: (_p, x) => {
       const fs = stages[0].v;
-      return { r: folded + (0.5 * Math.max(netW, netH) - folded) * (1 - fs), y: h / 2 };
+      return { r: (folded + (0.5 * Math.max(netW, netH) - folded) * (1 - fs)) * (1 + 0.18 * x), y: h / 2 + d * 0.25 * x };
     },
   };
 }
@@ -471,10 +560,7 @@ function buildGift(spec: PackSpec, k: Kit): Built {
   const bh = H - T;
   const L = k.lining;
   const rb = (w: number, h: number, d: number, mats: THREE.Material[]) => {
-    const g = new RoundedBoxGeometry(w, h, d, 2, Math.min(w, h, d) * 0.45);
-    const m = new THREE.Mesh(g, mats);
-    m.castShadow = true;
-    return m;
+    return splitMesh(new RoundedBoxGeometry(w, h, d, 2, Math.min(w, h, d) * 0.45), mats);
   };
   // material order: +x, -x, +y, -y, +z, -z
   const root = new THREE.Group();
@@ -511,7 +597,6 @@ function buildGift(spec: PackSpec, k: Kit): Built {
   manual.rotation.x = -Math.PI / 2;
   manual.rotation.z = -0.09;
   manual.position.set(bw * 0.24, T + trayH + 0.6 * U, 0.01);
-  for (const c of [inner, manual]) c.castShadow = true;
   base.add(inner, manual);
 
   // lid (origin at its bottom centre)
@@ -542,10 +627,28 @@ function buildGift(spec: PackSpec, k: Kit): Built {
     return 1;
   };
   const closedR = 0.5 * Math.hypot(W, D) * 0.98;
+  // Anatomy: lid, tray and the two cards lift off the base one after another.
+  const rest = { tray: tray.position.y, inner: inner.position.y, manual: manual.position.y };
+  const explode = (x: number) => {
+    lid.position.y += H * 1.55 * springAt(x, 0);
+    tray.position.y = rest.tray + H * 0.55 * springAt(x, 1);
+    inner.position.y = rest.inner + H * 0.55 * springAt(x, 1) + H * 0.42 * springAt(x, 2);
+    manual.position.y = rest.manual + H * 0.55 * springAt(x, 1) + H * 0.42 * springAt(x, 3);
+  };
+  const S = spec;
+  const pins: Pin[] = [
+    { n: 1, label: { zh: "天盖", en: "Lid" }, detail: { zh: `${S.w} × ${S.d} × ${mmOf(lidH)} mm，1.5 mm 灰板外裱印刷纸`, en: `${S.w} × ${S.d} × ${mmOf(lidH)} mm, 1.5 mm chipboard wrapped in printed paper` }, obj: lid, at: new THREE.Vector3(W * 0.3, lidH, D * 0.2), normal: new THREE.Vector3(0, 1, 0) },
+    { n: 2, label: { zh: "地盒", en: "Base" }, detail: { zh: `${mmOf(bw)} × ${mmOf(bd)} × ${mmOf(bh)} mm，比盖每边小 ${mmOf(T + gap)} mm，盖能顺滑套上`, en: `${mmOf(bw)} × ${mmOf(bd)} × ${mmOf(bh)} mm, ${mmOf(T + gap)} mm smaller per side so the lid slides on` }, obj: base, at: new THREE.Vector3(-bw * 0.25, bh * 0.45, bd / 2), normal: new THREE.Vector3(0, 0, 1) },
+    { n: 3, label: { zh: "内托", en: "Tray" }, detail: { zh: `高 ${mmOf(trayH)} mm，植绒，托住内容物`, en: `${mmOf(trayH)} mm high, flocked, holds the contents` }, obj: tray, at: new THREE.Vector3(bw * 0.38, trayH / 2, bd * 0.3), normal: new THREE.Vector3(0, 1, 0) },
+    { n: 4, label: { zh: "内包装", en: "Inner pack" }, detail: { zh: `${mmOf(iw)} × ${mmOf(id)} mm，印品名与规格`, en: `${mmOf(iw)} × ${mmOf(id)} mm, printed with name and size` }, obj: inner, at: new THREE.Vector3(0, 0, 1.6 * U), normal: new THREE.Vector3(0, 0, 1) },
+    { n: 5, label: { zh: "说明书", en: "Manual" }, detail: { zh: `${mmOf(mw)} × ${mmOf(md)} mm，编号步骤`, en: `${mmOf(mw)} × ${mmOf(md)} mm, numbered steps` }, obj: manual, at: new THREE.Vector3(0, md * 0.2, 0.6 * U), normal: new THREE.Vector3(0, 0, 1) },
+  ];
   return {
     root,
     apply,
-    frame: (p) => ({ r: closedR * (1 + 0.28 * p), y: H / 2 + (D * 0.25) * p }),
+    explode,
+    pins,
+    frame: (p, x) => ({ r: closedR * (1 + 0.28 * p) * (1 + 0.35 * x), y: H / 2 + (D * 0.25) * p + H * 0.95 * x }),
   };
 }
 
@@ -651,26 +754,72 @@ function buildTin(spec: PackSpec, k: Kit, a: ArtInput, maxTex: number, own: { di
     return 1;
   };
   const closedR = 0.5 * Math.max(H, 2 * R) * 1.05;
-  return { root, apply, frame: (p) => ({ r: closedR * (1 + 0.35 * p), y: H / 2 }) };
+  // Anatomy: the lid lifts, then the foil seal rises out of the neck.
+  const sealY = seal.position.y;
+  const explode = (x: number) => {
+    lid.position.y += H * 0.62 * springAt(x, 0);
+    seal.position.y = sealY + H * 0.3 * springAt(x, 1);
+  };
+  const S = spec;
+  const pins: Pin[] = [
+    { n: 1, label: { zh: "罐盖", en: "Lid" }, detail: { zh: `Ø${mmOf(2 * LR)} × ${mmOf(lidH)} mm，印铁，罩清漆，卷边包口`, en: `Ø${mmOf(2 * LR)} × ${mmOf(lidH)} mm, printed tinplate, lacquered, rolled edge` }, obj: lid, at: new THREE.Vector3(R * 0.4, lidH, R * 0.3), normal: new THREE.Vector3(0, 1, 0) },
+    { n: 2, label: { zh: "铝箔内封", en: "Foil seal" }, detail: { zh: `Ø${mmOf(2 * (R - 1.9 * mm))} mm，开罐前保鲜防潮`, en: `Ø${mmOf(2 * (R - 1.9 * mm))} mm, keeps it fresh and dry until opened` }, obj: seal, at: new THREE.Vector3(R * 0.35, -R * 0.3, 0), normal: new THREE.Vector3(0, 0, 1) },
+    { n: 3, label: { zh: "罐身印刷", en: "Printed body" }, detail: { zh: `Ø${S.w} × ${S.h} mm，印刷面展开 ${mmOf(circ)} × ${mmOf(labelH)} mm`, en: `Ø${S.w} × ${S.h} mm, printed area unrolled ${mmOf(circ)} × ${mmOf(labelH)} mm` }, obj: wrap, at: new THREE.Vector3(0, labelH * 0.1, R + 0.4 * mm), normal: new THREE.Vector3(0, 0, 1) },
+    { n: 4, label: { zh: "罐口", en: "Neck" }, detail: { zh: `收口 ${mmOf(1.2 * mm)} mm，罐盖套在这里`, en: `stepped in ${mmOf(1.2 * mm)} mm for the lid to sit on` }, obj: root, at: new THREE.Vector3(0, neckY + 1 * mm, R - 1.2 * mm), normal: new THREE.Vector3(0, 0, 1) },
+    { n: 5, label: { zh: "底部卷边", en: "Bottom bead" }, detail: { zh: "金属卷边，罐底不刮桌面", en: "rolled metal bead, so the base doesn't scratch" }, obj: root, at: new THREE.Vector3(0, 1.6 * mm, R + 0.8 * mm), normal: new THREE.Vector3(0, 0, 1) },
+  ];
+  return { root, apply, explode, pins, frame: (p, x) => ({ r: closedR * (1 + 0.35 * p) * (1 + 0.55 * x), y: H / 2 + H * 0.4 * x }) };
 }
 
 /* ================================================================ Scene */
+
+type PathTracerLike = {
+  setScene: (scene: THREE.Scene, camera: THREE.Camera) => unknown;
+  renderSample: () => void;
+  reset: () => void;
+  updateEnvironment: () => void;
+  updateCamera: () => void;
+  dispose?: () => void;
+  samples: number;
+  tiles: THREE.Vector2;
+  minSamples: number;
+  fadeDuration: number;
+  renderDelay: number;
+  renderScale: number;
+  bounces: number;
+  filterGlossyFactor: number;
+  textureSize: THREE.Vector2;
+  rasterizeScene: boolean;
+};
+
+export type SceneOptions = {
+  quality?: "high" | "normal";
+  /** "transparent": the package sits on the page (contact shadow only). "sweep": a photo studio. */
+  stage?: "transparent" | "sweep";
+  /** Progressive path tracing when the view is still (studio only). */
+  photoreal?: boolean;
+};
 
 export class PackScene {
   readonly canvas: HTMLCanvasElement;
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
-  private camera = new THREE.PerspectiveCamera(28, 1, 0.01, 100);
+  private camera: THREE.PerspectiveCamera = new THREE.PerspectiveCamera(28, 1, 0.01, 100);
   private turn = new THREE.Group();
   private shadow = new ContactShadow();
+  private equirect: THREE.DataTexture;
   private env: THREE.Texture;
-  private key: THREE.DirectionalLight;
+  private sweep: THREE.Mesh | null = null;
+  private sweepMat: THREE.MeshPhysicalMaterial | null = null;
+  private sweepMap: THREE.DataTexture | null = null;
+  private backdrop: Backdrop = "studio";
   private built: Built | null = null;
   private kit: Kit | null = null;
   private own: { dispose: () => void }[] = [];
   private input: SceneInput | null = null;
   private buildKey = "";
   private openT = tw(0);
+  private anatomyT = tw(0);
   private view: View = { x: -16, y: -34 };
   private zoom = 1;
   private w = 1;
@@ -680,11 +829,25 @@ export class PackScene {
   private dirty = true;
   private firstFrame = false;
   private maxTex: number;
+  private opts: SceneOptions;
+  // path tracing
+  private pt: PathTracerLike | null = null;
+  private ptReady = false;
+  private ptActive = false;
+  private still = 0;
+  private maxSamples = 400;
+  private ptDispose: (() => void) | null = null;
+  private exportWait: { samples: number; resolve: (c: HTMLCanvasElement) => void } | null = null;
   onFirstFrame?: () => void;
   afterRender?: (canvas: HTMLCanvasElement) => void;
+  /** Path-tracing progress 0..1 (null when not path tracing). */
+  onProgress?: (p: number | null) => void;
+  /** Anatomy pin positions in CSS pixels, each frame the anatomy view is open. */
+  onPins?: (pins: PinOnScreen[] | null) => void;
 
-  constructor(canvas: HTMLCanvasElement, opts: { quality?: "high" | "normal" } = {}) {
+  constructor(canvas: HTMLCanvasElement, opts: SceneOptions = {}) {
     this.canvas = canvas;
+    this.opts = opts;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance", preserveDrawingBuffer: false });
     const r = this.renderer;
     r.setClearColor(0x000000, 0);
@@ -693,36 +856,171 @@ export class PackScene {
     r.toneMappingExposure = 1.12;
     r.shadowMap.enabled = false;
     const hi = opts.quality === "high";
-    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, hi ? 2 : 1.75));
+    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, hi ? (opts.photoreal ? 1.5 : 2) : 1.75));
     this.maxTex = Math.min(r.capabilities.maxTextureSize, hi ? 4096 : 2048);
-    this.env = studioEnvironment(r);
+    this.equirect = studioEquirect(hi ? 1024 : 512);
+    this.env = studioEnvironment(r, this.equirect);
     this.scene.environment = this.env;
     this.scene.environmentIntensity = 0.95;
-    this.key = new THREE.DirectionalLight(0xffffff, 1.1);
-    this.key.position.set(-3, 5, 4);
-    const rim = new THREE.DirectionalLight(0xffffff, 0.35);
-    rim.position.set(4, 3, -4);
-    this.scene.add(this.key, rim, this.turn, this.shadow.plane);
+    this.scene.add(this.turn, this.shadow.plane);
+    if (opts.stage === "sweep") this.makeSweep();
+    if (opts.photoreal) this.loadPathTracer();
   }
+
+  /* ---------------------------------------------------------------- studio sweep */
+
+  private makeSweep() {
+    // falloff baked into a small texture: brightest under the product, darker up the wall
+    const geo = sweepGeometry();
+    const col = geo.getAttribute("color") as THREE.BufferAttribute;
+    const cols = 25;
+    const rows = col.count / cols;
+    const data = new Uint8Array(cols * rows * 4);
+    for (let i = 0; i < col.count; i++) {
+      const v = Math.round(col.getX(i) * 255);
+      data.set([v, v, v, 255], i * 4);
+    }
+    geo.deleteAttribute("color");
+    const map = new THREE.DataTexture(data, cols, rows, THREE.RGBAFormat);
+    map.colorSpace = THREE.SRGBColorSpace;
+    map.magFilter = THREE.LinearFilter;
+    map.minFilter = THREE.LinearFilter;
+    map.needsUpdate = true;
+    this.sweepMap = map;
+    this.sweepMat = new THREE.MeshPhysicalMaterial({ roughness: 0.96, map, emissiveMap: map });
+    this.sweep = new THREE.Mesh(geo, this.sweepMat);
+    this.sweep.position.y = -0.0005;
+    this.scene.add(this.sweep);
+    this.setBackdrop("studio");
+  }
+
+  /** Backdrop of the studio sweep. */
+  setBackdrop(b: Backdrop) {
+    this.backdrop = b;
+    if (!this.sweepMat) return;
+    const look = backdropLook(b, this.input ? rolesOf(this.input.d).ground : "#e4e4e0");
+    this.sweepMat.color.copy(look.color);
+    this.sweepMat.emissive.copy(look.color).multiplyScalar(look.glow);
+    this.scene.background = look.color.clone().multiplyScalar(b === "dark" ? 0.6 : 0.8);
+    this.sweepMat.needsUpdate = true;
+    this.invalidate();
+  }
+
+  /* ---------------------------------------------------------------- path tracing */
+
+  private loadPathTracer() {
+    Promise.all([import("three-gpu-pathtracer"), import("three/examples/jsm/postprocessing/Pass.js")])
+      .then(([{ WebGLPathTracer, PhysicalCamera, DenoiseMaterial }, { FullScreenQuad }]) => {
+        const cam = new PhysicalCamera(this.camera.fov, this.camera.aspect, 0.01, 100);
+        cam.position.copy(this.camera.position);
+        cam.quaternion.copy(this.camera.quaternion);
+        cam.apertureBlades = 7;
+        this.camera = cam;
+        const pt = new WebGLPathTracer(this.renderer) as unknown as PathTracerLike;
+        pt.tiles.set(2, 2);
+        pt.minSamples = 4;
+        pt.fadeDuration = 700;
+        pt.renderDelay = 0;
+        pt.bounces = 6;
+        pt.filterGlossyFactor = 0.4;
+        pt.textureSize.set(1536, 1536);
+        pt.rasterizeScene = true;
+        // Edge-preserving denoise while samples accumulate, easing off as the image converges.
+        const denoise = new DenoiseMaterial({ transparent: true, blending: THREE.NormalBlending, premultipliedAlpha: this.renderer.getContextAttributes()?.premultipliedAlpha ?? true }) as THREE.ShaderMaterial & { map: THREE.Texture | null; opacity: number; sigma: number; threshold: number; kSigma: number };
+        const quad = new FullScreenQuad(denoise);
+        (pt as unknown as { renderToCanvasCallback: (t: THREE.WebGLRenderTarget, r: THREE.WebGLRenderer, q: { material: { opacity: number } }) => void }).renderToCanvasCallback = (target, renderer, q) => {
+          const k = Math.max(0, 1 - pt.samples / (this.maxSamples * 0.8));
+          denoise.map = target.texture;
+          denoise.opacity = q.material.opacity;
+          denoise.sigma = 2 + 3 * k;
+          denoise.threshold = 0.01 + 0.16 * k;
+          denoise.kSigma = 1;
+          const auto = renderer.autoClear;
+          renderer.autoClear = false;
+          quad.render(renderer);
+          renderer.autoClear = auto;
+        };
+        this.ptDispose = () => {
+          quad.dispose();
+          denoise.dispose();
+        };
+        // the path tracer uses the same equirect HDR the live renderer was prefiltered from
+        this.pt = pt;
+        this.ptReady = true;
+        this.invalidate();
+      })
+      .catch(() => {
+        this.pt = null;
+      });
+  }
+
+  /** Something changed: drop back to the live renderer and wait for stillness again. */
+  private invalidate() {
+    this.ptActive = false;
+    this.still = performance.now();
+    this.dirty = true;
+    this.onProgress?.(null);
+    this.request();
+  }
+
+  private startPathTracing() {
+    const pt = this.pt;
+    if (!pt) return;
+    // the path tracer sees the real floor; the contact-shadow plane and die lines stay out
+    this.scene.remove(this.shadow.plane);
+    this.built?.lines && (this.built.lines.visible = false);
+    const env = this.scene.environment;
+    this.scene.environment = this.equirect;
+    pt.setScene(this.scene, this.camera);
+    this.scene.environment = env;
+    this.scene.add(this.shadow.plane);
+    this.ptActive = true;
+  }
+
+  private canPathTrace(): boolean {
+    if (!this.pt || !this.ptReady || !this.sweep) return false;
+    const fs = this.built?.stages?.[0].v ?? 1;
+    const above = -this.view.x > -1;
+    return fs > 0.999 && above; // not for the flat net or views from under the floor
+  }
+
+  /* ---------------------------------------------------------------- input */
 
   /** Change product, structure, finish or open state. The first call snaps without animating. */
   update(input: SceneInput) {
     const prev = this.input;
     this.input = input;
     const key = [input.d.id, input.d.layout, input.d.palette.map((p) => p.hex).join(), input.d.mockup.headline, input.d.mockup.detail, input.brand, input.spec.form, input.spec.w, input.spec.h, input.spec.d, input.spec.finish].join("|");
+    let changed = false;
     if (key !== this.buildKey) {
       this.buildKey = key;
       this.rebuild(input, !prev || prev.spec.form !== input.spec.form);
+      if (this.backdrop === "brand") this.setBackdrop("brand");
+      changed = true;
     }
     const now = performance.now();
     if (!prev || prev.spec.form !== input.spec.form) {
-      // snap to the requested state
       const v = input.open ? 1 : 0;
       this.openT = tw(v);
       if (this.built?.stages) for (const s of this.built.stages) Object.assign(s, tw(1 - v));
-    } else if (prev.open !== input.open) this.animateOpen(input.open, now);
-    this.dirty = true;
-    this.request();
+      changed = true;
+    } else if (prev.open !== input.open) {
+      this.animateOpen(input.open, now);
+      changed = true;
+    }
+    if (changed || !prev || prev.fit !== input.fit) this.invalidate();
+  }
+
+  /** Anatomy view on or off: the package comes apart into numbered parts. */
+  setAnatomy(on: boolean) {
+    aim(this.anatomyT, on ? 1 : 0, performance.now(), on ? 1500 : 900);
+    if (!on) this.onPins?.(null);
+    this.invalidate();
+  }
+
+  /** The numbered parts of the current package, for the parts list. */
+  parts(): { n: number; label: Pair; detail: Pair }[] {
+    return (this.built?.pins ?? []).map(({ n, label, detail }) => ({ n, label, detail }));
   }
 
   private animateOpen(open: boolean, now: number) {
@@ -776,10 +1074,10 @@ export class PackScene {
   }
 
   setView(v: View, zoom: number) {
+    if (v.x === this.view.x && v.y === this.view.y && zoom === this.zoom) return;
     this.view = { x: v.x, y: v.y };
     this.zoom = zoom;
-    this.dirty = true;
-    this.request();
+    this.invalidate();
   }
 
   /** Render again on the next frame (e.g. to refresh a snapshot). */
@@ -799,8 +1097,7 @@ export class PackScene {
     this.renderer.setSize(this.w, this.h, false);
     this.camera.aspect = this.w / this.h;
     this.camera.updateProjectionMatrix();
-    this.dirty = true;
-    this.request();
+    this.invalidate();
   }
 
   private request() {
@@ -808,28 +1105,62 @@ export class PackScene {
     this.frame = requestAnimationFrame(this.tick);
   }
 
+  /* ---------------------------------------------------------------- frame */
+
   private tick = (now: number) => {
     this.frame = 0;
     if (!this.visible || !this.built || !this.input) return;
     let moving = false;
     if (this.built.stages) for (const s of this.built.stages) moving = step(s, now) || moving;
     moving = step(this.openT, now) || moving;
+    moving = step(this.anatomyT, now) || moving;
+    if (moving) this.still = now;
+
+    // Still for a moment, in the studio: hand over to the path tracer and accumulate.
+    if (!moving && this.canPathTrace() && now - this.still > 220) {
+      if (!this.ptActive) {
+        this.pose();
+        this.startPathTracing();
+      }
+      const pt = this.pt!;
+      if (pt.samples < this.maxSamples || this.exportWait) {
+        pt.renderSample();
+        this.emitPins();
+        this.afterRender?.(this.canvas);
+        this.onProgress?.(Math.min(1, pt.samples / this.maxSamples));
+        if (this.exportWait && pt.samples >= this.exportWait.samples) {
+          const copy = document.createElement("canvas");
+          copy.width = this.canvas.width;
+          copy.height = this.canvas.height;
+          copy.getContext("2d")!.drawImage(this.canvas, 0, 0);
+          const w = this.exportWait;
+          this.exportWait = null;
+          w.resolve(copy);
+        }
+        this.request();
+      }
+      this.dirty = false;
+      return;
+    }
+
     if (moving || this.dirty) {
       this.renderFrame();
       this.dirty = false;
     }
-    if (moving) this.request();
+    if (moving || (this.canPathTrace() && !this.ptActive)) this.request();
   };
 
-  private renderFrame() {
+  /** Places the package and camera for the current state. Returns the contact-shadow strength. */
+  private pose(): { shadowK: number; fr: { r: number; y: number }; phi: number } {
     const b = this.built!;
     const input = this.input!;
     const p = this.openT.v;
+    const x = this.anatomyT.v;
     const shadowK = b.apply(p);
+    b.explode(x);
     // a tin turns its label a little toward the camera at the resting angle
     this.turn.rotation.y = (this.view.y + (input.spec.form === "tin" ? 22 : 0)) * RAD;
-    // camera on a sphere around the product: elevation from the orbit's x
-    const fr = b.frame(p);
+    const fr = b.frame(p, x);
     const fill = Math.min(0.92, Math.max(0.22, input.fit / Math.min(this.w, this.h)));
     const vt = Math.tan((this.camera.fov * RAD) / 2);
     const ht = vt * this.camera.aspect;
@@ -840,15 +1171,31 @@ export class PackScene {
     this.camera.up.set(0, Math.cos(phi), -Math.sin(phi));
     this.camera.lookAt(target);
     this.camera.near = Math.max(0.01, dist - fr.r * 4);
-    this.camera.far = dist + fr.r * 6;
+    this.camera.far = this.sweep ? dist + 60 : dist + fr.r * 6;
+    const cam = this.camera as THREE.PerspectiveCamera & { focusDistance?: number; bokehSize?: number };
+    if ("focusDistance" in cam) {
+      // a product lens at a moderate aperture: the package sharp, the sweep softly out of focus
+      cam.focusDistance = dist;
+      cam.bokehSize = fr.r * 0.012 * this.zoom;
+    }
     this.camera.updateProjectionMatrix();
+    this.turn.updateMatrixWorld(true);
+    return { shadowK, fr, phi };
+  }
+
+  private renderFrame() {
+    const { shadowK, fr, phi } = this.pose();
     // contact shadow under the product, faded when seen from below or when the carton is flat
     const above = Math.sin(phi) > -0.02;
     const size = Math.max(2.4 * fr.r, 1.2);
-    this.shadow.setSize(size * 2, fr.y * 2 + 0.5);
+    this.shadow.setSize(size * 2, fr.y * 2 + 0.5 + fr.r);
     this.shadow.plane.visible = above;
+    // the floor itself must not occlude in the shadow's depth pass
+    if (this.sweep) this.sweep.visible = false;
     this.shadow.update(this.renderer, this.scene, above ? 0.62 * shadowK : 0);
+    if (this.sweep) this.sweep.visible = above;
     this.renderer.render(this.scene, this.camera);
+    this.emitPins();
     this.afterRender?.(this.canvas);
     if (!this.firstFrame) {
       this.firstFrame = true;
@@ -856,8 +1203,41 @@ export class PackScene {
     }
   }
 
-  /** Renders a still at `scale` × the current size, composited on `background`, as PNG. */
-  async exportImage(scale = 2, background: string | ((ctx: CanvasRenderingContext2D, w: number, h: number) => void) = "#ffffff"): Promise<Blob> {
+  private emitPins() {
+    if (!this.onPins || !this.built || this.anatomyT.v < 0.02) return;
+    const v = new THREE.Vector3();
+    const nrm = new THREE.Vector3();
+    const toCam = new THREE.Vector3();
+    const out: PinOnScreen[] = this.built.pins.map((p) => {
+      p.obj.updateMatrixWorld(true);
+      v.copy(p.at).applyMatrix4(p.obj.matrixWorld);
+      let facing = true;
+      if (p.normal) {
+        nrm.copy(p.normal).transformDirection(p.obj.matrixWorld);
+        toCam.copy(this.camera.position).sub(v).normalize();
+        facing = nrm.dot(toCam) > 0.05;
+      }
+      v.project(this.camera);
+      return { n: p.n, x: (v.x * 0.5 + 0.5) * this.w, y: (-v.y * 0.5 + 0.5) * this.h, visible: !p.hidden && facing && v.z < 1 };
+    });
+    this.onPins(out);
+  }
+
+  /* ---------------------------------------------------------------- export */
+
+  /**
+   * A still as PNG. In the studio with path tracing, waits for `samples` and returns the
+   * path-traced frame at the current resolution; otherwise renders at `scale` × and composites
+   * on `background`.
+   */
+  async exportImage(scale = 2, background: string | ((ctx: CanvasRenderingContext2D, w: number, h: number) => void) = "#ffffff", samples = 160): Promise<Blob> {
+    if (this.canPathTrace()) {
+      const frame = await new Promise<HTMLCanvasElement>((resolve) => {
+        this.exportWait = { samples, resolve };
+        this.request();
+      });
+      return new Promise((resolve, reject) => frame.toBlob((b) => (b ? resolve(b) : reject(new Error("export failed"))), "image/png"));
+    }
     const pr = this.renderer.getPixelRatio();
     this.renderer.setPixelRatio(scale);
     this.renderer.setSize(this.w, this.h, false);
@@ -873,9 +1253,13 @@ export class PackScene {
     ctx.drawImage(this.canvas, 0, 0);
     this.renderer.setPixelRatio(pr);
     this.renderer.setSize(this.w, this.h, false);
-    this.dirty = true;
-    this.request();
+    this.invalidate();
     return new Promise((resolve, reject) => out.toBlob((b) => (b ? resolve(b) : reject(new Error("export failed"))), "image/png"));
+  }
+
+  /** Samples accumulated so far (0 when not path tracing). */
+  get samples(): number {
+    return this.ptActive && this.pt ? this.pt.samples : 0;
   }
 
   dispose() {
@@ -883,6 +1267,12 @@ export class PackScene {
     this.disposeBuilt();
     this.shadow.dispose();
     this.env.dispose();
+    this.equirect.dispose();
+    this.sweep?.geometry.dispose();
+    this.sweepMat?.dispose();
+    this.sweepMap?.dispose();
+    this.ptDispose?.();
+    this.pt?.dispose?.();
     this.renderer.dispose();
     this.renderer.forceContextLoss();
   }

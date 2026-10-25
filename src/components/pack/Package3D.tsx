@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { Direction } from "@/lib/board/schema";
 import type { PackSpec } from "@/lib/pack";
-import type { PackScene } from "../three/engine";
+import type { PackScene, PinOnScreen } from "../three/engine";
+import type { Backdrop } from "../three/studio";
 import type { Orbit } from "./orbit";
 import { PackageCSS } from "./PackageCSS";
 
@@ -26,6 +27,12 @@ export function Package3D({
   afterRender,
   loader = false,
   onReady,
+  stage = "transparent",
+  photoreal = false,
+  backdrop = "studio",
+  anatomy = false,
+  onProgress,
+  onPins,
 }: {
   d: Direction;
   brand: string;
@@ -40,6 +47,15 @@ export function Package3D({
   loader?: boolean;
   /** Called once the first frame is on screen (or the fallback is shown). */
   onReady?: () => void;
+  /** "sweep": stand the package in a photo studio instead of on the page. */
+  stage?: "transparent" | "sweep";
+  /** Path trace when the view is still (studio). */
+  photoreal?: boolean;
+  backdrop?: Backdrop;
+  /** Anatomy view: the package comes apart into numbered parts. */
+  anatomy?: boolean;
+  onProgress?: (p: number | null) => void;
+  onPins?: (pins: PinOnScreen[] | null) => void;
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const engine = useRef<PackScene | null>(null);
@@ -50,6 +66,10 @@ export function Package3D({
   after.current = afterRender;
   const ready = useRef(onReady);
   ready.current = onReady;
+  const progress = useRef(onProgress);
+  progress.current = onProgress;
+  const pinsCb = useRef(onPins);
+  pinsCb.current = onPins;
 
   useEffect(() => {
     let alive = true;
@@ -69,7 +89,11 @@ export function Package3D({
         canvas = document.createElement("canvas");
         canvas.className = "gl-canvas";
         host.appendChild(canvas);
-        const e = new PackScene(canvas, { quality });
+        const e = new PackScene(canvas, { quality, stage, photoreal });
+        e.onProgress = (p) => progress.current?.(p);
+        e.onPins = (p) => pinsCb.current?.(p);
+        e.setBackdrop(backdrop);
+        e.setAnatomy(anatomy);
         engine.current = e;
         e.onFirstFrame = () => {
           if (!alive) return;
@@ -102,7 +126,14 @@ export function Package3D({
       onEngine?.(null);
       canvas?.remove();
     };
-  }, [orbit, quality]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [orbit, quality, stage, photoreal]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    engine.current?.setBackdrop(backdrop);
+  }, [backdrop]);
+  useEffect(() => {
+    engine.current?.setAnatomy(anatomy);
+  }, [anatomy]);
 
   useEffect(() => {
     engine.current?.update({ d, brand, spec, open, fit });

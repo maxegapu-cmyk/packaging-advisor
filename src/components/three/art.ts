@@ -594,3 +594,30 @@ export function foilRoughMetal(mask: HTMLCanvasElement, paperRough: number, foil
   ctx.putImageData(img, 0, 0);
   return c;
 }
+
+let normalCache: HTMLCanvasElement | null = null;
+
+/** Tangent-space normal map of the paper fibres (both renderers support normal maps). */
+export function fiberNormal(strength = 2.2): HTMLCanvasElement {
+  if (normalCache) return normalCache;
+  const src = fiberTexture();
+  const S = src.width;
+  const h = src.getContext("2d")!.getImageData(0, 0, S, S).data;
+  const [c, ctx] = canvas(S, S);
+  const out = ctx.createImageData(S, S);
+  const at = (x: number, y: number) => h[(((y + S) % S) * S + ((x + S) % S)) * 4] / 255;
+  for (let y = 0; y < S; y++)
+    for (let x = 0; x < S; x++) {
+      const dx = (at(x + 1, y) - at(x - 1, y)) * strength;
+      const dy = (at(x, y + 1) - at(x, y - 1)) * strength;
+      const l = Math.hypot(dx, dy, 1);
+      const o = (y * S + x) * 4;
+      out.data[o] = Math.round(((-dx / l) * 0.5 + 0.5) * 255);
+      out.data[o + 1] = Math.round(((dy / l) * 0.5 + 0.5) * 255);
+      out.data[o + 2] = Math.round(((1 / l) * 0.5 + 0.5) * 255);
+      out.data[o + 3] = 255;
+    }
+  ctx.putImageData(out, 0, 0);
+  normalCache = c;
+  return c;
+}

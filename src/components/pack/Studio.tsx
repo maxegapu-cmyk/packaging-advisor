@@ -21,7 +21,8 @@ import { renderBrief } from "@/lib/renderBrief";
 import { paletteVars } from "../BoxFaces";
 import { CopyButton } from "../CopyButton";
 import { Package3D } from "./Package3D";
-import type { PackScene } from "../three/engine";
+import type { PackScene, PinOnScreen } from "../three/engine";
+import type { Backdrop } from "../three/studio";
 import { Orbit, REST_ANGLE, reducedMotion, VIEWS, type Angle } from "./orbit";
 import { Stage3D } from "./Stage3D";
 import { FormGlyph } from "./FormGlyph";
@@ -45,7 +46,12 @@ const S = {
   reset: { zh: "复位", en: "Reset" },
   zoomIn: { zh: "放大", en: "Zoom in" },
   zoomOut: { zh: "缩小", en: "Zoom out" },
-  hint: { zh: "拖动旋转 · 双指或滚轮缩放 · 双击复位", en: "Drag to turn · pinch or scroll to zoom · double-click to reset" },
+  hint: { zh: "拖动旋转 · 双指或滚轮缩放 · 停下后自动渲染成照片级画质", en: "Drag to turn · pinch or scroll to zoom · hold still for a photoreal render" },
+  anatomy: { zh: "结构解剖", en: "Anatomy" },
+  anatomyNote: { zh: "数字都由你填的尺寸算出。", en: "Every number is computed from your sizes." },
+  photoreal: { zh: "照片级渲染", en: "Photoreal render" },
+  photorealDone: { zh: "照片级画质", en: "Photoreal" },
+  rendering: { zh: "正在渲染照片级画质…", en: "Rendering photoreal still…" },
   listing: { zh: "主图测试", en: "Listing test" },
   listingNote: { zh: "左：800×800 白底主图。右：在搜索结果里大约这么大，品牌名还看得清吗？", en: "Left: an 800×800 white main image. Right: about this size in search results. Can you still read the brand?" },
   brief: { zh: "渲染简报", en: "Render brief" },
@@ -154,6 +160,13 @@ function Icon({ name }: { name: string }) {
     ),
     sliders: <path d="M4 7h10M18 7h2M4 17h4M12 17h8M14 5v4M8 15v4" />,
     x: <path d="M6 6l12 12M18 6L6 18" />,
+    anatomy: (
+      <>
+        <path d="M4 15l8 4 8-4" />
+        <path d="M4 10l8 4 8-4" />
+        <path d="M4 5l8-3 8 3-8 4z" />
+      </>
+    ),
     download: (
       <>
         <path d="M12 4v11M7 10l5 5 5-5" />
@@ -233,6 +246,11 @@ export function Studio({
   const [hint, setHint] = useState(true);
   const [panel, setPanel] = useState(false);
   const [showListing, setShowListing] = useState(true);
+  const [anatomy, setAnatomy] = useState(false);
+  const [pins, setPins] = useState<PinOnScreen[] | null>(null);
+  const [parts, setParts] = useState<{ n: number; label: Pair; detail: Pair }[]>([]);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [hot, setHot] = useState<number | null>(null);
 
   // Stage size decides how big the package is drawn.
   const stageRef = useRef<HTMLDivElement>(null);
@@ -294,7 +312,7 @@ export function Studio({
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, w, h);
       };
-      const blob = await e.exportImage(Math.max(2, Math.min(3, 2400 / Math.max(stage.w, 1))), paint);
+      const blob = await e.exportImage(Math.max(2, Math.min(3, 2400 / Math.max(stage.w, 1))), paint, 160);
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = `${one(board.meta.product, lang)}-${d.id}.png`.replace(/[\\/:*?"<>|\s]+/g, "_");
@@ -334,6 +352,17 @@ export function Studio({
     return () => clearTimeout(t);
   }, []);
 
+  const toggleAnatomy = () => {
+    const next = !anatomy;
+    setAnatomy(next);
+    setDetail(null);
+    setHint(false);
+    if (next) {
+      setOpen(false);
+      orbit.tween({ x: -24, y: -32 }, 900, 1);
+    }
+  };
+
   const interact = useCallback(() => {
     setHint(false);
     setDetail(null);
@@ -341,6 +370,7 @@ export function Studio({
 
   const toggleOpen = () => {
     setDetail(null);
+    setAnatomy(false);
     const next = !open;
     setOpen(next);
     if (spec.form === "carton") orbit.tween(next ? { x: 0, y: 0 } : REST_ANGLE, next ? 1400 : 2300, 1);
@@ -411,8 +441,37 @@ export function Studio({
             loader
             onEngine={(e) => (engine.current = e)}
             afterRender={snapshot}
+            stage="sweep"
+            photoreal
+            backdrop={backdrop as Backdrop}
+            anatomy={anatomy}
+            onProgress={setProgress}
+            onPins={(p) => {
+              setPins(p);
+              const list = engine.current?.parts() ?? [];
+              setParts((old) => (old.length === list.length && old.every((o, i) => o.detail.zh === list[i].detail.zh && o.label.zh === list[i].label.zh) ? old : list));
+            }}
           />
         </Stage3D>
+
+        {anatomy && pins
+          ? pins.map((p) =>
+              p.visible ? (
+                <span key={p.n} className={`st-pin${hot === p.n ? " is-hot" : ""}`} style={{ left: p.x, top: p.y }} aria-hidden="true">
+                  {p.n}
+                </span>
+              ) : null,
+            )
+          : null}
+
+        {progress !== null ? (
+          <div className="st-progress" aria-live="polite">
+            <span className="st-progress-bar">
+              <i style={{ width: `${Math.round(progress * 100)}%` }} />
+            </span>
+            <span>{exporting ? one(S.rendering, lang) : progress >= 1 ? one(S.photorealDone, lang) : `${one(S.photoreal, lang)} ${Math.round(progress * 100)}%`}</span>
+          </div>
+        ) : null}
 
         <div className={`st-hint${hint ? " is-on" : ""}`} aria-hidden={!hint}>
           <svg viewBox="0 0 48 48" aria-hidden="true">
@@ -421,7 +480,32 @@ export function Studio({
           <L p={S.hint} lang={lang} />
         </div>
 
-        {detail ? (
+        {anatomy ? (
+          <aside className="st-caption st-parts" aria-live="polite">
+            <div className="st-caption-head">
+              <span className="st-caption-title">
+                {one(S.anatomy, lang)} · {one(FORM_LABELS[spec.form], lang)}
+              </span>
+              <button type="button" className="st-icon-btn" aria-label={both(S.close, lang)} onClick={() => toggleAnatomy()}>
+                <Icon name="x" />
+              </button>
+            </div>
+            <ol className="st-part-list">
+              {parts.map((x) => (
+                <li key={x.n} onPointerEnter={() => setHot(x.n)} onPointerLeave={() => setHot(null)}>
+                  <span className="st-pin-n">{x.n}</span>
+                  <span>
+                    <L p={x.label} lang={lang} className="st-part-name" />
+                    <L p={x.detail} lang={lang} className="st-part-detail" />
+                  </span>
+                </li>
+              ))}
+            </ol>
+            <p className="st-small">{both(S.anatomyNote, lang)}</p>
+          </aside>
+        ) : null}
+
+        {detail && !anatomy ? (
           <aside className="st-caption" aria-live="polite">
             <div className="st-caption-head">
               <L p={detail.label} lang={lang} className="st-caption-title" />
@@ -461,6 +545,10 @@ export function Studio({
           <button type="button" className={spinning ? "st-dock-btn is-active" : "st-dock-btn"} aria-pressed={spinning} onClick={() => (interact(), orbit.spin(!spinning))} title={both(S.spin, lang)}>
             <Icon name="spin" />
             <span className="st-dock-text">{one(S.spin, lang)}</span>
+          </button>
+          <button type="button" className={anatomy ? "st-dock-btn is-active" : "st-dock-btn"} aria-pressed={anatomy} onClick={() => toggleAnatomy()} title={both(S.anatomy, lang)}>
+            <Icon name="anatomy" />
+            <span className="st-dock-text">{one(S.anatomy, lang)}</span>
           </button>
           <button type="button" className={open ? "st-dock-btn is-active" : "st-dock-btn"} aria-pressed={open} onClick={toggleOpen} title={both(openLabel, lang)}>
             <Icon name="open" />

@@ -130,10 +130,19 @@ tests/              测试 Tests
 
 - 地址 Routes：`/space/demo`（公开示例 public sample）、`/space/<产品 id>`（登录后 signed in，改动自动保存 changes save）、`/s/<分享码>/space`（设计师只读 designer, read-only）。
 - 使用 three.js 物理渲染（`src/components/three/`）：摄影棚柔光箱与轮廓灯组成的环境光照（反射真实）、Khronos PBR Neutral 色调映射（印刷色准确）、0.45 mm 卡纸厚度与纸芯毛边、纸纤维微表面、覆膜清漆反光、按烫金掩膜生成的金属烫金、马口铁卷边与罐盖、柔和接触阴影。 Rendered with three.js PBR: a studio of softboxes and strip lights for real reflections, Khronos PBR Neutral tone mapping for true print colors, 0.45 mm board thickness with raw edges, paper-fibre micro-surface, laminate clearcoat, real metallic foil from a stamped mask, tinplate beads and lid, soft contact shadows.
+- 照片级渲染：在 3D 空间里停止操作约 0.2 秒后，路径追踪器（three-gpu-pathtracer）接手，在真实的摄影无缝背景纸上逐帧累积采样，得到真实的全局光照、柔和阴影、角落遮蔽和轻微景深；采样过程中有渐弱的去噪。拖动时切回实时渲染，两者使用同一套摄影棚灯光，切换时光线不跳。导出图片会等路径追踪完成后输出。 Photoreal: about 0.2 s after the view stops, a path tracer (three-gpu-pathtracer) takes over and accumulates samples on a real seamless photo sweep, giving true global illumination, soft shadows, corner occlusion and a touch of depth of field, with denoising that fades as samples build up. Dragging returns to the live renderer; both use the same studio light, so nothing jumps. Exports wait for the path-traced frame.
+- 结构解剖：参照 anatomy 技能（wheresryan22/anatomy，MIT）的方法——部件按顺序弹开、每个部件编号、每个数字都由模型算出——在 3D 空间里把盒子拆开，列出各部件及其尺寸和工艺。 Anatomy: following the method of the anatomy skill (wheresryan22/anatomy, MIT), assemblies spring apart in sequence and every part is numbered, with every number computed from the model.
+- 卡纸面板有约 0.3–0.6 mm 的自然鼓起，折边有柔化高光；纸纤维用法线贴图表现，两种渲染器都支持。 Board panels bow very slightly and folds catch a softened highlight; paper fibre is a normal map both renderers support.
 - 印刷图稿按每毫米最高 16 像素在浏览器中绘制（`art.ts`），可导出 2400 像素宽的 PNG。 Print artwork is drawn in the browser at up to 16 px/mm, and a 2400 px-wide PNG can be exported.
 - 浏览器不支持 WebGL 时，自动退回 CSS 3D 版本（`PackageCSS.tsx`）。 Without WebGL it falls back to the CSS 3D version.
 - 盒型与尺寸按产品保存，方案板、3D 空间和分享链接显示一致。 Structure and size are saved per product, so the board, the 3D space and share links match.
 - 渲染简报按 skill-home 中 `ecommerce-3d-render-assistant` 的棚拍规则生成。 The render brief follows the studio rules of the `ecommerce-3d-render-assistant` skill from skill-home.
+
+## 致谢 · Credits
+
+- [three.js](https://threejs.org)（MIT）
+- [three-gpu-pathtracer](https://github.com/gkjohnson/three-gpu-pathtracer) 与 [three-mesh-bvh](https://github.com/gkjohnson/three-mesh-bvh)，Garrett Johnson（MIT）
+- [anatomy](https://github.com/wheresryan22/anatomy)，wheresryan22（MIT）：结构解剖视图采用了它的爆炸视图与编号部件方法 The anatomy view adopts its exploded-view and numbered-parts method
 
 ## 已知限制 · Known limits
 
@@ -141,4 +150,4 @@ tests/              测试 Tests
 - 正面草图使用等宽字符绘制，中文字符宽度不一，对齐只是示意。 The ASCII front sketch is approximate with Chinese characters.
 - 完整概念效果图（第二阶段）尚未包含。 Full concept mockups (Phase 2) are not included yet.
 - 展开的刀模只是结构示意，不能用于生产。 The unfolded net is a structural sketch, not a production dieline.
-- 3D 空间需要支持 WebGL 2 的浏览器（近五年的主流浏览器均可）；低端手机上首次加载需 1–2 秒。 The 3D space needs WebGL 2 (any mainstream browser of the last five years); first load takes 1–2 s on low-end phones.
+- 3D 空间需要支持 WebGL 2 的浏览器（近五年的主流浏览器均可）；低端手机上首次加载需 1–2 秒。照片级渲染依赖显卡，独立显卡几秒内完成，集成显卡或手机上需要更久（仍可随时拖动）。 Photoreal rendering is GPU-bound: seconds on a discrete GPU, longer on integrated graphics or phones (the view stays draggable). The 3D space needs WebGL 2 (any mainstream browser of the last five years); first load takes 1–2 s on low-end phones.
