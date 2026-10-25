@@ -1,0 +1,81 @@
+{
+  "meta": {
+    "product": "桌面香氛器",
+    "brand": "SORA",
+    "note": "包装视觉方向探索｜外箱 · 内包装 · 说明书 · 非印刷稿"
+  },
+  "directions": [
+    {
+      "id": "01",
+      "name": "静谧陈列",
+      "tagline": "把包装做成家居杂志的一页。",
+      "layout": "offset",
+      "palette": [
+        {"name": "纸白", "role": "底色", "hex": "#EEE9DC", "share": "65%"},
+        {"name": "深墨", "role": "文字", "hex": "#252D30", "share": "25%"},
+        {"name": "灰绿", "role": "识别", "hex": "#607E77", "share": "8%"},
+        {"name": "暖金", "role": "点睛", "hex": "#C18B54", "share": "2%"}
+      ],
+      "headline": "SORA",
+      "detail": "桌面香氛器",
+      "inner_label": "01 / MAIN UNIT",
+      "manual_title": "使用指南",
+      "manual_step": "01 认识产品",
+      "typography": "细节克制，宽松大字，节奏偏杂志排版",
+      "anchor": "右侧灰绿几何断面",
+      "outer": "正面左上品牌名，右下几何主图，大面积空白",
+      "inner": "只保留右侧灰绿断面和配件序号",
+      "manual": "封面重复断面，内页用细分割线+大步骤序号",
+      "suitable": "家居、生活方式、轻礼赠",
+      "risk": "留白太多会弱化产品品类，需保留清晰的品类名"
+    },
+    {
+      "id": "02",
+      "name": "信号实验室",
+      "tagline": "让货架上出现一条可记住的高对比信号。",
+      "layout": "stripe",
+      "palette": [
+        {"name": "雾白", "role": "底色", "hex": "#E7EAEC", "share": "58%"},
+        {"name": "深海", "role": "文字", "hex": "#172630", "share": "27%"},
+        {"name": "钴蓝", "role": "识别", "hex": "#1D55B7", "share": "12%"},
+        {"name": "橘信号", "role": "点睛", "hex": "#E76D33", "share": "3%"}
+      ],
+      "headline": "SORA",
+      "detail": "桌面香氛器",
+      "inner_label": "MODULE / 01",
+      "manual_title": "快速上手",
+      "manual_step": "01 / OPEN",
+      "typography": "高对比粗体，工程标识感的小字号说明",
+      "anchor": "贯穿四面载体的钴蓝索引带",
+      "outer": "左侧竖向钴蓝色带，右侧粗标题、功能图形",
+      "inner": "缩减为蓝色短带和模块序号",
+      "manual": "封面保留蓝色左栏，内页用蓝色步骤编号",
+      "suitable": "功能型器具、科技配件、年轻用户",
+      "risk": "小字密度过高会像技术警示文件，需留出呼吸感"
+    },
+    {
+      "id": "03",
+      "name": "植物收藏馆",
+      "tagline": "像打开一盒有编号的自然样本。",
+      "layout": "split",
+      "palette": [
+        {"name": "鼠尾草白", "role": "底色", "hex": "#E7E8D7", "share": "56%"},
+        {"name": "常青绿", "role": "文字", "hex": "#304B3C", "share": "25%"},
+        {"name": "苔绿色", "role": "识别", "hex": "#8E9C65", "share": "14%"},
+        {"name": "红陶", "role": "点睛", "hex": "#C47D62", "share": "5%"}
+      ],
+      "headline": "SORA",
+      "detail": "桌面香氛器",
+      "inner_label": "BOTANICAL / 01",
+      "manual_title": "日常手帖",
+      "manual_step": "01 / 初次使用",
+      "typography": "有温度的中等粗细标题，间距宽松的说明文字",
+      "anchor": "左侧自然标本形状与编号框",
+      "outer": "左侧三分之二文字，右侧三分之一抽象植物标本",
+      "inner": "抽象标本图形缩成一个角标",
+      "manual": "封面带标本编号，内页以大片留白和结构图示呈现",
+      "suitable": "香氛、护肤、手工日用品",
+      "risk": "如果做成满版叶子照片，容易沦为普通自然系包装"
+    }
+  ]
+}

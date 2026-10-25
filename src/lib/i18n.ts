@@ -1,0 +1,133 @@
+/**
+ * Display languages. Default "bi": Chinese first with English beneath. Testers can switch to
+ * Chinese only or English only; the choice is a cookie, so it works without JavaScript.
+ */
+export const LANG_COOKIE = "pa_lang";
+export const LANGS = ["bi", "zh", "en"] as const;
+export type Lang = (typeof LANGS)[number];
+export const isLang = (v: unknown): v is Lang => typeof v === "string" && (LANGS as readonly string[]).includes(v);
+
+export type Pair = { zh: string; en: string };
+
+/** Plain-text rendering (for attributes, titles, alt text). */
+export function plain(p: Pair, lang: Lang): string {
+  if (lang === "zh") return p.zh;
+  if (lang === "en") return p.en || p.zh;
+  return p.en && p.en !== p.zh ? `${p.zh} ${p.en}` : p.zh;
+}
+
+export const UI = {
+  appName: { zh: "包装视觉顾问", en: "Packaging Advisor" },
+  tagline: { zh: "上传产品照片，得到三个可交给设计师的包装方向。", en: "Upload a product photo and get three packaging directions you can hand to a designer." },
+  signIn: { zh: "登录", en: "Sign in" },
+  inviteCode: { zh: "邀请码", en: "Invite code" },
+  inviteHelp: { zh: "测试期间凭邀请码使用。邀请码由项目负责人发放。", en: "During testing, access is by invite code from the project team." },
+  badCode: { zh: "邀请码无效或已停用，请核对后重试。", en: "That invite code is invalid or disabled. Check it and try again." },
+  signOut: { zh: "退出", en: "Sign out" },
+  myProducts: { zh: "我的产品", en: "My products" },
+  newProduct: { zh: "新建产品方案", en: "New product brief" },
+  noProducts: { zh: "还没有产品。上传一张产品照片，几分钟内得到三个包装方向。", en: "No products yet. Upload a product photo and get three packaging directions in minutes." },
+  admin: { zh: "管理", en: "Admin" },
+  language: { zh: "语言", en: "Language" },
+  langBi: { zh: "中英", en: "中英" },
+  langZh: { zh: "中文", en: "中文" },
+  langEn: { zh: "English", en: "English" },
+
+  productName: { zh: "产品名称", en: "Product name" },
+  productNameHint: { zh: "例如：明前龙井 100 克罐装", en: "e.g. Pre-Qingming Longjing, 100 g tin" },
+  category: { zh: "品类", en: "Category" },
+  brand: { zh: "品牌名", en: "Brand name" },
+  brandHint: { zh: "可不填", en: "Optional" },
+  description: { zh: "产品描述与卖点", en: "Description and selling points" },
+  descriptionHint: { zh: "写真实信息：产地、规格、目标买家、售价区间、销售平台。不确定的可以不写。", en: "Real facts only: origin, size, target buyers, price range, sales platform. Leave out anything you're unsure of." },
+  mustText: { zh: "包装上必须出现的文字", en: "Text that must appear on the packaging" },
+  mustTextHint: { zh: "例如宣传语、卖点。我们会核查其中有风险的措辞。", en: "e.g. slogans or claims. We'll flag risky wording." },
+  productPhotos: { zh: "产品照片", en: "Product photos" },
+  productPhotosHint: { zh: "1–2 张，拍清楚产品本身或现有包装。", en: "1–2 photos showing the product or its current packaging." },
+  referencePhotos: { zh: "喜欢的参考图（可选）", en: "References you like (optional)" },
+  referencePhotosHint: { zh: "最多 4 张。只借鉴排版与配色思路，不会照抄。", en: "Up to 4. We borrow layout and color ideas, never copy." },
+  model: { zh: "使用的模型", en: "Model" },
+  modelNoVision: { zh: "此模型看不到图片，将只根据文字生成。", en: "This model can't see images; it will work from your text only." },
+  generate: { zh: "生成包装方向", en: "Generate directions" },
+  generating: { zh: "正在生成，通常需要 1–3 分钟，请不要关闭页面…", en: "Generating. This usually takes 1–3 minutes; keep this page open…" },
+  required: { zh: "必填", en: "Required" },
+
+  directions: { zh: "三个方向", en: "Three directions" },
+  recommended: { zh: "推荐", en: "Recommended" },
+  routeSafe: { zh: "稳妥耐看", en: "Safe" },
+  routeDistinctive: { zh: "有识别度", en: "Distinctive" },
+  routeBold: { zh: "大胆探索", en: "Bold" },
+  colorCard: { zh: "色彩卡", en: "Color card" },
+  outerFront: { zh: "外箱正面", en: "Box front" },
+  outerBack: { zh: "外箱侧面与背面", en: "Box sides and back" },
+  inner: { zh: "内包装", en: "Inner pack" },
+  manual: { zh: "说明书", en: "Manual" },
+  anchor: { zh: "视觉锚点", en: "Visual anchor" },
+  typography: { zh: "字体气质", en: "Typography" },
+  imagery: { zh: "图像", en: "Imagery" },
+  graphics: { zh: "图形语言", en: "Graphics" },
+  finish: { zh: "质感", en: "Finish" },
+  sketch: { zh: "正面草图（非比例示意）", en: "Front sketch (not to scale)" },
+  faceLayout: { zh: "正面版式（非比例示意）", en: "Front layout (not to scale)" },
+  fullSpec: { zh: "完整说明", en: "Full spec" },
+  rotateTogether: { zh: "三个盒子一起转", en: "Rotate all three together" },
+  dragHint: { zh: "拖动盒子旋转，双击复位；也可用方向键。", en: "Drag a box to rotate, double-click to reset, or use the arrow keys." },
+  boxOf: { zh: "包装立体示意", en: "3D packaging sketch" },
+  carriersFlat: { zh: "内包装与说明书", en: "Inner pack and manual" },
+  suitable: { zh: "更适合", en: "Best for" },
+  risk: { zh: "需要小心", en: "Watch out for" },
+  whatWeSaw: { zh: "我们看到的", en: "What we saw" },
+  borrow: { zh: "借鉴", en: "Borrow" },
+  avoid: { zh: "不照搬", en: "Don't copy" },
+  assumptions: { zh: "暂按以下假设处理", en: "Working assumptions" },
+  ourPick: { zh: "我们的建议", en: "Our recommendation" },
+  forDesigner: { zh: "可直接转发给设计师", en: "Forward this to your designer" },
+  copyText: { zh: "复制", en: "Copy" },
+  copied: { zh: "已复制", en: "Copied" },
+  packagingCopy: { zh: "包装文案", en: "Packaging copy" },
+  nameLine: { zh: "品名行", en: "Name line" },
+  frontPromise: { zh: "正面主张", en: "Front promise" },
+  manualSteps: { zh: "说明书步骤", en: "Manual steps" },
+  placeholders: { zh: "需要你补充的信息", en: "Information you need to supply" },
+  claimCheck: { zh: "措辞风险核查", en: "Wording check" },
+  claimNone: { zh: "没有发现需要修改的措辞。", en: "No risky wording found." },
+  levelHigh: { zh: "高风险", en: "High risk" },
+  levelMedium: { zh: "需注意", en: "Caution" },
+  levelLow: { zh: "提示", en: "Note" },
+  saferWording: { zh: "建议改为", en: "Safer wording" },
+  compliance: { zh: "品类标签提醒", en: "Category labeling reminders" },
+  disclaimer: { zh: "概念方向示意，非印刷稿。HEX 色值为屏幕色，印刷前请打样；标签与合规信息请以现行规定和专业审核为准。", en: "Concept directions, not print files. HEX values are screen colors; proof before printing. Check labels and compliance against current rules with a professional." },
+
+  pickThis: { zh: "选这个方向", en: "Pick this direction" },
+  picked: { zh: "已选定", en: "Picked" },
+  revise: { zh: "修改一个维度", en: "Revise one dimension" },
+  reviseHelp: { zh: "只改你选的维度，其余保持不变。", en: "Only the dimension you choose changes; everything else stays." },
+  dimension: { zh: "要修改的维度", en: "Dimension" },
+  feedback: { zh: "哪里不满意？", en: "What's not working?" },
+  feedbackHint: { zh: "例如：太普通、配色怪、看不出是茶叶", en: "e.g. too generic, odd colors, doesn't read as tea" },
+  applyRevision: { zh: "修改这个方向", en: "Revise this direction" },
+  revising: { zh: "正在修改…", en: "Revising…" },
+  version: { zh: "版本", en: "Version" },
+  versions: { zh: "历史版本", en: "Versions" },
+  regenerate: { zh: "重新生成三个方向", en: "Generate new directions" },
+  share: { zh: "分享给设计师", en: "Share with designer" },
+  shareOn: { zh: "任何拿到链接的人都能查看这个方案板（不含你上传的图片）。", en: "Anyone with the link can view this board (your uploaded images are not included)." },
+  stopSharing: { zh: "停止分享", en: "Stop sharing" },
+  handedOff: { zh: "我已经把方案交给设计师或印厂", en: "I've handed this to a designer or printer" },
+  handedOffDone: { zh: "已记录，谢谢。", en: "Recorded, thank you." },
+  sendFeedback: { zh: "给我们反馈", en: "Send feedback" },
+  feedbackBox: { zh: "这次结果对你有用吗？哪里需要改进？", en: "Was this useful? What should we improve?" },
+  rating: { zh: "有用程度", en: "Usefulness" },
+  submit: { zh: "提交", en: "Submit" },
+  thanks: { zh: "收到，谢谢你的反馈。", en: "Got it, thanks for the feedback." },
+  uploads: { zh: "你上传的图片", en: "Your uploads" },
+  noBoardYet: { zh: "这个产品还没有方案板。", en: "This product has no board yet." },
+  backToProducts: { zh: "返回我的产品", en: "Back to my products" },
+  failed: { zh: "没有成功", en: "That didn't work" },
+  details: { zh: "技术细节", en: "Technical details" },
+  sharedBoard: { zh: "包装方向方案板", en: "Packaging direction board" },
+  notFound: { zh: "找不到这个页面，链接可能已停用。", en: "This page isn't available; the link may have been turned off." },
+  limitLeft: { zh: "今天还可生成", en: "Generations left today" },
+} satisfies Record<string, Pair>;
+
+export type UiKey = keyof typeof UI;
