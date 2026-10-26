@@ -1,13 +1,13 @@
 # 包装视觉顾问 · Packaging Advisor
 
-面向中国国内电商卖家的网页应用：上传一张产品照片，几分钟内得到三个风格明确不同的包装方向，包括带 HEX 色值的配色、外箱/内包装/说明书的版式、包装文案、措辞风险核查，以及一句可以直接转发给设计师的指令。交付的是设计简报，不是印刷文件。
+面向中国国内电商卖家的网页应用：上传一张产品照片，几分钟内得到三个风格明确不同的包装方向；选定后在 3D 里按真实尺寸打样，再下载能直接交给印厂的印刷文件（1:1 刀模展开图、3 mm 出血、裁切与压痕专色、印刷工单）和电商主图。一个人、不懂设计，也能把包装做到可以印刷。
 
-A web app for domestic Chinese e-commerce sellers: upload a product photo and get three distinct packaging directions in minutes, with HEX colors, layouts for the outer box, inner pack and manual, packaging copy, a wording-risk check, and one sentence to forward to a designer. It produces a brief, not a print file.
+A web app for domestic Chinese e-commerce sellers: upload a product photo and get three distinct packaging directions in minutes; pick one, proof it in 3D at real size, then download a print file a printer can use (1:1 die lines, 3 mm bleed, cut and crease spot colors, job sheet) and listing images. One person with no design background can take packaging all the way to print.
 
 当前版本是给 20 位测试者使用的 MVP。任何产品都可以上传：15 个品类分 6 组（食品饮料、美妆个护、母婴宠物、家居家电、数码与生活、其他），选「其他」时用自己的话写清是什么。
 This version is the MVP for 20 testers. Any product can be uploaded: 15 categories in 6 families (food and drink, beauty and personal care, baby and pet, home, tech and lifestyle, other); with Other, the seller says in their own words what it is.
 
-**四步流程 · Four steps:** 上传产品 → 比较方向 → 3D 打样 → 交给设计师。首页、我的产品、上传页、方案板和 3D 空间都显示同一条进度，并给出下一步。 Upload a product → compare directions → proof in 3D → hand off. The homepage, product list, upload page, board and 3D space all show the same progress and the next step.
+**四步流程 · Four steps:** 上传产品 → 比较方向 → 3D 打样 → 出成品。首页、我的产品、上传页、方案板和 3D 空间都显示同一条进度，并给出下一步。 Upload a product → compare directions → proof in 3D → final files. The homepage, product list, upload page, board and 3D space all show the same progress and the next step.
 
 ---
 
@@ -15,7 +15,7 @@ This version is the MVP for 20 testers. Any product can be uploaded: 15 categori
 
 | 功能 Feature | 说明 | Description |
 | --- | --- | --- |
-| 公开首页 Landing page | 印刷样张风格的首屏轮播四个品类的示例（茶叶、美妆、零食、数码）；四步流程；15 个品类的总览；每个示例可在页内旋转或进 3D 空间打开 | A press-sheet hero cycling samples from four categories (tea, cosmetics, snacks, electronics); the four steps; all 15 categories; each sample rotatable in place or opened in the 3D space |
+| 公开首页 Landing page | 首屏是一段用代码实时绘制的循环影片「共生」：印刷图案在纸上印出、刀线裁切、平面展开图折成盒子（或标签卷上铁罐和瓶身），立体成型的同时，平面的轮廓、连接线和尺寸线仍留在纸上，平面与立体互为一体；五种产品轮流出现。之后是四步流程（每步配实际产出的小图）、15 个品类总览、10 个示例（每个都可在页内旋转或进 3D 空间） | The first screen is a looping film drawn live in code, “Symbiosis”: artwork prints on a sheet, the die cuts it, the flat net folds into a box (or a label wraps a tin or bottle), and while the 3D form stands the flat outline, threads and dimension lines stay on the sheet; five products take turns. Then the four steps (each with a picture of what it produces), all 15 categories and 10 samples, each rotatable in place or in the 3D space |
 | 上传产品 Upload | 拖入或点选产品照片（每张可加备注）、可选参考图、按组选品类、品牌和产品名；右侧说明提交后的三步。未登录点击上传会先登录再回到上传页 | Drag in or choose product photos (each with an optional note), optional references, category by family, brand and name; the side panel explains the next three steps. Signed-out visitors sign in and land back on the upload page |
 | 我的产品 My products | 每个产品一张卡片：照片缩略图、四段进度、下一步该做什么 | One card per product: photo thumbnail, four-segment progress and the next thing to do |
 | 邀请码登录 Invite sign-in | 每位测试者一个邀请码，无需注册 | One code per tester, no sign-up |
@@ -24,6 +24,8 @@ This version is the MVP for 20 testers. Any product can be uploaded: 15 categori
 | 方案板 Board | 可拖动旋转的立体包装盒（三个方向可同步旋转对比）、色彩面积条、正面版式图、内包装与说明书小样；中英双语，可切换 | Rotatable 3D boxes (synced for comparison), color area bars, front-layout drawings, inner pack and manual; bilingual, switchable |
 | 只改一个维度 Single-dimension revision | 配色、版式、字体、图像或锚点，其余保持不变（由代码保证） | Color, layout, type, imagery or anchor; everything else is kept, enforced in code |
 | 包装文案与核查 Copy and claim check | 只依据卖家提供的事实撰写；标出"医用级""降三高"等风险措辞并给出替代说法 | Written only from the seller's facts; flags risky claims and suggests safer wording |
+| 出成品 Final files | 定稿正面文字、颜色、标志、净含量、按品类列出的标签必标项和商品条码（EAN-13 校验）；印前检查（必标项、条码、对比度、信息字号 ≥ 1.8 mm、风险措辞）；下载印刷文件 PDF（印刷工单 + 每个部件 1:1 展开图，300 dpi、3 mm 出血、CutContour 裁切与 Crease 压痕专色、裁切标记，烫金工艺另附烫金版）和 7 张 1600 px 电商图片（白底主图、正背面、打开、细节、尺寸图、品牌色背景）。18 种包装形态都有展开图：直立盒刀模、礼盒与书型盒裱纸、飞机盒（FEFCO 0427）、抽屉盒、纸罐、手提袋、利乐砖、自立袋、各类标签与印铁、木箱雕刻稿 | Settle the front wording, colors, logo, net content, the label items each category must carry and the EAN-13 barcode (check-digit validated); pre-press checks (mandatory items, barcode, contrast, information text ≥ 1.8 mm, risky claims); download a print PDF (job sheet plus a 1:1 page per printed part at 300 dpi with 3 mm bleed, CutContour and Crease spot colors, crop marks, and a foil plate for foil finishes) and seven 1600 px listing images. All 18 forms lay out flat: tuck carton die, rigid-box and book-box wraps, mailer (FEFCO 0427), drawer box, paper tube, bag, aseptic web, pouch, labels and tin blanks, crate engraving |
+| 实物核对 Match the sample | 拿到打样后：正面照片叠在印刷图案上对齐比较（透明度、差异模式），填写实测外尺寸（±1 mm），从照片取色与设计色比较 CIEDE2000 色差；可选择让 3D 和电商图片按实物取色显示。确认之前，电商图片在说明和界面里都标注为渲染图 | When the printer's sample arrives: overlay a front photo on the print artwork (opacity and difference mode), enter the measured size (±1 mm), pick colors from the photo and compare them by CIEDE2000; optionally show the 3D and listing images in the sample's measured colors. Until confirmed, listing images are marked as renders in the file notes and on screen |
 | 分享给设计师 Share | 只读链接，不含卖家上传的图片，可随时停用 | Read-only link without the seller's uploads; can be turned off |
 | 可插拔模型 Pluggable models | 管理员接入任何提供 API Key 的平台；测试者在生成时自由选择模型 | Admin connects any API-key platform; testers pick a model per board |
 | 测试数据 Test tracking | 每位测试者的生成、选定、交出、失败与反馈，直接对应 MVP 指标 | Per-tester generations, picks, hand-offs, failures and feedback, matching the MVP measure |
@@ -150,9 +152,12 @@ tests/              测试 Tests
 
 ## 已知限制 · Known limits
 
+- 渲染图与实物的一致性：图案、尺寸和盒型结构与印刷文件同源，但纸张、油墨、印厂刀模和内装产品的真实外观只有实物打样能确认；请用「实物核对」比对后再把图片当作实物图使用。 Renders share the print file's artwork, size and structure, but paper, ink, the printer's die and the product inside can only be confirmed on a printed sample; use “Match the sample” before presenting images as the real product.
+- 印刷文件中的文字随图案以 300 dpi 位图输出（中文字体不内嵌）；需要矢量文字时请让印厂或设计师替换。 Text in the print file is rasterised with the artwork at 300 dpi (Chinese fonts aren't embedded); ask the printer if vector text is required.
+- 标签必标项按常见法规整理（GB 7718、化妆品标签管理办法等），法规会更新，内容需你核对。 Mandatory label items follow common rules (GB 7718, cosmetics labelling measures and others); rules change, so check them.
 - 离线演示模型（未接入真实模型时）只有四套示例方案，会返回品类最接近的一套并换上卖家的产品名和品牌；真实方案需要接入模型平台。 The offline demo model has four sample boards; it returns the one nearest the category with the seller's name and brand swapped in. Real boards need a connected model platform.
 - 方案板中的色值是屏幕色，正式印刷前需要打样；标签与合规内容只做提醒，不构成合规审查。 HEX values are screen colors; proof before printing. Labeling notes are reminders, not a compliance review.
 - 正面草图使用等宽字符绘制，中文字符宽度不一，对齐只是示意。 The ASCII front sketch is approximate with Chinese characters.
 - 完整概念效果图（第二阶段）尚未包含。 Full concept mockups (Phase 2) are not included yet.
-- 展开的刀模只是结构示意，不能用于生产。 The unfolded net is a structural sketch, not a production dieline.
+- 刀模为标准结构（直立盒、礼盒裱纸、FEFCO 0427 等），开模前请以印厂刀模为准。 Die lines are standard structures (tuck carton, rigid-box wraps, FEFCO 0427 and others); use your printer's die before cutting.
 - 3D 空间需要支持 WebGL 2 的浏览器（近五年的主流浏览器均可）；低端手机上首次加载需 1–2 秒。照片级渲染依赖显卡，独立显卡几秒内完成，集成显卡或手机上需要更久（仍可随时拖动）。 Photoreal rendering is GPU-bound: seconds on a discrete GPU, longer on integrated graphics or phones (the view stays draggable). The 3D space needs WebGL 2 (any mainstream browser of the last five years); first load takes 1–2 s on low-end phones.

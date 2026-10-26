@@ -60,9 +60,36 @@ function tex(c: HTMLCanvasElement, r: THREE.WebGLRenderer): THREE.CanvasTexture 
   return t;
 }
 
+/** Drawn artwork, kept per product so the switch to the next product doesn't stall a frame. */
+const ART = new Map<string, HTMLCanvasElement>();
+function artCanvas(kind: FaceKind, w: number, h: number, it: HeroItem): HTMLCanvasElement {
+  const key = `${it.id}|${kind}|${w.toFixed(1)}|${h.toFixed(1)}`;
+  let c = ART.get(key);
+  if (!c) {
+    const ppm = Math.min(6, 900 / Math.max(w, h));
+    c = drawFace(kind, w, h, ppm, { d: it.d, brand: it.brand, finish: "matte" }).color;
+    ART.set(key, c);
+  }
+  return c;
+}
 function art(kind: FaceKind, w: number, h: number, it: HeroItem, r: THREE.WebGLRenderer) {
-  const ppm = Math.min(6, 900 / Math.max(w, h));
-  return tex(drawFace(kind, w, h, ppm, { d: it.d, brand: it.brand, finish: "matte" }).color, r);
+  return tex(artCanvas(kind, w, h, it), r);
+}
+
+/** Draws a product's artwork ahead of time (called while the previous one is on screen). */
+export function prefetchArt(it: HeroItem) {
+  if (it.kind === "carton") {
+    artCanvas("front", it.w, it.h, it);
+    artCanvas("right", it.dep, it.h, it);
+    artCanvas("back", it.w, it.h, it);
+    artCanvas("left", it.dep, it.h, it);
+    artCanvas("top", it.w, it.dep, it);
+    artCanvas("bottom", it.w, it.dep, it);
+  } else {
+    const area = roundAreas(it.kind === "tin" ? "tin" : "bottle", it.w, it.h);
+    artCanvas("tinWrap", area.wrap!.w, area.wrap!.h, it);
+    if (it.kind === "tin") artCanvas("tinCap", it.w, it.w, it);
+  }
 }
 
 /** The press sheet: paper with registration marks, a color bar and a slug line. */
@@ -426,6 +453,8 @@ export class SymbiosisScene {
   private raf = 0;
   private running = false;
   private shiftX = 0;
+  /** Override for the sideways framing (fraction of the width; null = automatic). */
+  private shiftOverride: number | null = null;
   private env: THREE.Texture;
   onFrame?: (f: FrameInfo, o: OverlayFrame) => void;
 
@@ -525,7 +554,7 @@ export class SymbiosisScene {
     cam.aspect = this.w / this.h;
     // wide: the copy sits on the left, so the scene's centre moves right
     const wide = this.w / this.h > 1.25;
-    this.shiftX = wide ? -this.w * 0.24 : 0;
+    this.shiftX = this.shiftOverride !== null ? -this.w * this.shiftOverride : wide ? -this.w * 0.24 : 0;
     cam.setViewOffset(this.w, this.h, this.shiftX, 0, this.w, this.h);
     const dist = wide ? 9.4 : 9.6 + Math.max(0, 1 - cam.aspect) * 7;
     const el = (40 * Math.PI) / 180;
@@ -691,14 +720,31 @@ export class SymbiosisScene {
     return of;
   }
 
+  private prefetched = -1;
+
   /** Renders one frame at absolute time `now` (seconds since start). */
   frame(now: number) {
     const cycle = Math.floor(now / DUR) % this.items.length;
     if (cycle !== this.ix) this.load(cycle);
     const t = now % DUR;
+    // while this product holds still, draw the next one's artwork in idle time
+    const next = (cycle + 1) % this.items.length;
+    if (t > T.hold[0] && this.prefetched !== next) {
+      this.prefetched = next;
+      const run = () => prefetchArt(this.items[next]);
+      const w = window as Window & { requestIdleCallback?: (f: () => void) => void };
+      if (w.requestIdleCallback) w.requestIdleCallback(run);
+      else setTimeout(run, 0);
+    }
     const of = this.pose(t);
     this.renderer.render(this.scene, this.camera);
     this.onFrame?.({ item: this.ix, stage: of.stage, t }, of);
+  }
+
+  /** Frame the scene in the middle (e.g. for a video without the page copy). */
+  setShift(f: number | null) {
+    this.shiftOverride = f;
+    this.resize(this.w, this.h);
   }
 
   /** Jump to a product (its finished pose when still). */

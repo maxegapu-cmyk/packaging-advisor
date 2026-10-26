@@ -259,7 +259,9 @@ export class PackScene {
     this.scene.environmentIntensity = 0.95;
     this.scene.add(this.turn, this.shadow.plane);
     if (opts.stage === "sweep") this.makeSweep();
-    if (opts.photoreal) this.loadPathTracer();
+    // tests on software rendering can't path trace in reasonable time (window.__PA_NO_PATHTRACE)
+    const noPt = typeof window !== "undefined" && (window as Window & { __PA_NO_PATHTRACE?: boolean }).__PA_NO_PATHTRACE;
+    if (opts.photoreal && !noPt) this.loadPathTracer();
   }
 
   /* ---------------------------------------------------------------- studio sweep */
