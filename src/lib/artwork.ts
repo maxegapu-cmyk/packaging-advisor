@@ -34,7 +34,32 @@ export type Artwork = {
   barcode: string;
   /** Upload id of the logo (PNG with transparency), or null for a type-only mark. */
   logoId: string | null;
+  /** The check against a real printed sample (打样). */
+  proof: Proof;
 };
+
+/**
+ * What the seller measured and saw on the printed sample. The render is only trusted as a
+ * true picture of the product once a real sample has been compared with it.
+ */
+export type Proof = {
+  /** Measured outside size in mm (null = not measured yet). */
+  w: number | null;
+  h: number | null;
+  d: number | null;
+  /** Photo of the sample (upload id), front on. */
+  photoId: string | null;
+  /** Colors picked from the photo, per palette role. */
+  colors: Partial<Record<keyof Roles, string>>;
+  /** Render the 3D and listing images in the colors measured on the sample (the print file keeps the design colors). */
+  useSample: boolean;
+  /** The seller confirmed the sample matches the render. */
+  confirmed: boolean;
+  /** When it was confirmed (ISO date). */
+  at: string | null;
+};
+
+export const EMPTY_PROOF: Proof = { w: null, h: null, d: null, photoId: null, colors: {}, useSample: false, confirmed: false, at: null };
 
 /** Palette roles of a direction (background, text, brand, accent), with index fallbacks. */
 export function rolesOf(d: Direction): Roles {
@@ -68,6 +93,11 @@ export function applyArtwork(d: Direction, a: Artwork): Direction {
   add("brand", a.palette.key);
   add("accent", a.palette.accent);
   return { ...d, palette, mockup: { ...d.mockup, headline: a.headline || d.mockup.headline, detail: a.detail } };
+}
+
+/** The palette to show the product in: the sample's measured colors when the seller chose them. */
+export function renderPalette(a: Artwork): Roles {
+  return a.proof.useSample ? { ...a.palette, ...a.proof.colors } : a.palette;
 }
 
 /* ---------------------------------------------------------------- label fields */
@@ -162,6 +192,7 @@ export function defaultArtwork(board: Board, dirId?: string | null): Artwork {
     rows,
     barcode: "",
     logoId: null,
+    proof: { ...EMPTY_PROOF, colors: {} },
   };
 }
 
@@ -185,6 +216,15 @@ export function normalizeArtwork(raw: unknown, base: Artwork): Artwork {
     })
     .filter((r) => r.label);
   const logo = typeof o.logoId === "string" && /^[A-Za-z0-9_-]{6,40}$/.test(o.logoId) ? o.logoId : null;
+  const pr = (typeof o.proof === "object" && o.proof !== null ? o.proof : base.proof) as Record<string, unknown>;
+  const mm = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 0 && v < 3000 ? Math.round(v * 10) / 10 : null);
+  const pc = (typeof pr.colors === "object" && pr.colors !== null ? pr.colors : {}) as Record<string, unknown>;
+  const colors: Proof["colors"] = {};
+  for (const k of ["ground", "ink", "key", "accent"] as const) {
+    const h = hex(pc[k], "");
+    if (h) colors[k] = h;
+  }
+  const confirmed = pr.confirmed === true;
   return {
     v: 1,
     dir: clip(o.dir, 4) || base.dir,
@@ -197,5 +237,15 @@ export function normalizeArtwork(raw: unknown, base: Artwork): Artwork {
     rows,
     barcode: cleanDigits(clip(o.barcode, 20)).replace(/\D/g, "").slice(0, 13),
     logoId: logo,
+    proof: {
+      w: mm(pr.w),
+      h: mm(pr.h),
+      d: mm(pr.d),
+      photoId: typeof pr.photoId === "string" && /^[A-Za-z0-9_-]{6,40}$/.test(pr.photoId) ? pr.photoId : null,
+      colors,
+      useSample: pr.useSample === true,
+      confirmed,
+      at: confirmed && typeof pr.at === "string" && /^\d{4}-\d{2}-\d{2}/.test(pr.at) ? pr.at.slice(0, 10) : null,
+    },
   };
 }

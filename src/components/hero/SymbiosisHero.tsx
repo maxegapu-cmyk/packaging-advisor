@@ -107,7 +107,14 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
     let canvas: HTMLCanvasElement | undefined;
     let last = { item: -1, stage: -1 };
     const onVis = () => (document.hidden ? scene.current?.stop() : io && scene.current?.start());
-    import("./symbiosis")
+    // start after the page has loaded, so the copy and the rest of the page come first
+    const ready = new Promise<void>((res) => {
+      const idle = () => ((window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => void }).requestIdleCallback ?? ((f: () => void) => setTimeout(f, 120)))(() => res(), { timeout: 1200 });
+      if (document.readyState === "complete") idle();
+      else window.addEventListener("load", idle, { once: true });
+    });
+    ready
+      .then(() => import("./symbiosis"))
       .then(({ SymbiosisScene }) => {
         const el = host.current;
         if (!alive || !el) return;

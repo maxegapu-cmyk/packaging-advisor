@@ -4,11 +4,11 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { applyArtwork, defaultArtwork, labelFields, normalizeArtwork, rolesOf } from "../src/lib/artwork";
+import { applyArtwork, defaultArtwork, labelFields, normalizeArtwork, renderPalette, rolesOf } from "../src/lib/artwork";
 import { CATEGORY_KEYS } from "../src/lib/categories";
 import { CATEGORY_PACK, FORMS, FORM_PRESET, type PackSpec } from "../src/lib/pack";
 import { breakLines, layoutBack, MIN_TEXT_MM, textWidth } from "../src/lib/print/backpanel";
-import { barcodePcs, cmykText, contrast, toCmyk } from "../src/lib/print/color";
+import { barcodePcs, cmykText, contrast, deltaE, deltaE2000, hexToLab, toCmyk } from "../src/lib/print/color";
 import { checkDigit, checkEan13, ean13Modules } from "../src/lib/print/ean13";
 import { artSize, BLEED, infoPanels, printLayout } from "../src/lib/print/layout";
 import { blocking, infoSize, preflight } from "../src/lib/print/preflight";
@@ -171,4 +171,56 @@ test("preflight: flags what a print shop would, passes a complete artwork", () =
   if (risky) assert.ok(preflight({ ...filled, intro: `本品${risky.text}` }, s.board, spec).some((c) => c.id.startsWith("claim-")));
   // every sample and default pack can be checked
   for (const x of SAMPLES) for (const sp of [x.pack, CATEGORY_PACK[x.id as keyof typeof CATEGORY_PACK] ?? x.pack]) assert.ok(preflight(defaultArtwork(x.board), x.board, sp).length > 3);
+});
+
+test("color difference: CIEDE2000 matches published test pairs; sRGB to Lab", () => {
+  // Sharma, Wu and Dalal (2005) test data
+  const pairs: [number[], number[], number][] = [
+    [[50, 2.6772, -79.7751], [50, 0, -82.7485], 2.0425],
+    [[50, 3.1571, -77.2803], [50, 0, -82.7485], 2.8615],
+    [[50, -1, 2], [50, 0, 0], 2.3669],
+    [[50, 2.49, -0.001], [50, -2.49, 0.0009], 7.1792],
+    [[60.2574, -34.0099, 36.2677], [60.4626, -34.1751, 39.4387], 1.2644],
+    [[22.7233, 20.0904, -46.694], [23.0331, 14.973, -42.5619], 2.0373],
+  ];
+  for (const [a, b, want] of pairs) {
+    const got = deltaE2000({ L: a[0], a: a[1], b: a[2] }, { L: b[0], a: b[1], b: b[2] });
+    assert.ok(Math.abs(got - want) < 1e-3, `ΔE00 ${got} vs ${want}`);
+  }
+  const w = hexToLab("#FFFFFF");
+  assert.ok(Math.abs(w.L - 100) < 0.01 && Math.abs(w.a) < 0.01 && Math.abs(w.b) < 0.01);
+  assert.equal(deltaE("#3F7A4F", "#3F7A4F"), 0);
+  assert.ok(deltaE("#3F7A4F", "#C2283C") > 40);
+});
+
+test("proof: measured size, sample colors and sign-off drive the checks", () => {
+  const s = SAMPLES[3]; // a carton-type pack
+  const a = defaultArtwork(s.board);
+  const filled = { ...a, barcode: "6901234567892", rows: a.rows.map((r) => ({ ...r, value: r.value || "已填" })) };
+  const spec = s.pack;
+  const none = preflight(filled, s.board, spec);
+  assert.ok(none.some((c) => c.id === "sample" && c.level === "warn"), "unchecked sample is flagged");
+  const off = preflight({ ...filled, proof: { ...filled.proof, w: spec.w + 2, h: spec.h, d: spec.d } }, s.board, spec);
+  assert.ok(off.some((c) => c.id === "proof-w" && c.level === "error"));
+  const ok = preflight({ ...filled, proof: { ...filled.proof, w: spec.w + 0.5, h: spec.h - 1, d: spec.d, colors: { key: filled.palette.key }, confirmed: true, at: "2026-10-27" } }, s.board, spec);
+  assert.ok(ok.some((c) => c.id === "proof-size" && c.level === "ok"));
+  assert.ok(ok.some((c) => c.id === "proof-color" && c.level === "ok"));
+  assert.ok(ok.some((c) => c.id === "sample" && c.level === "ok"));
+  const far = preflight({ ...filled, proof: { ...filled.proof, colors: { key: "#FF00FF" } } }, s.board, spec);
+  assert.ok(far.some((c) => c.id === "proof-color" && c.level === "error"));
+  // validation keeps only sane proof data
+  const n = normalizeArtwork({ ...filled, proof: { w: -3, h: 150.26, d: "x", photoId: "../x", colors: { key: "abc", ink: "nope" }, confirmed: true, at: "2026-10-27T10:00:00Z" } }, filled);
+  assert.deepEqual(n.proof, { w: null, h: 150.3, d: null, photoId: null, colors: { key: "#AABBCC" }, useSample: false, confirmed: true, at: "2026-10-27" });
+  assert.equal(renderPalette({ ...n, proof: { ...n.proof, useSample: true } }).key, "#AABBCC");
+  assert.equal(renderPalette(n).key, n.palette.key);
+});
+
+test("preflight: every check has its own id (they are list keys on the page)", () => {
+  for (const x of SAMPLES) {
+    const a = defaultArtwork(x.board);
+    for (const art of [a, { ...a, barcode: "6901234567890", proof: { ...a.proof, w: 1, h: 1, d: 1, colors: { key: "#000000", ink: "#FFFFFF" } } }]) {
+      const ids = preflight(art, x.board, x.pack).map((c) => c.id);
+      assert.equal(new Set(ids).size, ids.length, `${x.id}: ${ids.join(",")}`);
+    }
+  }
 });

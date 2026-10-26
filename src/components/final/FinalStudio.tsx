@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { applyArtwork, labelFields, rolesOf, type Artwork, type Roles } from "@/lib/artwork";
+import { applyArtwork, labelFields, renderPalette, rolesOf, type Artwork, type Roles } from "@/lib/artwork";
 import type { Board } from "@/lib/board/schema";
 import type { Lang, Pair } from "@/lib/i18n";
 import { FINISH_LABELS, FORM_LABELS, type PackSpec } from "@/lib/pack";
@@ -14,6 +14,7 @@ import { Package3D } from "../pack/Package3D";
 import { Orbit, REST_ANGLE } from "../pack/orbit";
 import { Stage3D } from "../pack/Stage3D";
 import type { ArtInfo } from "../three/art";
+import { ProofMatch } from "./ProofMatch";
 import { drawSheetPreview } from "./render";
 
 const T = {
@@ -50,6 +51,9 @@ const T = {
   reset: { zh: "恢复方向原色", en: "Reset to the direction's colors" },
   tab3d: { zh: "3D", en: "3D" },
   tabSheet: { zh: "印刷展开图", en: "Print sheet" },
+  tabProof: { zh: "实物核对", en: "Match the sample" },
+  rendered: { zh: "渲染图：实物打样核对前，请勿当作实拍图使用。", en: "Renders: until checked against a printed sample, don't present them as product photos." },
+  verified: { zh: "已与实物打样核对", en: "Checked against the printed sample" },
   open: { zh: "打开", en: "Open" },
   close: { zh: "合上", en: "Close" },
   checks: { zh: "印前检查", en: "Pre-press checks" },
@@ -104,6 +108,16 @@ function useImage(src: string | null): HTMLImageElement | null {
   return img;
 }
 
+/** The value, once it has stopped changing for `ms` (typing shouldn't rebuild the 3D per key). */
+function useSettled<T>(value: T, ms: number): T {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return v;
+}
+
 /** The label content for the 3D and the print file, from the artwork. */
 export function artInfoOf(a: Artwork, spec: PackSpec, logo: CanvasImageSource | null): ArtInfo {
   const ip = infoPanels(printLayout(spec)).find((x) => !x.sheet.id.startsWith("inner-"));
@@ -142,6 +156,7 @@ export function FinalStudio({
   lang,
   saveUrl,
   logoUrl,
+  proofUrl,
   exportUrl,
   boardHref,
   spaceHref,
@@ -154,6 +169,7 @@ export function FinalStudio({
   lang: Lang;
   saveUrl?: string;
   logoUrl?: string;
+  proofUrl?: string;
   exportUrl?: string;
   boardHref?: string;
   spaceHref?: string;
@@ -162,7 +178,7 @@ export function FinalStudio({
 }) {
   const [art, setArt] = useState<Artwork>(initial);
   const [save, setSave] = useState<"idle" | "saving" | "saved" | "failed">("idle");
-  const [tab, setTab] = useState<"3d" | "sheet">("3d");
+  const [tab, setTab] = useState<"3d" | "sheet" | "proof">("3d");
   const [open, setOpen] = useState(false);
   const [sheetIx, setSheetIx] = useState(0);
   const [busy, setBusy] = useState<null | "pdf" | "images">(null);
@@ -176,6 +192,7 @@ export function FinalStudio({
   const base = board.directions.find((d) => d.id === art.dir) ?? board.directions[0];
   const d = useMemo(() => applyArtwork(base, art), [base, art]);
   const logoSrc = art.logoId ? (localLogo[art.logoId] ?? logoSrcFor(art.logoId)) : null;
+  const proofSrc = art.proof.photoId ? (localLogo[art.proof.photoId] ?? logoSrcFor(art.proof.photoId)) : null;
   const logo = useImage(logoSrc);
   const info = useMemo(() => artInfoOf(art, pack, logo), [art, pack, logo]);
   const layout = useMemo(() => printLayout(pack), [pack]);
@@ -184,6 +201,13 @@ export function FinalStudio({
   const fields = useMemo(() => labelFields(board.meta.category), [board.meta.category]);
   const bc = checkEan13(art.barcode);
   const artInput = useMemo(() => ({ d, brand: art.brand, finish: pack.finish, info }), [d, art.brand, pack.finish, info]);
+  // what the product looks like: the sample's measured colors when chosen (print keeps the design)
+  const shown = useMemo(() => {
+    const dd = art.proof.useSample ? applyArtwork(base, { ...art, palette: renderPalette(art) }) : d;
+    return { d: dd, brand: art.brand, finish: pack.finish, info };
+  }, [art, base, d, pack.finish, info]);
+  const view = useSettled(artInput, 400);
+  const view3d = useSettled(shown, 400);
 
   // autosave
   useEffect(() => {
@@ -211,14 +235,14 @@ export function FinalStudio({
     const t = setTimeout(() => {
       const w = host.clientWidth || 600;
       const k = Math.min(4, (w * Math.min(2, window.devicePixelRatio || 1)) / sheet.w);
-      const c = drawSheetPreview(sheet, artInput, { pxPerMm: k });
+      const c = drawSheetPreview(sheet, view, { pxPerMm: k });
       c.className = "final-sheet-canvas";
       c.setAttribute("role", "img");
       c.setAttribute("aria-label", `${one(sheet.name, lang)} ${Math.round(sheet.w)} × ${Math.round(sheet.h)} mm`);
       host.replaceChildren(c);
     }, 250);
     return () => clearTimeout(t);
-  }, [tab, sheetIx, layout, artInput, lang]);
+  }, [tab, sheetIx, layout, view, lang]);
 
   const set = (patch: Partial<Artwork>) => setArt((a) => ({ ...a, ...patch }));
   const setRow = (key: string, label: string, value: string) =>
@@ -248,6 +272,24 @@ export function FinalStudio({
     }
   }
 
+  async function uploadProof(file: File): Promise<string | null> {
+    setError(null);
+    if (proofUrl) {
+      const fd = new FormData();
+      fd.append("photo", file);
+      const r = await fetch(proofUrl, { method: "POST", body: fd }).catch(() => null);
+      const j = r ? await r.json().catch(() => null) : null;
+      if (!r?.ok || !j?.id) {
+        setError(j?.error ?? one(T.saveFailed, lang));
+        return null;
+      }
+      return j.id as string;
+    }
+    const id = `local${Date.now().toString(36)}p`;
+    setLocalLogo((m) => ({ ...m, [id]: URL.createObjectURL(file) }));
+    return id;
+  }
+
   async function onPdf() {
     setBusy("pdf");
     setProgress(0);
@@ -270,12 +312,13 @@ export function FinalStudio({
     setError(null);
     try {
       const { renderShots, zipShots } = await import("./mainImages");
-      const files = await renderShots({ d, brand: art.brand, spec: pack, category: board.meta.category, info, lang, onProgress: (n, t) => setProgress(n / t) });
+      const files = await renderShots({ d: shown.d, brand: art.brand, spec: pack, category: board.meta.category, info, lang, onProgress: (n, t) => setProgress(n / t) });
       shots.forEach((s) => URL.revokeObjectURL(s.url));
       setShots(files.map((f) => ({ name: f.name, url: URL.createObjectURL(f.blob), label: f.label })));
       const readme = [
         `${art.brand} ${art.headline}`.trim(),
         "电商图片 Listing images, 1600 × 1600 px PNG.",
+        art.proof.confirmed ? `${T.verified.zh} ${T.verified.en}${art.proof.at ? ` (${art.proof.at})` : ""}` : `${T.rendered.zh}\n${T.rendered.en}`,
         ...files.map((f) => `${f.name}  ${f.label.zh} ${f.label.en}`),
         "",
         "由包装视觉顾问从 3D 渲染生成。Rendered from the 3D by Packaging Advisor.",
@@ -427,6 +470,10 @@ export function FinalStudio({
               <button type="button" role="tab" aria-selected={tab === "sheet"} className={tab === "sheet" ? "is-on" : ""} onClick={() => setTab("sheet")}>
                 {one(T.tabSheet, lang)}
               </button>
+              <button type="button" role="tab" aria-selected={tab === "proof"} className={tab === "proof" ? "is-on" : ""} onClick={() => setTab("proof")}>
+                {one(T.tabProof, lang)}
+                {art.proof.confirmed ? " ✓" : ""}
+              </button>
               <span className="final-pack">
                 {one(FORM_LABELS[pack.form], lang)} · {pack.w}×{pack.h}×{pack.d} mm · {one(FINISH_LABELS[pack.finish], lang)}
               </span>
@@ -434,7 +481,7 @@ export function FinalStudio({
             {tab === "3d" ? (
               <div className="final-stage">
                 <Stage3D orbit={orbit} label={`${art.brand} ${art.headline}`} className="final-stage-3d" inPage>
-                  <Package3D d={d} brand={art.brand} spec={pack} fit={400} open={open} orbit={orbit} category={board.meta.category} info={info} quality="high" />
+                  <Package3D d={view3d.d} brand={view3d.brand} spec={pack} fit={400} open={open} orbit={orbit} category={board.meta.category} info={view3d.info} quality="high" />
                 </Stage3D>
                 <div className="final-stage-bar">
                   <button type="button" className="btn btn-small" onClick={() => setOpen(!open)}>
@@ -453,6 +500,8 @@ export function FinalStudio({
                   ) : null}
                 </div>
               </div>
+            ) : tab === "proof" ? (
+              <ProofMatch art={art} spec={pack} input={view} lang={lang} setProof={(proof) => set({ proof })} uploadPhoto={uploadProof} photoSrc={proofSrc} />
             ) : (
               <div className="final-sheet">
                 {layout.sheets.length > 1 ? (
@@ -507,7 +556,11 @@ export function FinalStudio({
               <span className="final-dl-k">ZIP</span>
               <span className="final-dl-t">
                 <strong>{busy === "images" ? `${one(T.working, lang)} ${Math.round(progress * 100)}%` : `${one(T.dl, lang)} ${one(T.images, lang)}`}</strong>
-                <small>{one(T.imagesDesc, lang)}</small>
+                <small>
+                  {one(T.imagesDesc, lang)}
+                  <br />
+                  <span className={art.proof.confirmed ? "final-verified" : "final-render"}>{one(art.proof.confirmed ? T.verified : T.rendered, lang)}</span>
+                </small>
               </span>
             </button>
             {error ? (

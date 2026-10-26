@@ -6,9 +6,9 @@
 import type { Artwork } from "../artwork";
 import { labelFields } from "../artwork";
 import type { Board } from "../board/schema";
-import type { PackSpec } from "../pack";
+import { ROUND_FORMS, type PackSpec } from "../pack";
 import { layoutBack, MIN_TEXT_MM } from "./backpanel";
-import { contrast } from "./color";
+import { contrast, deltaE } from "./color";
 import { checkEan13, EAN_NOMINAL } from "./ean13";
 import { artSize, infoPanels, printLayout, wrapBack } from "./layout";
 
@@ -69,6 +69,25 @@ export function preflight(a: Artwork, board: Board, spec: PackSpec): Check[] {
     if (fnd.level === "low" || !fnd.text.trim()) continue;
     if (text.includes(fnd.text.trim())) out.push(C(`claim-${fnd.text}`, fnd.level === "high" ? "error" : "warn", `有风险的说法：「${fnd.text}」`, `Risky wording: “${fnd.text}”`, `建议改为：${fnd.safer.zh}`, `Suggested: ${fnd.safer.en}`));
   }
+
+  // the real sample (打样): size, color, and the seller's sign-off
+  const pf = a.proof;
+  const dims: [string, string, string, number, number | null][] = [
+    ["w", ROUND_FORMS.includes(spec.form) ? "直径" : "宽", ROUND_FORMS.includes(spec.form) ? "diameter" : "width", spec.w, pf.w],
+    ["h", "高", "height", spec.h, pf.h],
+  ];
+  if (!ROUND_FORMS.includes(spec.form)) dims.push(["d", "深", "depth", spec.d, pf.d]);
+  const off = dims.filter(([, , , set, m]) => m !== null && Math.abs(m - set) > 1);
+  for (const [k, zh, en, set, m] of off) out.push(C(`proof-${k}`, "error", `实测${zh} ${m} mm，设定 ${set} mm`, `Measured ${en} ${m} mm, set to ${set} mm`, "差了 1 mm 以上：请在 3D 空间改成实测尺寸，或让印厂按设定尺寸重新打样。", "More than 1 mm out: set the measured size in the 3D space, or have the printer re-proof to the set size."));
+  if (!off.length && dims.every(([, , , , m]) => m !== null)) out.push(C("proof-size", "ok", "实测尺寸与设定一致（±1 mm）", "Measured size matches (±1 mm)"));
+  const picked = (Object.keys(pf.colors) as (keyof typeof pf.colors)[]).map((k) => ({ k, de: deltaE(a.palette[k], pf.colors[k]!) }));
+  if (picked.length) {
+    const worst = picked.reduce((x, y) => (y.de > x.de ? y : x));
+    const lvl: Level = worst.de > 10 ? "error" : worst.de > 5 ? "warn" : "ok";
+    out.push(C("proof-color", lvl, `实物色差 ΔE ${worst.de.toFixed(1)}`, `Sample color difference ΔE ${worst.de.toFixed(1)}`, lvl === "ok" ? "肉眼几乎看不出差别。" : "照片和设计色差别明显：先确认拍照光线（白天自然光、无滤镜），仍偏差就请印厂调墨后再打样。", lvl === "ok" ? "Hard to tell apart." : "A visible difference: check the photo's lighting (daylight, no filters); if it persists, ask the printer to adjust the ink and re-proof."));
+  }
+  if (pf.confirmed) out.push(C("sample", "ok", `已与实物打样核对${pf.at ? `（${pf.at}）` : ""}`, `Checked against the printed sample${pf.at ? ` (${pf.at})` : ""}`));
+  else out.push(C("sample", "warn", "还没有和实物打样核对", "Not yet checked against a printed sample", "在实物打样到手前，电商图片只是渲染图。拿到样品后在「实物核对」里比对并确认，图片才算与实物一致。", "Until the printed sample arrives the listing images are renders. Compare and confirm it under “Match the sample” before treating them as true to the product."));
 
   // always
   out.push(C("die", "info", "刀模以印厂为准", "Your printer's die line wins", "结构尺寸是标准做法；开模前请印厂核对。", "Structural sizes are standard practice; have the printer check before cutting."));

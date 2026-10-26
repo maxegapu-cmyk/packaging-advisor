@@ -7,7 +7,7 @@ import { readUpload, writeUpload } from "./uploads";
 import { defaultPack, normalizePack, type PackSpec } from "./pack";
 
 export type Project = { id: string; inviteId: number; title: string; category: Category; itemType: string; brand: string; description: string; mustText: string; pack: PackSpec; createdAt: string };
-export type Upload = { id: string; projectId: string; kind: "product" | "reference" | "logo"; note: string; file: string; mime: string };
+export type Upload = { id: string; projectId: string; kind: "product" | "reference" | "logo" | "proof"; note: string; file: string; mime: string };
 export type BoardRecord = { id: string; projectId: string; version: number; data: Board; modelLabel: string; note: string; shareToken: string | null; picked: string | null; createdAt: string };
 
 type ProjectRow = { id: string; invite_id: number; title: string; category: string; item_type?: string; brand: string; description: string; must_text: string; pack?: string; artwork?: string | null; created_at: string };
@@ -87,6 +87,14 @@ export function addUpload(projectId: string, kind: "product" | "reference", note
   return { id, projectId, kind, note, file, mime: "image/jpeg" };
 }
 
+/** A photo of the printed sample, for comparing it with the render. */
+export function addProofPhoto(projectId: string, jpeg: Buffer): Upload {
+  const id = randomId();
+  const file = writeUpload(id, jpeg);
+  getDb().prepare("INSERT INTO uploads (id, project_id, kind, note, file, mime, created_at) VALUES (?, ?, 'proof', '', ?, 'image/jpeg', ?)").run(id, projectId, file, now());
+  return { id, projectId, kind: "proof", note: "", file, mime: "image/jpeg" };
+}
+
 /** A logo for the artwork, stored as PNG so its transparency survives. */
 export function addLogo(projectId: string, png: Buffer): Upload {
   const id = randomId();
@@ -97,7 +105,7 @@ export function addLogo(projectId: string, png: Buffer): Upload {
 
 export function listUploads(projectId: string): Upload[] {
   // product photos and references only: logos belong to the artwork, not to the model's input
-  return (getDb().prepare("SELECT id, project_id, kind, note, file, mime FROM uploads WHERE project_id = ? AND kind != 'logo' ORDER BY created_at, rowid").all(projectId) as any[]).map((r) => ({
+  return (getDb().prepare("SELECT id, project_id, kind, note, file, mime FROM uploads WHERE project_id = ? AND kind NOT IN ('logo', 'proof') ORDER BY created_at, rowid").all(projectId) as any[]).map((r) => ({
     id: r.id, projectId: r.project_id, kind: r.kind, note: r.note, file: r.file, mime: r.mime,
   }));
 }

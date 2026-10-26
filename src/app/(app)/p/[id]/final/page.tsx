@@ -41,6 +41,7 @@ export default async function FinalPage({ params }: { params: Promise<{ id: stri
         lang={lang}
         saveUrl={`/api/projects/${project.id}/artwork`}
         logoUrl={`/api/projects/${project.id}/logo`}
+        proofUrl={`/api/projects/${project.id}/proof`}
         exportUrl={`/api/projects/${project.id}/export`}
         boardHref={`${boardHref}#handoff`}
         spaceHref={spaceHref}
