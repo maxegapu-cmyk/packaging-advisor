@@ -10,12 +10,13 @@ import { boxIn, smooth, springAt, U, type Built, type Holds, type Pin, type Slot
 import { buildCarton, buildGift, buildTin } from "./forms";
 import { buildBag, buildBookBox, buildDrawer, buildMailer, buildPaperTube } from "./forms-paper";
 import { buildBottle, buildCeramic, buildGlassBottle, buildJar, buildPouch, buildTube } from "./forms-round";
+import { buildAseptic, buildBlister, buildCan, buildWoodBox } from "./forms-more";
 import type { InsertKind, Kit } from "./kit";
 
 export type BuildCtx = { spec: PackSpec; kit: Kit; art: ArtInput; maxTex: number; own: { dispose: () => void }[]; category: string };
 
 /** Outer packs that hold their products in an insert (the rest show them beside). */
-const SLOTTED = new Set(["gift", "bookBox", "mailer", "drawer"]);
+const SLOTTED = new Set(["gift", "bookBox", "mailer", "drawer", "woodBox"]);
 
 function single(spec: PackSpec, c: BuildCtx, holds?: Holds, insert?: InsertKind): Built {
   const k = c.kit;
@@ -48,6 +49,14 @@ function single(spec: PackSpec, c: BuildCtx, holds?: Holds, insert?: InsertKind)
       return buildCeramic(spec, k, c.art, c.category);
     case "tin":
       return buildTin(spec, k, c.art, c.maxTex, c.own);
+    case "can":
+      return buildCan(spec, k, c.art);
+    case "blister":
+      return buildBlister(spec, k);
+    case "aseptic":
+      return buildAseptic(spec, k, c.art);
+    case "woodBox":
+      return buildWoodBox(spec, k, holds, insert);
   }
 }
 

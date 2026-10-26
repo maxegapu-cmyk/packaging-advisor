@@ -6,23 +6,23 @@
  */
 import type { Pair } from "./i18n";
 
-export const FORMS = ["carton", "gift", "bookBox", "mailer", "drawer", "paperTube", "bag", "pouch", "bottle", "tube", "jar", "glassBottle", "tin", "ceramic"] as const;
+export const FORMS = ["carton", "gift", "bookBox", "mailer", "drawer", "paperTube", "bag", "aseptic", "pouch", "bottle", "tube", "blister", "jar", "glassBottle", "tin", "can", "ceramic", "woodBox"] as const;
 export type Form = (typeof FORMS)[number];
 
 export const FINISHES = ["matte", "gloss", "paper", "foil"] as const;
 export type Finish = (typeof FINISHES)[number];
 
 /** Forms that can hold products (combinations). */
-export const OUTER_FORMS = ["carton", "gift", "bookBox", "mailer", "drawer", "bag"] as const;
+export const OUTER_FORMS = ["carton", "gift", "bookBox", "mailer", "drawer", "woodBox", "bag"] as const;
 export type OuterForm = (typeof OUTER_FORMS)[number];
 /** Forms that go inside another (the product's own container). */
-export const INNER_FORMS = ["bottle", "tube", "jar", "glassBottle", "tin", "ceramic", "paperTube", "pouch"] as const;
+export const INNER_FORMS = ["bottle", "tube", "jar", "glassBottle", "tin", "can", "ceramic", "paperTube", "aseptic", "pouch"] as const;
 export type InnerForm = (typeof INNER_FORMS)[number];
 
 /** Round forms: `w` is the diameter and `d` equals it. */
-export const ROUND_FORMS: readonly Form[] = ["tin", "paperTube", "bottle", "tube", "jar", "glassBottle", "ceramic"];
+export const ROUND_FORMS: readonly Form[] = ["tin", "can", "paperTube", "bottle", "tube", "jar", "glassBottle", "ceramic"];
 /** Forms with an open motion (unfold, lid off, tray out, stopper out). */
-export const CAN_OPEN: readonly Form[] = ["carton", "gift", "bookBox", "mailer", "drawer", "paperTube", "tin", "jar", "glassBottle", "ceramic"];
+export const CAN_OPEN: readonly Form[] = ["carton", "gift", "bookBox", "mailer", "drawer", "woodBox", "paperTube", "aseptic", "tin", "can", "jar", "glassBottle", "ceramic"];
 
 /** What the products sit in, inside a combination (the cushioning families in use today). */
 export const INSERTS = ["velvet", "pulp", "foam", "card"] as const;
@@ -39,10 +39,12 @@ export type PackSpec = { form: Form; w: number; h: number; d: number; finish: Fi
 
 export const MATERIAL_GROUPS: { id: string; label: Pair; forms: readonly Form[] }[] = [
   { id: "paper", label: { zh: "纸与卡纸", en: "Paper and board" }, forms: ["carton", "gift", "bookBox", "mailer", "drawer", "paperTube", "bag"] },
-  { id: "plastic", label: { zh: "塑料", en: "Plastic" }, forms: ["pouch", "bottle", "tube"] },
+  { id: "composite", label: { zh: "复合材料", en: "Composite" }, forms: ["aseptic"] },
+  { id: "plastic", label: { zh: "塑料", en: "Plastic" }, forms: ["pouch", "bottle", "tube", "blister"] },
   { id: "glass", label: { zh: "玻璃", en: "Glass" }, forms: ["jar", "glassBottle"] },
-  { id: "metal", label: { zh: "金属", en: "Metal" }, forms: ["tin"] },
+  { id: "metal", label: { zh: "金属", en: "Metal" }, forms: ["tin", "can"] },
   { id: "ceramic", label: { zh: "陶瓷", en: "Ceramic" }, forms: ["ceramic"] },
+  { id: "wood", label: { zh: "木材", en: "Wood" }, forms: ["woodBox"] },
 ];
 
 export const FORM_LABELS: Record<Form, Pair> = {
@@ -53,6 +55,10 @@ export const FORM_LABELS: Record<Form, Pair> = {
   drawer: { zh: "抽屉盒", en: "Drawer box" },
   paperTube: { zh: "纸罐", en: "Paper tube" },
   bag: { zh: "手提纸袋", en: "Paper bag" },
+  aseptic: { zh: "利乐砖", en: "Aseptic carton" },
+  blister: { zh: "泡罩卡", en: "Blister card" },
+  can: { zh: "易拉罐", en: "Drink can" },
+  woodBox: { zh: "抽盖木箱", en: "Wooden crate" },
   pouch: { zh: "自立拉链袋", en: "Stand-up pouch" },
   bottle: { zh: "按压瓶", en: "Pump bottle" },
   tube: { zh: "软管", en: "Squeeze tube" },
@@ -70,6 +76,10 @@ export const FORM_NOTES: Record<Form, Pair> = {
   drawer: { zh: "外套加抽屉，拉出即见内容物，化妆品和礼品常用。", en: "A sleeve and a sliding tray; pull it out to reveal the contents. Common for cosmetics and gifts." },
   paperTube: { zh: "纸质圆筒，盖子套在内颈上，茶叶和化妆品常用，环保。", en: "A paperboard cylinder with a lid over an inner neck; used for tea and cosmetics, and recyclable." },
   bag: { zh: "门店和礼品用的手提纸袋，带绳提手和侧面风琴折。", en: "A retail and gift bag with rope handles and gusseted sides." },
+  aseptic: { zh: "纸 / 塑 / 铝复合的无菌砖，牛奶、果汁、植物饮品常用，顶部折耳，带旋盖。", en: "A board / PE / foil aseptic brick for milk, juice and plant drinks, with folded ears and a screw cap." },
+  blister: { zh: "印刷卡纸加透明 PET 泡罩，挂钩陈列，小件化妆品和五金常用。", en: "A printed card with a clear PET blister, made to hang on a peg; common for small cosmetics and hardware." },
+  can: { zh: "两片式铝罐，罐身直接印刷，带拉环，饮料和特产饮品常用。", en: "A two-piece aluminium can printed directly on the body, with a pull tab, for drinks and specialty beverages." },
+  woodBox: { zh: "松木箱，盖子沿槽抽出，盖面激光烙印品牌，茶叶、酒、土特产礼盒常用。", en: "A pine crate whose lid slides out along grooves, with the brand laser-engraved on the lid; used for tea, spirits and specialty gifts." },
   pouch: { zh: "复合膜自立袋，带自封拉链，零食、茶叶、特产最常用。", en: "A laminated stand-up pouch with a zip, the most common pack for snacks, tea and specialties." },
   bottle: { zh: "塑料按压泵瓶，洗护和护肤品常用。", en: "A plastic pump bottle for body care and skincare." },
   tube: { zh: "可挤压软管，倒立放置，洁面和护手霜常用。", en: "A squeeze tube that stands on its cap, for cleansers and hand creams." },
@@ -122,6 +132,10 @@ export const FORM_PRESET: Record<Form, { form: Form; w: number; h: number; d: nu
   drawer: { form: "drawer", w: 200, h: 70, d: 140 },
   paperTube: { form: "paperTube", w: 80, h: 140, d: 80 },
   bag: { form: "bag", w: 260, h: 320, d: 110 },
+  aseptic: { form: "aseptic", w: 95, h: 166, d: 63 },
+  blister: { form: "blister", w: 120, h: 180, d: 28 },
+  can: { form: "can", w: 66, h: 115, d: 66 },
+  woodBox: { form: "woodBox", w: 300, h: 140, d: 220 },
   pouch: { form: "pouch", w: 140, h: 210, d: 70 },
   bottle: { form: "bottle", w: 52, h: 170, d: 52 },
   tube: { form: "tube", w: 38, h: 160, d: 38 },
@@ -183,7 +197,7 @@ export function comboLayout(spec: PackSpec) {
   const inner = spec.inner;
   if (!inner) return null;
   const n = inner.count;
-  const lyingOk = spec.form === "gift" || spec.form === "bookBox" || spec.form === "mailer" || spec.form === "drawer";
+  const lyingOk = spec.form === "gift" || spec.form === "bookBox" || spec.form === "mailer" || spec.form === "drawer" || spec.form === "woodBox";
   const lying = lyingOk && inner.h > inner.w * 1.4;
   const foot = lying ? { w: inner.h, d: inner.w, h: inner.d } : { w: inner.w, d: inner.d, h: inner.h };
   const c = (x: number) => Math.round(Math.max(DIM_RANGE.min, Math.min(DIM_RANGE.max, x)));
@@ -198,6 +212,11 @@ export function comboLayout(spec: PackSpec) {
     case "bookBox":
       gap = 22;
       outer = { w: c(n * foot.w + (n + 1) * gap), h: c(foot.h + 26), d: c(foot.d + 56) };
+      break;
+    case "woodBox":
+      // 10 mm pine walls each side, a 6 mm floor and a sliding lid
+      gap = 22;
+      outer = { w: c(n * foot.w + (n + 1) * gap + 20), h: c(foot.h + 30), d: c(foot.d + 64) };
       break;
     case "mailer":
       gap = 18;

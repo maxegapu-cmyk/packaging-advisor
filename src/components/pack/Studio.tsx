@@ -57,6 +57,9 @@ const S = {
   unstop: { zh: "拔出瓶塞", en: "Pull stopper" },
   stopIn: { zh: "塞回瓶塞", en: "Stopper in" },
   openBook: { zh: "翻开", en: "Open" },
+  pullTab: { zh: "拉开拉环", en: "Pull the tab" },
+  slideLid: { zh: "抽出盖子", en: "Slide the lid out" },
+  slideIn: { zh: "推回盖子", en: "Slide the lid in" },
   closeBook: { zh: "合上", en: "Close" },
   combo: { zh: "组合包装", en: "Combination" },
   comboNote: { zh: "选一种产品装进这个外包装，外包装尺寸会按产品自动配好。", en: "Pick a product to pack in this outer pack; the outer size is fitted to it." },
@@ -112,7 +115,7 @@ function detailsFor(form: Form): Detail[] {
   const type = (d: Direction) => d.styleDna.typography;
   const finish = (d: Direction) => d.styleDna.finish;
   const canOpen = CAN_OPEN.includes(form);
-  if (form === "gift" || form === "bookBox" || form === "mailer")
+  if (form === "gift" || form === "bookBox" || form === "mailer" || form === "woodBox")
     return [
       { id: "lid", label: { zh: "盖面主视觉", en: "Lid artwork" }, angle: { x: -64, y: -8 }, zoom: 1.16, text: front },
       { id: "band", label: { zh: "侧边与字体", en: "Sides and type" }, angle: { x: -10, y: -22 }, zoom: 1.31, text: type },
@@ -131,14 +134,14 @@ function detailsFor(form: Form): Detail[] {
     return [
       { id: "label", label: { zh: "正面标签", en: "Label" }, angle: { x: -6, y: -8 }, zoom: 1.2, text: front },
       { id: "side", label: { zh: "侧面信息", en: "Side panel" }, angle: { x: -6, y: -150 }, zoom: 1.2, text: back },
-      { id: "top", label: form === "glassBottle" ? { zh: "瓶塞", en: "Stopper" } : form === "tube" ? { zh: "尾封", en: "Crimp" } : { zh: "顶部", en: "Top" }, angle: { x: -64, y: -12 }, zoom: 1.18, text: anchor },
+      { id: "top", label: form === "glassBottle" ? { zh: "瓶塞", en: "Stopper" } : form === "tube" ? { zh: "尾封", en: "Crimp" } : form === "can" ? { zh: "罐盖与拉环", en: "End and tab" } : { zh: "顶部", en: "Top" }, angle: { x: -64, y: -12 }, zoom: 1.18, text: anchor },
       ...(canOpen ? [{ id: "open", label: { zh: "打开", en: "Opened" }, angle: { x: -40, y: -22 }, zoom: 0.95, open: true, text: inner }] : []),
       { id: "finish", label: { zh: "工艺", en: "Finish" }, angle: { x: -14, y: 30 }, zoom: 1.27, text: finish },
     ];
-  if (form === "pouch" || form === "bag")
+  if (form === "pouch" || form === "bag" || form === "blister")
     return [
       { id: "front", label: { zh: "正面主视觉", en: "Front artwork" }, angle: { x: -6, y: -8 }, zoom: 1.16, text: front },
-      { id: "side", label: form === "bag" ? { zh: "侧面风琴折", en: "Gusset" } : { zh: "侧封与拉链", en: "Seal and zip" }, angle: { x: -8, y: 70 }, zoom: 1.2, text: type },
+      { id: "side", label: form === "bag" ? { zh: "侧面风琴折", en: "Gusset" } : form === "blister" ? { zh: "泡罩侧面", en: "Blister profile" } : { zh: "侧封与拉链", en: "Seal and zip" }, angle: { x: -8, y: 70 }, zoom: 1.2, text: type },
       { id: "back", label: { zh: "背面信息", en: "Back panel" }, angle: { x: -6, y: 180 }, zoom: 1.16, text: back },
       { id: "finish", label: { zh: "工艺", en: "Finish" }, angle: { x: -24, y: -46 }, zoom: 1.28, text: finish },
     ];
@@ -158,6 +161,9 @@ function openLabelFor(form: Form, open: boolean): Pair {
   if (form === "jar") return open ? S.closeLid : S.unscrew;
   if (form === "glassBottle") return open ? S.stopIn : S.unstop;
   if (form === "bookBox") return open ? S.closeBook : S.openBook;
+  if (form === "can") return open ? S.closeLid : S.pullTab;
+  if (form === "aseptic") return open ? S.closeLid : S.unscrew;
+  if (form === "woodBox") return open ? S.slideIn : S.slideLid;
   return open ? S.closeLid : S.openLid;
 }
 

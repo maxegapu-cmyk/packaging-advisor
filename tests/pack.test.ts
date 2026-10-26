@@ -39,4 +39,8 @@ test("the outer pack is sized to its products", () => {
   assert.deepEqual(outerSize(carton), { w: 56, h: 176, d: 56 });
   assert.equal(formatSize(carton), "56 × 176 × 56 mm");
   assert.equal(formatInner(carton), "1 × Ø52 × 170 mm");
+  // two cans lie in a pine crate: 10 mm walls, a floor and a sliding lid on top
+  const crate = comboLayout(normalizePack({ form: "woodBox", w: 10, h: 10, d: 10, inner: { form: "can", count: 2, w: 66, h: 115 } }))!;
+  assert.equal(crate.lying, true);
+  assert.deepEqual(crate.outer, { w: 2 * 115 + 3 * 22 + 20, h: 66 + 30, d: 66 + 64 });
 });

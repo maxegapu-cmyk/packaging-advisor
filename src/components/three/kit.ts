@@ -32,6 +32,10 @@ export type Kit = {
   ceramic: (hex: string) => THREE.MeshPhysicalMaterial;
   /** A plain printed sheet in the ground color, for wrapped edges and seals. */
   plain: (surface?: Surface) => THREE.MeshPhysicalMaterial;
+  /** Pine, its grain along u, for a face `uMm` × `vMm`. */
+  wood: (uMm: number, vMm: number) => THREE.MeshPhysicalMaterial;
+  /** A face's artwork laser-engraved into pine (dark burn where the print has ink). */
+  engraved: (kind: FaceKind, wMm: number, hMm: number) => THREE.MeshPhysicalMaterial;
   rope: THREE.MeshStandardMaterial;
   cork: THREE.MeshStandardMaterial;
   dispose: () => void;
@@ -77,6 +81,44 @@ function noiseCanvas(base: string, spread: number, size = 256, flecks = 2400): H
     ctx.beginPath();
     ctx.ellipse(x, y, 1 + rnd() * 5, 0.6 + rnd() * 1.6, rnd() * Math.PI, 0, Math.PI * 2);
     ctx.fill();
+  }
+  return c;
+}
+
+/** Flat-sawn pine: fine growth rings of uneven spacing along the length, pores, a soft knot. */
+function woodCanvas(W = 1024, H = 512, seed0 = 7): HTMLCanvasElement {
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext("2d")!;
+  let seed = seed0;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const img = ctx.createImageData(W, H);
+  const base = [222, 194, 150];
+  const late = [176, 132, 84];
+  const kx = W * (0.2 + rnd() * 0.6);
+  const ky = H * (0.2 + rnd() * 0.6);
+  const p = [rnd() * 6, rnd() * 6, rnd() * 6];
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const dx = (x - kx) / W;
+      const dy = (y - ky) / H;
+      const knot = Math.exp(-(dx * dx * 900 + dy * dy * 3600));
+      const sx = x / W;
+      let u = y / H + 0.006 * Math.sin(sx * 9 + p[0]) + 0.003 * Math.sin(sx * 31 + p[1]) + knot * 0.03 * Math.sign(dy || 1);
+      u = u * 28 + 1.6 * Math.sin(u * 4.1 + p[2]); // rings of uneven width
+      const f = u - Math.floor(u);
+      const ring = Math.pow(Math.max(0, Math.sin(f * Math.PI)), 14);
+      const tone = 0.08 * Math.sin((y / H) * 5.3 + p[0]) + 0.05 * Math.sin(sx * 2.1 + p[1]);
+      const t = Math.min(1, ring * 0.55 + Math.max(0, tone) + knot * 0.55);
+      const o = (y * W + x) * 4;
+      for (let i = 0; i < 3; i++) img.data[o + i] = base[i] + (late[i] - base[i]) * t;
+      img.data[o + 3] = 255;
+    }
+  ctx.putImageData(img, 0, 0);
+  for (let i = 0; i < 14000; i++) {
+    ctx.fillStyle = `rgba(110,72,36,${rnd() * 0.1})`;
+    ctx.fillRect(rnd() * W, rnd() * H, 2 + rnd() * 12, 0.7);
   }
   return c;
 }
@@ -234,6 +276,43 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
     card: live(new THREE.MeshStandardMaterial({ color: "#ECE8DF", roughness: 0.9, normalMap: insideFiber, normalScale: nScale(0.35) })),
   };
   const ceramic = (hex: string) => live(new THREE.MeshPhysicalMaterial({ color: hex, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.03, sheen: 0.2, sheenColor: new THREE.Color("#ffffff") }));
+  // pine: one grain image for the walls, and engraving drawn over a copy of it
+  const woodImg = woodCanvas();
+  const woodBase = canvasTex(woodImg, true, true);
+  const wood = (uMm: number, vMm: number) => {
+    const t = woodBase.clone();
+    t.repeat.set(uMm / 320, vMm / 160);
+    t.needsUpdate = true;
+    disposables.push(t);
+    return live(new THREE.MeshPhysicalMaterial({ map: t, roughness: 0.78, sheen: 0.25, sheenRoughness: 0.7, sheenColor: new THREE.Color("#fff3df"), normalMap: insideFiber, normalScale: nScale(0.25) }));
+  };
+  const engraved = (kind: FaceKind, wMm: number, hMm: number) => {
+    const ppm = Math.min(8, maxTex / Math.max(wMm, hMm));
+    const art = drawFace(kind, wMm, hMm, ppm, { ...a, finish: "matte" }).color;
+    const W = art.width;
+    const H = art.height;
+    const c = document.createElement("canvas");
+    c.width = W;
+    c.height = H;
+    const ctx = c.getContext("2d")!;
+    ctx.drawImage(woodImg, 0, 0, woodImg.width * Math.min(1, wMm / 320), woodImg.height * Math.min(1, hMm / 160), 0, 0, W, H);
+    // burn: wherever the artwork differs from its ground color
+    const src = art.getContext("2d")!.getImageData(0, 0, W, H);
+    const dst = ctx.getImageData(0, 0, W, H);
+    const g = new THREE.Color(roles.ground);
+    const gr = g.r * 255;
+    const gg = g.g * 255;
+    const gb = g.b * 255;
+    for (let i = 0; i < src.data.length; i += 4) {
+      const d = Math.min(1, Math.hypot(src.data[i] - gr, src.data[i + 1] - gg, src.data[i + 2] - gb) / 90);
+      const k = d * 0.66;
+      dst.data[i] = dst.data[i] * (1 - k) + 58 * k;
+      dst.data[i + 1] = dst.data[i + 1] * (1 - k) + 36 * k;
+      dst.data[i + 2] = dst.data[i + 2] * (1 - k) + 20 * k;
+    }
+    ctx.putImageData(dst, 0, 0);
+    return live(new THREE.MeshPhysicalMaterial({ map: canvasTex(c, true), roughness: 0.8, sheen: 0.25, sheenRoughness: 0.7, sheenColor: new THREE.Color("#fff3df"), normalMap: insideFiber, normalScale: nScale(0.25) }));
+  };
   const plainCache = new Map<Surface, THREE.MeshPhysicalMaterial>();
   const plain = (surface: Surface = "board") => {
     let m = plainCache.get(surface);
@@ -241,5 +320,5 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
     return m;
   };
 
-  return { tex, edge, inside, lining, velvet, bareMetal, kraft, flute, plastic, anodised, glass, fill, insert: (kind) => inserts[kind], ceramic, plain, rope, cork, dispose: () => disposables.forEach((x) => x.dispose()) };
+  return { tex, edge, inside, lining, velvet, bareMetal, kraft, flute, plastic, anodised, glass, fill, insert: (kind) => inserts[kind], ceramic, plain, wood, engraved, rope, cork, dispose: () => disposables.forEach((x) => x.dispose()) };
 }

@@ -32,6 +32,10 @@ const FORM_TEXT: Record<PackSpec["form"], Pair> = {
   glassBottle: { zh: "玻璃瓶配瓶塞，正标与颈标", en: "glass bottle with a stopper, front label and neck band" },
   tin: { zh: "金属圆罐，标签环绕罐身，金属罐盖", en: "round metal tin with a wrap-around label and a metal lid" },
   ceramic: { zh: "釉面瓷罐配瓷盖，釉上贴花", en: "glazed porcelain caddy with a porcelain lid and a fired-on decal" },
+  can: { zh: "两片式铝制易拉罐，缩颈罐肩，拉环在罐盖上", en: "two-piece aluminium drink can with a necked shoulder and a pull tab on the end" },
+  blister: { zh: "泡罩卡：印刷背卡带欧式挂孔，透明 PET 泡罩内装产品", en: "blister card: a printed backing card with a euro hang slot and the product in a clear PET blister" },
+  aseptic: { zh: "无菌砖形纸盒，顶部封边折平，两侧折耳，带旋盖", en: "aseptic brick carton with the top seal folded flat, ears folded onto the sides and a screw cap" },
+  woodBox: { zh: "松木抽盖木箱，盖面激光烙印", en: "pine crate with a sliding lid, laser-engraved on top" },
 };
 
 /** Surface notes for forms whose outside is not printed paper. */
@@ -41,6 +45,10 @@ const SURFACE_TEXT: Partial<Record<PackSpec["form"], Pair>> = {
   glassBottle: { zh: "玻璃清澈有厚度感，瓶肩与瓶底有自然折射", en: "clear glass with visible thickness, natural refraction at the shoulder and base" },
   ceramic: { zh: "釉面温润光滑，高光柔和，贴花平整", en: "smooth, warm glaze with soft highlights and a flat decal" },
   tin: { zh: "印铁表面罩清漆，卷边处有金属高光", en: "lacquered printed tinplate with metallic highlights on the rolled edges" },
+  can: { zh: "铝面印刷，罐肩和罐底露出拉丝铝的金属高光", en: "print on aluminium, with bare brushed-metal highlights on the shoulder and base" },
+  blister: { zh: "泡罩清透，边缘有细窄高光，不发雾", en: "a clear blister with thin edge highlights, not hazy" },
+  aseptic: { zh: "表面是 PE 淋膜，柔和光泽", en: "PE-coated board with a soft sheen" },
+  woodBox: { zh: "松木纹理自然，烙印处颜色深、边缘略焦", en: "natural pine grain; the engraving dark with slightly scorched edges" },
 };
 
 const role = (d: Direction, r: string) => d.palette.find((s) => s.role === r);

@@ -114,6 +114,41 @@ export function FormGlyph({ form }: { form: Form }) {
           <path d="M7 19c2 1 5.5 1.5 9 1.5s7-.5 9-1.5" />
         </svg>
       );
+    case "can":
+      return (
+        <svg {...P}>
+          <ellipse cx="16" cy="6.5" rx="6" ry="2" />
+          <path d="M10 6.5l-1.5 3V25c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5V9.5L22 6.5" />
+          <path d="M15 5.5h3" />
+        </svg>
+      );
+    case "blister":
+      return (
+        <svg {...P}>
+          <rect x="7" y="3" width="18" height="26" rx="1.5" />
+          <path d="M14 6.5h4" />
+          <rect x="10.5" y="11" width="11" height="14" rx="3" />
+          <path d="M13 14v8" opacity="0.5" />
+        </svg>
+      );
+    case "aseptic":
+      return (
+        <svg {...P}>
+          <path d="M9 7l9-2 6 2-9 2z" />
+          <path d="M9 7v21l6 1.5V9M24 7v20l-9 2.5" />
+          <path d="M24 7l-2.5 4" />
+          <rect x="11" y="4" width="3" height="2.4" rx="0.8" />
+        </svg>
+      );
+    case "woodBox":
+      return (
+        <svg {...P}>
+          <path d="M3 12l13-5 13 5-13 5z" />
+          <path d="M3 12v10l13 5 13-5V12" />
+          <path d="M16 17v10" />
+          <path d="M6 16.5l7 2.7M6 20l7 2.7M19 19.2l7-2.7M19 22.7l7-2.7" opacity="0.55" />
+        </svg>
+      );
     default:
       return (
         <svg {...P}>
