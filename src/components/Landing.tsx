@@ -11,10 +11,11 @@ import { Box3D, BoxSync, PackProvider, SpaceIcon } from "./Box3D";
 import { paletteVars } from "./BoxFaces";
 import { Brandmark } from "./Brandmark";
 import { ColorBar } from "./ColorBar";
-import { HeroSection } from "./DielineHero";
+import { SymbiosisHero } from "./hero/SymbiosisHero";
 import { FaceLayout } from "./FaceLayout";
 import { PackBar } from "./PackBar";
 import { FormGlyph } from "./pack/FormGlyph";
+import { HowVignette } from "./HowVignettes";
 import { SpaceShowcase } from "./SpaceShowcase";
 
 const UPLOAD_HREF = "/login?next=/new";
@@ -24,22 +25,22 @@ const C = {
   navAny: { zh: "适用品类", en: "Categories" },
   navSamples: { zh: "示例", en: "Samples" },
   navSpace: { zh: "3D 空间", en: "3D space" },
-  heroA: { zh: "一张产品照片，", en: "One product photo." },
-  heroB: { zh: "三个包装方向。", en: "Three packaging directions." },
+  heroA: { zh: "拍一张照片，", en: "One product photo in." },
+  heroB: { zh: "拿到能印的包装。", en: "Print-ready packaging out." },
   heroSub: {
-    zh: "茶叶、护肤品、零食、数码配件，什么产品都可以。上传照片，几分钟后得到三个能直接交给设计师的包装方向，再在 3D 里按真实尺寸看清楚。",
-    en: "Tea, skincare, snacks, gadgets: any product. Upload a photo and in minutes get three packaging directions a designer can act on, then check them at real size in 3D.",
+    zh: "茶叶、护肤品、零食、数码……什么产品都可以。三个方向里挑一个，在 3D 里按真实尺寸打样，再下载能直接交给印厂的印刷文件和电商主图。不用请设计师。",
+    en: "Tea, skincare, snacks, gadgets: any product. Pick one of three directions, proof it at real size in 3D, then download a print file your printer can use and your listing images. No designer needed.",
   },
   ctaUpload: { zh: "上传你的产品", en: "Upload your product" },
   ctaSpace: { zh: "先看 3D 空间", en: "See the 3D space first" },
   testNote: { zh: "测试版，凭邀请码使用。", en: "Test version, invite only." },
 
-  howH: { zh: "四步，从照片到交给设计师", en: "Four steps from a photo to your designer" },
+  howH: { zh: "四步，从一张照片到能印的包装", en: "Four steps from a photo to print-ready packaging" },
   steps: [
     { t: UI.step1, d: { zh: "一两张手机照片，选好品类，写下品名。喜欢的参考图可加可不加。", en: "One or two phone photos, the category and the product name. References you like are optional." } },
     { t: UI.step2, d: { zh: "三个真正不同的方向：稳妥、有识别度、大胆。每个都有配色、版式、文案和措辞核查。", en: "Three genuinely different routes: safe, distinctive, bold. Each with colors, layout, copy and a wording check." } },
     { t: UI.step3, d: { zh: "选一个方向，在 3D 里按真实尺寸换盒型、装进外盒、打开看内部、出一张照片级效果图。", en: "Pick one and, in 3D at real size, change the form, pack it into an outer box, open it, and render a photo." } },
-    { t: UI.step4, d: { zh: "复制一句话指令或分享链接，设计师照着就能做。", en: "Copy the one-line brief or a share link; your designer can work straight from it." } },
+    { t: UI.step4, d: { zh: "填好标签信息和条码，下载 1:1 刀模印刷文件和电商主图，直接交给印厂。", en: "Fill in the label details and barcode, then download a 1:1 print file with die lines and your listing images for the printer." } },
   ] as { t: Pair; d: Pair }[],
 
   anyH: { zh: "什么产品都可以", en: "Works for any product" },
@@ -52,7 +53,7 @@ const C = {
   hasSample: { zh: "有示例", en: "Sample" },
 
   samplesH: { zh: "示例", en: "Samples" },
-  samplesSub: { zh: "同一套方法，用在四种完全不同的产品上。三个盒子会一起转，方便比较。", en: "One method on four very different products. The three boxes turn together so you can compare." },
+  samplesSub: { zh: "同一套方法，用在十种完全不同的产品和包装上。三个方向会一起转，方便比较。", en: "One method on ten very different products and packages. The three directions turn together so you can compare." },
   reading: { zh: "我们看到的", en: "What we saw" },
   openSample: { zh: "在 3D 空间里打开这个示例", en: "Open this sample in the 3D space" },
 
@@ -68,84 +69,29 @@ const C = {
     { t: { zh: "照片级出图", en: "Photo renders" }, d: { zh: "停下来就能出一张棚拍质感的效果图，直接用于提案。", en: "Stop turning and render a studio-quality image for your pitch." } },
   ] as { t: Pair; d: Pair }[],
 
-  boardH: { zh: "方案板里有什么", en: "What's in a board" },
+  boardH: { zh: "你会拿到什么", en: "What you get" },
   items: [
     { t: { zh: "色彩卡", en: "Color card" }, d: { zh: "HEX 色值与每种颜色的面积占比。", en: "HEX values and each color's share of the surface." } },
     { t: { zh: "四个载体", en: "Four carriers" }, d: { zh: "外箱正面、侧面与背面、内包装、说明书，各自怎么排。", en: "Box front, sides and back, inner pack, manual: how each is laid out." } },
     { t: { zh: "视觉锚点", en: "Visual anchor" }, d: { zh: "一个贯穿整个开箱过程、让人记住你的元素。", en: "One element that carries through the whole unboxing." } },
     { t: { zh: "包装文案", en: "Packaging copy" }, d: { zh: "品名行、正面主张和说明书步骤，只依据你提供的事实。", en: "Name line, front promise and manual steps, from your facts only." } },
     { t: { zh: "措辞核查", en: "Wording check" }, d: { zh: "标出“医用级”“降三高”这类有风险的说法，并给出替代写法。", en: "Flags risky claims like “medical grade” and suggests safer wording." } },
-    { t: { zh: "设计师指令", en: "Designer instruction" }, d: { zh: "一句话说清选哪个方向、怎么做。", en: "One sentence on which direction and how to execute it." } },
+    { t: { zh: "印刷文件", en: "Print file" }, d: { zh: "1:1 刀模展开图、3 mm 出血、裁切与压痕专色、印刷工单，印厂直接可用。", en: "1:1 die lines and artwork, 3 mm bleed, cut and crease spot colors and a job sheet a printer can use." } },
+    { t: { zh: "电商图片", en: "Listing images" }, d: { zh: "白底主图、正背面、打开、细节、尺寸图，从 3D 直接渲染。", en: "White main image, front, back, opened, close-up and dimensions, rendered from the 3D." } },
+    { t: { zh: "印前检查", en: "Pre-press checks" }, d: { zh: "标签必标项、条码、对比度、字号和措辞，下载前逐项核对。", en: "Mandatory label items, barcode, contrast, text size and wording, checked before you download." } },
   ] as { t: Pair; d: Pair }[],
 
-  notH: { zh: "我们不做的事", en: "What it doesn't do" },
+  notH: { zh: "需要你知道的", en: "Good to know" },
   nots: [
-    { zh: "不出可生产的刀模和印刷文件：展开图只是结构示意。", en: "No production dielines or print files: the unfolded net is a sketch." },
+    { zh: "不替印厂开模：刀模是标准结构，开模前请印厂核对。", en: "It doesn't make the cutting die: the die line is a standard structure for your printer to check." },
     { zh: "不替代打样：屏幕色与印刷色会有差异。", en: "No substitute for proofing: screen and print colors differ." },
-    { zh: "不构成合规审查：标签信息以占位符提示。", en: "No compliance review: label details are placeholders." },
+    { zh: "不替你决定标签内容：必标项会列出来，内容由你填写并对照现行规定核对。", en: "It doesn't decide your label: mandatory items are listed, you fill them in and check them against current rules." },
     { zh: "不复制别人的设计：参考图只借鉴思路。", en: "No copying: references inform ideas, not artwork." },
   ] as Pair[],
   endH: { zh: "把你的产品放上来看看。", en: "Put your product on the press." },
   endSub: { zh: "测试期间凭邀请码使用；还没有邀请码，请联系项目负责人。", en: "Invite-only during testing; ask the project team for a code." },
-  footer: { zh: "概念方向示意，非印刷稿。", en: "Concept directions, not print files." },
+  footer: { zh: "印刷前请与印厂核对刀模并打样。", en: "Check the die line with your printer and proof before printing." },
 };
-
-/** Small drawings for the four steps. */
-function StepArt({ n }: { n: number }) {
-  const ink = "#161616";
-  if (n === 0)
-    return (
-      <svg className="step-art" viewBox="0 0 160 96" aria-hidden="true">
-        <rect x="46" y="6" width="68" height="84" rx="8" fill="#fff" stroke={ink} strokeWidth="1.2" />
-        <rect x="52" y="14" width="56" height="58" rx="2" fill="#ECEFE9" />
-        <path d="M70 62V36c0-4 4-6 10-6s10 2 10 6v26z" fill="#6F8A5E" />
-        <rect x="70" y="42" width="20" height="5" fill="#2A2E2B" opacity="0.7" />
-        <circle cx="80" cy="81" r="3" fill={ink} />
-        <path d="M122 30l14-10M122 46h18" stroke="#E4007F" strokeWidth="1.4" strokeDasharray="3 2" />
-      </svg>
-    );
-  if (n === 1)
-    return (
-      <svg className="step-art" viewBox="0 0 160 96" aria-hidden="true">
-        {[
-          ["#EFEDE4", "#6F8A5E"],
-          ["#E8ECE6", "#3F7A4F"],
-          ["#E9DFA8", "#7FA83A"],
-        ].map(([g, k], i) => (
-          <g key={i} transform={`translate(${14 + i * 46} ${18 + (i === 1 ? -6 : 0)})`}>
-            <path d="M0 10l14-8h24l-14 8z" fill={g} stroke={ink} strokeWidth="0.8" />
-            <path d="M24 10l14-8v52l-14 8z" fill={k} stroke={ink} strokeWidth="0.8" />
-            <rect x="0" y="10" width="24" height="52" fill={g} stroke={ink} strokeWidth="0.8" />
-            <rect x="0" y="10" width="7" height="52" fill={k} />
-          </g>
-        ))}
-        <rect x="58" y="6" width="44" height="72" fill="none" stroke="#E4007F" strokeWidth="1.2" strokeDasharray="4 3" />
-      </svg>
-    );
-  if (n === 2)
-    return (
-      <svg className="step-art" viewBox="0 0 160 96" aria-hidden="true">
-        <ellipse cx="80" cy="84" rx="44" ry="6" fill="#000" opacity="0.08" />
-        <path d="M50 34l30-14 30 14-30 14z" fill="#E8ECE6" stroke={ink} strokeWidth="1" />
-        <path d="M50 34v36l30 14V48z" fill="#E8ECE6" stroke={ink} strokeWidth="1" />
-        <path d="M110 34v36l-30 14V48z" fill="#3F7A4F" stroke={ink} strokeWidth="1" />
-        <path d="M30 40a52 52 0 0 1 100 0" fill="none" stroke="#E4007F" strokeWidth="1.3" strokeDasharray="3 3" />
-        <path d="M126 34l4 6 6-3" fill="none" stroke="#E4007F" strokeWidth="1.3" />
-      </svg>
-    );
-  return (
-    <svg className="step-art" viewBox="0 0 160 96" aria-hidden="true">
-      <rect x="40" y="6" width="68" height="84" fill="#fff" stroke={ink} strokeWidth="1.2" />
-      <rect x="48" y="16" width="52" height="8" fill="#3F7A4F" />
-      <path d="M48 34h52M48 42h44M48 50h48M48 58h30" stroke={ink} strokeWidth="1.2" opacity="0.5" />
-      <rect x="48" y="68" width="10" height="10" fill="#E8ECE6" stroke={ink} strokeWidth="0.6" />
-      <rect x="60" y="68" width="10" height="10" fill="#1F2A24" />
-      <rect x="72" y="68" width="10" height="10" fill="#3F7A4F" />
-      <rect x="84" y="68" width="10" height="10" fill="#C9A14A" />
-      <path d="M116 48h30m-8-6l8 6-8 6" fill="none" stroke={ink} strokeWidth="1.4" />
-    </svg>
-  );
-}
 
 function Topbar({ lang, langSwitch }: { lang: Lang; langSwitch: React.ReactNode }) {
   return (
@@ -195,7 +141,7 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
     <div className="landing">
       <Topbar lang={lang} langSwitch={langSwitch} />
 
-      <HeroSection samples={SAMPLES} lang={lang}>
+      <SymbiosisHero samples={SAMPLES} lang={lang}>
         <h1 className="hero-h">
           <span className="hero-line">{one(C.heroA)}</span>
           <span className="hero-line">{one(C.heroB)}</span>
@@ -207,23 +153,23 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
         </h1>
         <Bi p={C.heroSub} lang={lang} as="p" className="hero-sub" />
         <div className="hero-ctas">
-          <a className="btn btn-sheet btn-large" href={UPLOAD_HREF}>
+          <a className="btn btn-primary btn-large" href={UPLOAD_HREF}>
             <Bi p={C.ctaUpload} lang={lang} />
           </a>
-          <a className="btn btn-sheet-ghost btn-large btn-icon" href="/space/demo">
+          <a className="btn btn-large btn-icon sym-ghost" href="/space/demo">
             <SpaceIcon />
             <Bi p={C.ctaSpace} lang={lang} />
           </a>
         </div>
         <Bi p={C.testNote} lang={lang} as="p" className="hero-note" />
-      </HeroSection>
+      </SymbiosisHero>
 
       <section id="how" className="band band-how">
         <Bi p={C.howH} lang={lang} as="h2" className="band-h" />
         <ol className="how">
           {C.steps.map((s, i) => (
             <li key={i}>
-              <StepArt n={i} />
+              <HowVignette n={i} sample={SAMPLES[0]} lang={lang} />
               <span className="how-n">{i + 1}</span>
               <Bi p={s.t} lang={lang} as="h3" />
               <Bi p={s.d} lang={lang} as="p" />
