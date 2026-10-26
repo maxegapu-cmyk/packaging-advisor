@@ -13,12 +13,15 @@ import * as THREE from "three";
 
 type Panel = { c: THREE.Vector3; w: number; h: number; i: number; warm?: number };
 
+// Large diffusers, as in a real product studio: soft light, gentle highlights, and far less
+// sampling noise for the path tracer than small hot sources. Intensity × area matches the
+// earlier smaller set, so exposure is unchanged.
 const PANELS: Panel[] = [
-  { c: new THREE.Vector3(-5.5, 5, 4.5), w: 5, h: 3.6, i: 7, warm: 1 }, // key softbox
-  { c: new THREE.Vector3(6.5, 2.5, -3.5), w: 1, h: 7, i: 9 }, // right strip (rim)
-  { c: new THREE.Vector3(-6.5, 2.5, -4), w: 1, h: 7, i: 6 }, // left strip (rim)
-  { c: new THREE.Vector3(0, 9.5, 0), w: 8, h: 4, i: 2.2 }, // overhead
-  { c: new THREE.Vector3(2, 1.8, 8), w: 7, h: 3, i: 2.0 }, // front fill
+  { c: new THREE.Vector3(-5.5, 5, 4.5), w: 8.5, h: 6, i: 2.5, warm: 1 }, // key softbox
+  { c: new THREE.Vector3(6.5, 2.5, -3.5), w: 2, h: 9, i: 3.5 }, // right strip (rim)
+  { c: new THREE.Vector3(-6.5, 2.5, -4), w: 2, h: 9, i: 2.3 }, // left strip (rim)
+  { c: new THREE.Vector3(0, 9.5, 0), w: 11, h: 7, i: 0.9 }, // overhead
+  { c: new THREE.Vector3(2, 1.8, 8), w: 10, h: 5, i: 0.85 }, // front fill
 ];
 
 const smooth = (e0: number, e1: number, x: number) => {

@@ -598,11 +598,16 @@ export function foilRoughMetal(mask: HTMLCanvasElement, paperRough: number, foil
 let normalCache: HTMLCanvasElement | null = null;
 
 /** Tangent-space normal map of the paper fibres (both renderers support normal maps). */
-export function fiberNormal(strength = 2.2): HTMLCanvasElement {
+export function fiberNormal(strength = 1.4): HTMLCanvasElement {
   if (normalCache) return normalCache;
   const src = fiberTexture();
   const S = src.width;
-  const h = src.getContext("2d")!.getImageData(0, 0, S, S).data;
+  // Height from the fibres with the per-pixel speckle blurred out: speckle in a normal map
+  // reads as grain, real board does not.
+  const [bc, bctx] = canvas(S, S);
+  bctx.filter = "blur(1.2px)";
+  for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) bctx.drawImage(src, ox, oy);
+  const h = bctx.getImageData(0, 0, S, S).data;
   const [c, ctx] = canvas(S, S);
   const out = ctx.createImageData(S, S);
   const at = (x: number, y: number) => h[(((y + S) % S) * S + ((x + S) % S)) * 4] / 255;

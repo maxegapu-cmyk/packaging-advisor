@@ -19,6 +19,10 @@ import { drawFace, drawSeal, fiberNormal, fiberTexture, foilRoughMetal, rolesOf,
 import { backdropLook, studioEquirect, sweepGeometry, type Backdrop } from "./studio";
 
 const U = 0.01; // scene units per millimetre (1 unit = 100 mm)
+/** Samples before the path-traced photo is clean enough to fade in over the live view. */
+const PT_MIN_SAMPLES = 160;
+/** A photo render accumulates this many samples. */
+const PT_MAX_SAMPLES = 480;
 const RAD = Math.PI / 180;
 
 export type SceneInput = { d: Direction; brand: string; spec: PackSpec; open: boolean; fit: number };
@@ -168,11 +172,19 @@ type Kit = {
   dispose: () => void;
 };
 
+/**
+ * The live renderer has no bounce light, so packages read about 12% darker and the floor a
+ * little brighter than in the path tracer. These factors match the two, so switching between
+ * them is not a visible jump. Measured on the studio sweep at rest.
+ */
+const LIVE_PRODUCT_ENV = 1.18;
+const LIVE_SWEEP_ENV = 0.92;
+
 const FINISH = {
-  matte: { rough: 0.74, bump: 0.22, clearcoat: 0, ccRough: 0.1, sheen: 0.15 },
-  gloss: { rough: 0.42, bump: 0.08, clearcoat: 1, ccRough: 0.04, sheen: 0 },
-  paper: { rough: 0.9, bump: 0.7, clearcoat: 0, ccRough: 0.1, sheen: 0.35 },
-  foil: { rough: 0.72, bump: 0.22, clearcoat: 0, ccRough: 0.1, sheen: 0.12 },
+  matte: { rough: 0.74, bump: 0.1, clearcoat: 0, ccRough: 0.1, sheen: 0.15 },
+  gloss: { rough: 0.42, bump: 0.04, clearcoat: 1, ccRough: 0.04, sheen: 0 },
+  paper: { rough: 0.9, bump: 0.38, clearcoat: 0, ccRough: 0.1, sheen: 0.35 },
+  foil: { rough: 0.72, bump: 0.1, clearcoat: 0, ccRough: 0.1, sheen: 0.12 },
 } as const;
 
 function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: number, metalPrint: boolean): Kit {
@@ -223,6 +235,7 @@ function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: number, met
       m.roughnessMap = rm;
       m.metalnessMap = rm;
     }
+    m.envMapIntensity = LIVE_PRODUCT_ENV;
     disposables.push(m);
     return m;
   };
@@ -232,11 +245,12 @@ function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: number, met
   insideFiber.repeat.set(4, 4);
   insideFiber.needsUpdate = true;
   disposables.push(insideFiber);
-  const inside = new THREE.MeshStandardMaterial({ color: "#D9D4C8", roughness: 0.92, normalMap: insideFiber, normalScale: nScale(0.6) });
-  const lining = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(roles.ground).lerp(new THREE.Color("#ffffff"), 0.15), roughness: 0.85, normalMap: insideFiber, normalScale: nScale(0.35), sheen: 0.3 });
+  const inside = new THREE.MeshStandardMaterial({ color: "#D9D4C8", roughness: 0.92, normalMap: insideFiber, normalScale: nScale(0.3) });
+  const lining = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(roles.ground).lerp(new THREE.Color("#ffffff"), 0.15), roughness: 0.85, normalMap: insideFiber, normalScale: nScale(0.18), sheen: 0.3 });
   const velvet = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(roles.ink).lerp(new THREE.Color(roles.key), 0.35), roughness: 1, sheen: 1, sheenRoughness: 0.55, sheenColor: new THREE.Color(roles.key).lerp(new THREE.Color("#ffffff"), 0.4) });
   const bareMetal = new THREE.MeshPhysicalMaterial({ color: "#D7D9D8", metalness: 1, roughness: 0.22 });
   disposables.push(edge, inside, lining, velvet, bareMetal);
+  for (const m of [edge, inside, lining, velvet, bareMetal]) m.envMapIntensity = LIVE_PRODUCT_ENV;
   return { tex, edge, inside, lining, velvet, bareMetal, dispose: () => disposables.forEach((x) => x.dispose()) };
 }
 
@@ -835,8 +849,12 @@ export class PackScene {
   private ptReady = false;
   private ptActive = false;
   private still = 0;
-  private maxSamples = 400;
+  private maxSamples = PT_MAX_SAMPLES;
   private ptDispose: (() => void) | null = null;
+  private ptStart = 0;
+  /** A photo render was asked for (the live view is used otherwise). */
+  private rendering = false;
+  private renderTarget = PT_MAX_SAMPLES;
   private exportWait: { samples: number; resolve: (c: HTMLCanvasElement) => void } | null = null;
   onFirstFrame?: () => void;
   afterRender?: (canvas: HTMLCanvasElement) => void;
@@ -887,7 +905,7 @@ export class PackScene {
     map.minFilter = THREE.LinearFilter;
     map.needsUpdate = true;
     this.sweepMap = map;
-    this.sweepMat = new THREE.MeshPhysicalMaterial({ roughness: 0.96, map, emissiveMap: map });
+    this.sweepMat = new THREE.MeshPhysicalMaterial({ roughness: 0.96, map, emissiveMap: map, envMapIntensity: LIVE_SWEEP_ENV });
     this.sweep = new THREE.Mesh(geo, this.sweepMat);
     this.sweep.position.y = -0.0005;
     this.scene.add(this.sweep);
@@ -917,9 +935,10 @@ export class PackScene {
         cam.apertureBlades = 7;
         this.camera = cam;
         const pt = new WebGLPathTracer(this.renderer) as unknown as PathTracerLike;
-        pt.tiles.set(2, 2);
-        pt.minSamples = 4;
-        pt.fadeDuration = 700;
+        pt.tiles.set(1, 1);
+        // Never show an early, noisy frame: the live render stays until the image is clean.
+        pt.minSamples = PT_MIN_SAMPLES;
+        pt.fadeDuration = 900;
         pt.renderDelay = 0;
         pt.bounces = 6;
         pt.filterGlossyFactor = 0.4;
@@ -927,13 +946,19 @@ export class PackScene {
         pt.rasterizeScene = true;
         // Edge-preserving denoise while samples accumulate, easing off as the image converges.
         const denoise = new DenoiseMaterial({ transparent: true, blending: THREE.NormalBlending, premultipliedAlpha: this.renderer.getContextAttributes()?.premultipliedAlpha ?? true }) as THREE.ShaderMaterial & { map: THREE.Texture | null; opacity: number; sigma: number; threshold: number; kSigma: number };
+        // Clamp fireflies (a stray path that hit a softbox through a glossy bounce) before
+        // denoising, so they never flash as white specks.
+        denoise.fragmentShader = denoise.fragmentShader
+          .replace(/texture2D\(\s*tex\s*,/g, "clampedTex( tex,")
+          .replace("vec4 smartDeNoise", "vec4 clampedTex( sampler2D t, vec2 uv ) { vec4 c = texture2D( t, uv ); float l = max( max( c.r, c.g ), c.b ); return l > 2.5 ? vec4( c.rgb * ( 2.5 / l ), c.a ) : c; }\nvec4 smartDeNoise");
+        denoise.needsUpdate = true;
         const quad = new FullScreenQuad(denoise);
         (pt as unknown as { renderToCanvasCallback: (t: THREE.WebGLRenderTarget, r: THREE.WebGLRenderer, q: { material: { opacity: number } }) => void }).renderToCanvasCallback = (target, renderer, q) => {
-          const k = Math.max(0, 1 - pt.samples / (this.maxSamples * 0.8));
+          const k = Math.max(0, 1 - pt.samples / PT_MAX_SAMPLES);
           denoise.map = target.texture;
           denoise.opacity = q.material.opacity;
-          denoise.sigma = 2 + 3 * k;
-          denoise.threshold = 0.01 + 0.16 * k;
+          denoise.sigma = 1.5 + 2.5 * k;
+          denoise.threshold = 0.04 + 0.18 * k;
           denoise.kSigma = 1;
           const auto = renderer.autoClear;
           renderer.autoClear = false;
@@ -957,10 +982,20 @@ export class PackScene {
   /** Something changed: drop back to the live renderer and wait for stillness again. */
   private invalidate() {
     this.ptActive = false;
+    this.rendering = false;
     this.still = performance.now();
     this.dirty = true;
-    this.onProgress?.(null);
+    this.progress(null);
     this.request();
+  }
+
+  private lastProgress: number | null = -1;
+  /** Reports path-tracing progress only when it changes (not on every drag frame). */
+  private progress(p: number | null) {
+    const v = p === null ? null : Math.round(p * 100) / 100;
+    if (v === this.lastProgress) return;
+    this.lastProgress = v;
+    this.onProgress?.(v);
   }
 
   private startPathTracing() {
@@ -975,6 +1010,22 @@ export class PackScene {
     this.scene.environment = env;
     this.scene.add(this.shadow.plane);
     this.ptActive = true;
+  }
+
+  /** True when a photo render can run (studio, path tracer loaded, a normal view). */
+  get canRender(): boolean {
+    return this.canPathTrace();
+  }
+
+  /** Starts a photo render: path traced until `samples`, shown once clean. Moving cancels it. */
+  startRender(samples = PT_MAX_SAMPLES) {
+    if (!this.canPathTrace()) return false;
+    this.rendering = true;
+    this.renderTarget = samples;
+    this.ptActive = false;
+    this.progress(0);
+    this.request();
+    return true;
   }
 
   private canPathTrace(): boolean {
@@ -1116,28 +1167,28 @@ export class PackScene {
     moving = step(this.anatomyT, now) || moving;
     if (moving) this.still = now;
 
-    // Still for a moment, in the studio: hand over to the path tracer and accumulate.
-    if (!moving && this.canPathTrace() && now - this.still > 220) {
+    // A photo render was asked for and nothing is moving: path trace and accumulate.
+    if (this.rendering && !moving && this.canPathTrace()) {
       if (!this.ptActive) {
         this.pose();
         this.startPathTracing();
+        this.ptStart = now;
       }
       const pt = this.pt!;
-      if (pt.samples < this.maxSamples || this.exportWait) {
+      const target = Math.max(this.renderTarget, this.exportWait?.samples ?? 0);
+      if (pt.samples < target) {
         pt.renderSample();
         this.emitPins();
         this.afterRender?.(this.canvas);
-        this.onProgress?.(Math.min(1, pt.samples / this.maxSamples));
-        if (this.exportWait && pt.samples >= this.exportWait.samples) {
-          const copy = document.createElement("canvas");
-          copy.width = this.canvas.width;
-          copy.height = this.canvas.height;
-          copy.getContext("2d")!.drawImage(this.canvas, 0, 0);
-          const w = this.exportWait;
-          this.exportWait = null;
-          w.resolve(copy);
-        }
+        this.progress(Math.min(0.999, pt.samples / target));
+        if (this.exportWait && pt.samples >= this.exportWait.samples) this.resolveExport();
         this.request();
+      } else {
+        // done: draw the finished photo once more and keep it until the view moves
+        pt.renderSample();
+        this.afterRender?.(this.canvas);
+        if (this.exportWait) this.resolveExport();
+        this.progress(1);
       }
       this.dirty = false;
       return;
@@ -1147,8 +1198,19 @@ export class PackScene {
       this.renderFrame();
       this.dirty = false;
     }
-    if (moving || (this.canPathTrace() && !this.ptActive)) this.request();
+    if (moving) this.request();
   };
+
+  private resolveExport() {
+    const w = this.exportWait;
+    if (!w) return;
+    const copy = document.createElement("canvas");
+    copy.width = this.canvas.width;
+    copy.height = this.canvas.height;
+    copy.getContext("2d")!.drawImage(this.canvas, 0, 0);
+    this.exportWait = null;
+    w.resolve(copy);
+  }
 
   /** Places the package and camera for the current state. Returns the contact-shadow strength. */
   private pose(): { shadowK: number; fr: { r: number; y: number }; phi: number } {
@@ -1233,8 +1295,11 @@ export class PackScene {
   async exportImage(scale = 2, background: string | ((ctx: CanvasRenderingContext2D, w: number, h: number) => void) = "#ffffff", samples = 160): Promise<Blob> {
     if (this.canPathTrace()) {
       const frame = await new Promise<HTMLCanvasElement>((resolve) => {
-        this.exportWait = { samples, resolve };
-        this.request();
+        // past the clean threshold plus the fade-in, so the export is the finished photo
+        const n = Math.max(samples, PT_MIN_SAMPLES + 120);
+        this.exportWait = { samples: n, resolve };
+        if (!this.rendering) this.startRender(Math.max(n, this.renderTarget));
+        else this.request();
       });
       return new Promise((resolve, reject) => frame.toBlob((b) => (b ? resolve(b) : reject(new Error("export failed"))), "image/png"));
     }

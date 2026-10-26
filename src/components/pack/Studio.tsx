@@ -46,12 +46,13 @@ const S = {
   reset: { zh: "复位", en: "Reset" },
   zoomIn: { zh: "放大", en: "Zoom in" },
   zoomOut: { zh: "缩小", en: "Zoom out" },
-  hint: { zh: "拖动旋转 · 双指或滚轮缩放 · 停下后自动渲染成照片级画质", en: "Drag to turn · pinch or scroll to zoom · hold still for a photoreal render" },
+  hint: { zh: "拖动旋转 · 双指或滚轮缩放 · 双击复位", en: "Drag to turn · pinch or scroll to zoom · double-click to reset" },
   anatomy: { zh: "结构解剖", en: "Anatomy" },
   anatomyNote: { zh: "数字都由你填的尺寸算出。", en: "Every number is computed from your sizes." },
-  photoreal: { zh: "照片级渲染", en: "Photoreal render" },
-  photorealDone: { zh: "照片级画质", en: "Photoreal" },
-  rendering: { zh: "正在渲染照片级画质…", en: "Rendering photoreal still…" },
+  render: { zh: "照片级出图", en: "Render photo" },
+  renderingPct: { zh: "照片级出图", en: "Rendering photo" },
+  renderDone: { zh: "照片级成片 · 拖动即回到实时视图", en: "Photo ready · drag to return to the live view" },
+  rendering: { zh: "正在出图后导出…", en: "Rendering, then exporting…" },
   listing: { zh: "主图测试", en: "Listing test" },
   listingNote: { zh: "左：800×800 白底主图。右：在搜索结果里大约这么大，品牌名还看得清吗？", en: "Left: an 800×800 white main image. Right: about this size in search results. Can you still read the brand?" },
   brief: { zh: "渲染简报", en: "Render brief" },
@@ -160,6 +161,12 @@ function Icon({ name }: { name: string }) {
     ),
     sliders: <path d="M4 7h10M18 7h2M4 17h4M12 17h8M14 5v4M8 15v4" />,
     x: <path d="M6 6l12 12M18 6L6 18" />,
+    camera: (
+      <>
+        <path d="M4 8h3l1.5-2h7L17 8h3v11H4z" />
+        <circle cx="12" cy="13" r="3.5" />
+      </>
+    ),
     anatomy: (
       <>
         <path d="M4 15l8 4 8-4" />
@@ -469,7 +476,7 @@ export function Studio({
             <span className="st-progress-bar">
               <i style={{ width: `${Math.round(progress * 100)}%` }} />
             </span>
-            <span>{exporting ? one(S.rendering, lang) : progress >= 1 ? one(S.photorealDone, lang) : `${one(S.photoreal, lang)} ${Math.round(progress * 100)}%`}</span>
+            <span>{exporting ? one(S.rendering, lang) : progress >= 1 ? one(S.renderDone, lang) : `${one(S.renderingPct, lang)} ${Math.round(progress * 100)}%`}</span>
           </div>
         ) : null}
 
@@ -574,6 +581,19 @@ export function Studio({
             <Icon name="reset" />
           </button>
           <span className="st-sep" aria-hidden="true" />
+          <button
+            type="button"
+            className={progress !== null ? "st-dock-btn is-active" : "st-dock-btn"}
+            onClick={() => {
+              setHint(false);
+              orbit.stop();
+              engine.current?.startRender();
+            }}
+            title={both(S.render, lang)}
+          >
+            <Icon name="camera" />
+            <span className="st-dock-text">{one(S.render, lang)}</span>
+          </button>
           <button type="button" className="st-dock-btn" onClick={exportImage} disabled={exporting} title={both(S.export, lang)}>
             <Icon name="download" />
             <span className="st-dock-text">{one(exporting ? S.exporting : S.export, lang)}</span>
