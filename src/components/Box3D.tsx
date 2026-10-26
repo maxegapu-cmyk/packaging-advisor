@@ -59,7 +59,7 @@ const SyncCtx = createContext<Sync | null>(null);
 
 /** Lets several boxes share one camera, for side-by-side comparison. */
 export function BoxSync({ children, label, hint, toolbar }: { children: ReactNode; label: string; hint: string; toolbar?: ReactNode }) {
-  const [orbit] = useState(() => new Orbit());
+  const [orbit] = useState(() => new Orbit(undefined, 1, { free: true }));
   const [synced, setSynced] = useState(true);
   return (
     <SyncCtx.Provider value={{ orbit, synced }}>
@@ -92,7 +92,7 @@ export function SpaceIcon() {
 export function Box3D({ d, brand, label, fit = 200, spaceLabel = SPACE_LABEL, lang = "bi" }: { d: Direction; brand: string; label: string; fit?: number; spaceLabel?: Pair; lang?: "bi" | "zh" | "en" }) {
   const sync = useContext(SyncCtx);
   const { spec, studioHref } = usePack();
-  const [own] = useState(() => new Orbit());
+  const [own] = useState(() => new Orbit(undefined, 1, { free: true }));
   const shared = !!sync?.synced;
   // When "rotate together" is switched off, each box starts from where the shared view was.
   useEffect(() => {

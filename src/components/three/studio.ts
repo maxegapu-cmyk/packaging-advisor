@@ -93,19 +93,19 @@ export function studioEquirect(width = 1024): THREE.DataTexture {
  * falloff a real sweep shows away from the lights.
  */
 export function sweepGeometry(): THREE.BufferGeometry {
-  const front = 22;
+  const front = 70; // far enough that the near edge never shows, even on tall phone screens
   const back = 5;
   const radius = 5;
   const height = 14;
-  const half = 24;
+  const half = 60;
   const prof: [number, number][] = [];
-  for (let z = front; z > -back; z -= 1) prof.push([z, 0]);
+  for (let z = front; z > -back; z -= z > 20 ? 5 : 1) prof.push([z, 0]);
   for (let k = 0; k <= 24; k++) {
     const a = (k / 24) * (Math.PI / 2);
     prof.push([-back - Math.sin(a) * radius, radius - Math.cos(a) * radius]);
   }
   prof.push([-back - radius, height]);
-  const cols = 24;
+  const cols = 60;
   const pos: number[] = [];
   const col: number[] = [];
   const uv: number[] = [];
@@ -134,6 +134,7 @@ export function sweepGeometry(): THREE.BufferGeometry {
   g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx);
   g.computeVertexNormals();
+  g.userData.cols = cols + 1; // vertices per row, for the falloff texture
   return g;
 }
 

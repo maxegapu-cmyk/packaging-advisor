@@ -7,21 +7,12 @@ import { DEFAULT_PACK } from "@/lib/pack";
 import { Package3D } from "./pack/Package3D";
 import { Orbit, REST_ANGLE, reducedMotion } from "./pack/orbit";
 import { Stage3D } from "./pack/Stage3D";
+import { ColorStrip, RegMarks } from "./PressSheet";
 
 const FOLD_MS = 2800;
 const HERO_FIT = 300;
 const HERO_PACK = { ...DEFAULT_PACK, w: 120, h: 156, d: 48 };
 const CYCLE_MS = 4200;
-
-/** Printer's registration mark, drawn at the corners of the press sheet. */
-function RegMark({ className }: { className: string }) {
-  return (
-    <svg className={`regmark ${className}`} viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" strokeWidth="1" />
-      <path d="M12 0v24M0 12h24" stroke="currentColor" strokeWidth="1" />
-    </svg>
-  );
-}
 
 /** A box net (dieline) drawn large behind the box. */
 function DielineDrawing() {
@@ -37,19 +28,6 @@ function DielineDrawing() {
   );
 }
 
-/** Press color-control strip: the direction's palette next to process C, M, Y, K. */
-function ColorStrip({ d }: { d: Direction }) {
-  const cells = [...d.palette.map((p) => p.hex), "#00A0E9", "#E4007F", "#FFF100", "#1A1A1A"];
-  const run = Array.from({ length: 48 }, (_, i) => cells[i % cells.length]);
-  return (
-    <div className="press-strip" aria-hidden="true">
-      {run.map((c, i) => (
-        <span key={i} style={{ background: c, opacity: i % cells.length >= d.palette.length ? 0.85 : 1 }} />
-      ))}
-    </div>
-  );
-}
-
 /**
  * The landing hero is a press sheet in the colors of the packaging on show: a flat dieline
  * folds into a box, then the whole sheet re-inks itself for each sample direction.
@@ -58,7 +36,7 @@ function ColorStrip({ d }: { d: Direction }) {
 export function HeroSection({ directions, brand, lang, children }: { directions: Direction[]; brand: string; lang: Lang; children: ReactNode }) {
   const [i, setI] = useState(1);
   const [auto, setAuto] = useState(true);
-  const [orbit] = useState(() => new Orbit({ x: 0, y: 0 }, 1));
+  const [orbit] = useState(() => new Orbit({ x: 0, y: 0 }, 1, { free: true }));
   const [flat, setFlat] = useState(true);
   const started = useRef(false);
 
@@ -102,10 +80,7 @@ export function HeroSection({ directions, brand, lang, children }: { directions:
 
   return (
     <section className="hero-sheet" style={sheetVars}>
-      <RegMark className="rm-tl" />
-      <RegMark className="rm-tr" />
-      <RegMark className="rm-bl" />
-      <RegMark className="rm-br" />
+      <RegMarks />
       <div className="hero">
         <div className="hero-copy">{children}</div>
         <div className="hero-visual">

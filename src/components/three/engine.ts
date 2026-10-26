@@ -268,7 +268,7 @@ export class PackScene {
     // falloff baked into a small texture: brightest under the product, darker up the wall
     const geo = sweepGeometry();
     const col = geo.getAttribute("color") as THREE.BufferAttribute;
-    const cols = 25;
+    const cols: number = geo.userData.cols;
     const rows = col.count / cols;
     const data = new Uint8Array(cols * rows * 4);
     for (let i = 0; i < col.count; i++) {
@@ -612,7 +612,8 @@ export class PackScene {
     this.camera.position.set(0, fr.y + Math.sin(phi) * dist, Math.cos(phi) * dist);
     this.camera.up.set(0, Math.cos(phi), -Math.sin(phi));
     this.camera.lookAt(target);
-    this.camera.near = Math.max(0.01, dist - fr.r * 4);
+    // near enough that the floor in front of the package is never clipped (tall phone screens)
+    this.camera.near = Math.max(0.02, Math.min(dist - fr.r * 4, dist * 0.2));
     this.camera.far = this.sweep ? dist + 60 : dist + fr.r * 6;
     const cam = this.camera as THREE.PerspectiveCamera & { focusDistance?: number; bokehSize?: number };
     if ("focusDistance" in cam) {

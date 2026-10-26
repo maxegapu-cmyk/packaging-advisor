@@ -71,7 +71,7 @@ export const UI = {
   faceLayout: { zh: "正面版式（非比例示意）", en: "Front layout (not to scale)" },
   fullSpec: { zh: "完整说明", en: "Full spec" },
   rotateTogether: { zh: "三个盒子一起转", en: "Rotate all three together" },
-  dragHint: { zh: "拖动盒子旋转，双击复位；也可用方向键。", en: "Drag a box to rotate, double-click to reset, or use the arrow keys." },
+  dragHint: { zh: "拖动或单指滑动可任意翻转，双指捏合缩放、旋拧转动、上下滑动翻页；双击复位。", en: "Drag or swipe with one finger to turn it any way; pinch to zoom, twist to spin, slide two fingers to scroll; double-tap to reset." },
   boxOf: { zh: "包装立体示意", en: "3D packaging sketch" },
   carriersFlat: { zh: "内包装与说明书", en: "Inner pack and manual" },
   suitable: { zh: "更适合", en: "Best for" },

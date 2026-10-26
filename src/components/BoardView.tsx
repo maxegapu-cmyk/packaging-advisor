@@ -9,6 +9,7 @@ import { ColorBar } from "./ColorBar";
 import { CopyButton } from "./CopyButton";
 import { FaceLayout } from "./FaceLayout";
 import { PackBar } from "./PackBar";
+import { ColorStrip, RegMarks, sheetVars } from "./PressSheet";
 import { DEFAULT_PACK, type PackSpec } from "@/lib/pack";
 
 const ROUTE_KEY = { safe: "routeSafe", distinctive: "routeDistinctive", bold: "routeBold" } as const;
@@ -124,34 +125,40 @@ export function BoardView({
   const recDir = board.directions.find((d) => d.id === rec.pick);
   return (
     <div className="board">
-      <header className="board-head">
-        <div className="board-titles">
-          <p className="board-meta">
-            {board.meta.brand ? <span>{board.meta.brand}</span> : null}
-            {cat ? <Bi p={cat} lang={lang} /> : null}
-          </p>
-          <Bi p={board.meta.product} lang={lang} as="h1" className="board-title" />
-        </div>
-        {headerExtra}
-      </header>
+      <div className="board-sheet" style={sheetVars(recDir)}>
+        <RegMarks />
+        <div className="board-sheet-in">
+          <header className="board-head">
+            <div className="board-titles">
+              <p className="board-meta">
+                {board.meta.brand ? <span>{board.meta.brand}</span> : null}
+                {cat ? <Bi p={cat} lang={lang} /> : null}
+              </p>
+              <Bi p={board.meta.product} lang={lang} as="h1" className="board-title" />
+            </div>
+            {headerExtra}
+          </header>
 
-      <section className="handoff">
-        <div className="handoff-pick">
-          <T k="ourPick" lang={lang} as="h2" className="label" />
-          <p className="handoff-dir">
-            <span className="dir-id">{rec.pick}</span>
-            {recDir ? <Bi p={recDir.name} lang={lang} /> : null}
-          </p>
-          <Bi p={rec.reason} lang={lang} as="p" className="handoff-reason" />
+          <section className="handoff">
+            <div className="handoff-pick">
+              <T k="ourPick" lang={lang} as="h2" className="label" />
+              <p className="handoff-dir">
+                <span className="dir-id">{rec.pick}</span>
+                {recDir ? <Bi p={recDir.name} lang={lang} /> : null}
+              </p>
+              <Bi p={rec.reason} lang={lang} as="p" className="handoff-reason" />
+            </div>
+            <div className="handoff-quote">
+              <div className="handoff-quote-head">
+                <T k="forDesigner" lang={lang} as="h2" className="label" />
+                <CopyButton text={copyText(rec.designerInstruction, lang)} label={plain(UI.copyText, lang)} done={plain(UI.copied, lang)} />
+              </div>
+              <Bi p={rec.designerInstruction} lang={lang} as="p" className="quote" />
+            </div>
+          </section>
         </div>
-        <div className="handoff-quote">
-          <div className="handoff-quote-head">
-            <T k="forDesigner" lang={lang} as="h2" className="label" />
-            <CopyButton text={copyText(rec.designerInstruction, lang)} label={plain(UI.copyText, lang)} done={plain(UI.copied, lang)} />
-          </div>
-          <Bi p={rec.designerInstruction} lang={lang} as="p" className="quote" />
-        </div>
-      </section>
+        {recDir ? <ColorStrip d={recDir} cells={72} /> : null}
+      </div>
 
       <section aria-label={plain(UI.directions, lang)}>
         <PackProvider initial={pack} saveUrl={packSaveUrl} studioBase={studioBase}>

@@ -34,6 +34,7 @@ import type { Backdrop } from "../three/studio";
 import { Orbit, REST_ANGLE, reducedMotion, VIEWS, type Angle } from "./orbit";
 import { Stage3D } from "./Stage3D";
 import { FormGlyph } from "./FormGlyph";
+import { ColorStrip, RegMarks, sheetVars } from "../PressSheet";
 
 /* ---------------------------------------------------------------- Text */
 
@@ -63,15 +64,20 @@ const S = {
   closeBook: { zh: "合上", en: "Close" },
   combo: { zh: "组合包装", en: "Combination" },
   comboNote: { zh: "选一种产品装进这个外包装，外包装尺寸会按产品自动配好。", en: "Pick a product to pack in this outer pack; the outer size is fitted to it." },
-  none: { zh: "不装", en: "None" },
+  none: { zh: "不装产品", en: "Remove product" },
   count: { zh: "数量", en: "Count" },
   insert: { zh: "内托", en: "Insert" },
   productSize: { zh: "内装产品尺寸", en: "Product size" },
-  outerFitted: { zh: "外包装（自动配）", en: "Outer pack (fitted)" },
+  outerFitted: { zh: "外包装自动配为", en: "Outer pack fitted to" },
   reset: { zh: "复位", en: "Reset" },
   zoomIn: { zh: "放大", en: "Zoom in" },
   zoomOut: { zh: "缩小", en: "Zoom out" },
-  hint: { zh: "拖动旋转 · 双指或滚轮缩放 · 双击复位", en: "Drag to turn · pinch or scroll to zoom · double-click to reset" },
+  hint: { zh: "拖动或单指滑动任意翻转，双指捏合缩放、旋拧转动，双击复位", en: "Drag or swipe to turn it any way; pinch to zoom, twist to spin; double-tap to reset" },
+  tabPack: { zh: "包装", en: "Pack" },
+  tabLook: { zh: "外观", en: "Look" },
+  tabCheck: { zh: "检查", en: "Check" },
+  material: { zh: "材料", en: "Material" },
+  size: { zh: "尺寸", en: "Size" },
   anatomy: { zh: "结构解剖", en: "Anatomy" },
   anatomyNote: { zh: "数字都由你填的尺寸算出。", en: "Every number is computed from your sizes." },
   render: { zh: "照片级出图", en: "Render photo" },
@@ -103,6 +109,8 @@ const BACKDROPS: { id: string; label: Pair }[] = [
   { id: "brand", label: { zh: "品牌色", en: "Brand" } },
   { id: "dark", label: { zh: "暗场", en: "Dark" } },
 ];
+
+type PanelTab = "pack" | "look" | "check";
 
 type Detail = { id: string; label: Pair; angle: Angle; zoom: number; open?: boolean; text: (d: Direction) => Pair };
 
@@ -214,6 +222,12 @@ function Icon({ name }: { name: string }) {
     ),
     sliders: <path d="M4 7h10M18 7h2M4 17h4M12 17h8M14 5v4M8 15v4" />,
     x: <path d="M6 6l12 12M18 6L6 18" />,
+    eye: (
+      <>
+        <path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" />
+        <circle cx="12" cy="12" r="3" />
+      </>
+    ),
     camera: (
       <>
         <path d="M4 8h3l1.5-2h7L17 8h3v11H4z" />
@@ -305,7 +319,9 @@ export function Studio({
   const [detail, setDetail] = useState<Detail | null>(null);
   const [hint, setHint] = useState(true);
   const [panel, setPanel] = useState(false);
-  const [showListing, setShowListing] = useState(true);
+  const [tab, setTab] = useState<PanelTab>("pack");
+  const [views, setViews] = useState(false);
+  const [matGroup, setMatGroup] = useState(() => MATERIAL_GROUPS.find((g) => g.forms.includes(initialPack.form))?.id ?? "paper");
   const [anatomy, setAnatomy] = useState(false);
   const [pins, setPins] = useState<PinOnScreen[] | null>(null);
   const [parts, setParts] = useState<{ n: number; label: Pair; detail: Pair }[]>([]);
@@ -323,7 +339,7 @@ export function Studio({
     return () => ro.disconnect();
   }, []);
   const narrow = stage.w < 640;
-  const fit = Math.max(170, Math.min(stage.w * (narrow ? 0.6 : 0.44), stage.h * (narrow ? 0.46 : 0.47), 420));
+  const fit = Math.max(170, Math.min(stage.w * (narrow ? 0.74 : 0.44), stage.h * (narrow ? 0.5 : 0.47), 420));
 
   useEffect(() => orbit.onSpin(setSpinning), [orbit]);
 
@@ -488,16 +504,23 @@ export function Studio({
 
   const saveNote = isSample ? S.notSaved : saveState === "saving" ? S.saving : saveState === "saved" ? S.saved : saveState === "error" ? S.saveError : null;
 
+  const panelTabs: { id: PanelTab; label: Pair }[] = [
+    { id: "pack", label: S.tabPack },
+    { id: "look", label: S.tabLook },
+    { id: "check", label: S.tabCheck },
+  ];
+  const group = MATERIAL_GROUPS.find((g) => g.id === matGroup) ?? MATERIAL_GROUPS[0];
+
   return (
-    <div className={`studio bd-${backdrop}${panel ? " panel-open" : ""}`} style={{ ...paletteVars(d), "--sg": ground } as CSSProperties}>
+    <div className={`studio bd-${backdrop}${panel ? " panel-open" : ""}`} style={{ ...paletteVars(d), ...sheetVars(d), "--sg": ground } as CSSProperties}>
       <header className="st-top">
         <a className="st-back" href={backHref}>
           <Icon name="back" />
           <L p={S.back} lang={lang} />
         </a>
         <div className="st-title">
-          <span className="st-space">{one(S.space, lang)}</span>
           <strong>{one(board.meta.product, lang)}</strong>
+          <span className="st-space">{one(S.space, lang)}</span>
         </div>
         <nav className="st-dirs" aria-label={both(S.direction, lang)}>
           {dirs.map((x, i) => (
@@ -509,9 +532,11 @@ export function Studio({
           ))}
         </nav>
       </header>
+      <ColorStrip d={d} cells={64} className="st-strip" />
 
       <div className="st-stage" ref={stageRef}>
-        <Stage3D orbit={orbit} label={`${one(S.space, lang)}: ${one(d.name, lang)}`} touch="none" wheelZoom className="st-canvas" onInteract={interact}>
+        <RegMarks />
+        <Stage3D orbit={orbit} label={`${one(S.space, lang)}: ${one(d.name, lang)}`} inPage={false} wheelZoom className="st-canvas" onInteract={interact}>
           <Package3D
             d={d}
             brand={brand}
@@ -564,11 +589,14 @@ export function Studio({
         </div>
 
         {anatomy ? (
-          <aside className="st-caption st-parts" aria-live="polite">
-            <div className="st-caption-head">
-              <span className="st-caption-title">
-                {one(S.anatomy, lang)} · {one(FORM_LABELS[spec.form], lang)}
-                {spec.inner ? ` + ${one(FORM_LABELS[spec.inner.form], lang)}` : ""}
+          <aside className="st-card st-parts" aria-live="polite">
+            <div className="st-card-head">
+              <span className="st-card-title">
+                {one(S.anatomy, lang)}
+                <small>
+                  {one(FORM_LABELS[spec.form], lang)}
+                  {spec.inner ? ` + ${one(FORM_LABELS[spec.inner.form], lang)}` : ""}
+                </small>
               </span>
               <button type="button" className="st-icon-btn" aria-label={both(S.close, lang)} onClick={() => toggleAnatomy()}>
                 <Icon name="x" />
@@ -587,12 +615,20 @@ export function Studio({
             </ol>
             <p className="st-small">{both(S.anatomyNote, lang)}</p>
           </aside>
-        ) : null}
+        ) : (
+          <div className="st-details" role="group" aria-label={both(S.details, lang)}>
+            {details.map((x) => (
+              <button key={x.id} type="button" className={detail?.id === x.id ? "st-chip is-active" : "st-chip"} aria-pressed={detail?.id === x.id} onClick={() => showDetail(x)}>
+                {one(x.label, lang)}
+              </button>
+            ))}
+          </div>
+        )}
 
         {detail && !anatomy ? (
-          <aside className="st-caption" aria-live="polite">
-            <div className="st-caption-head">
-              <L p={detail.label} lang={lang} className="st-caption-title" />
+          <aside className="st-card st-caption" aria-live="polite">
+            <div className="st-card-head">
+              <L p={detail.label} lang={lang} className="st-card-title" />
               <button type="button" className="st-icon-btn" aria-label={both(S.close, lang)} onClick={() => showDetail(detail)}>
                 <Icon name="x" />
               </button>
@@ -601,31 +637,31 @@ export function Studio({
           </aside>
         ) : null}
 
-        <div className="st-details" role="group" aria-label={both(S.details, lang)}>
-          <span className="st-label">{one(S.details, lang)}</span>
-          {details.map((x) => (
-            <button key={x.id} type="button" className={detail?.id === x.id ? "st-chip is-active" : "st-chip"} aria-pressed={detail?.id === x.id} onClick={() => showDetail(x)}>
-              {one(x.label, lang)}
-            </button>
-          ))}
-        </div>
+        {views ? (
+          <div className="st-views" role="menu" aria-label={both(S.views, lang)}>
+            {VIEWS.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  interact();
+                  setViews(false);
+                  if (spec.form === "carton" && open) setOpen(false);
+                  orbit.tween(v.angle, 800, 1);
+                }}
+              >
+                {one(v.label, lang)}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         <div className="st-dock" role="toolbar" aria-label={both(S.views, lang)}>
-          {VIEWS.map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              className="st-dock-btn st-view"
-              onClick={() => {
-                interact();
-                if (spec.form === "carton" && open) setOpen(false);
-                orbit.tween(v.angle, 800, 1);
-              }}
-            >
-              {one(v.label, lang)}
-            </button>
-          ))}
-          <span className="st-sep" aria-hidden="true" />
+          <button type="button" className={views ? "st-dock-btn is-active" : "st-dock-btn"} aria-expanded={views} aria-haspopup="menu" onClick={() => setViews(!views)} title={both(S.views, lang)}>
+            <Icon name="eye" />
+            <span className="st-dock-text">{one(S.views, lang)}</span>
+          </button>
           <button type="button" className={spinning ? "st-dock-btn is-active" : "st-dock-btn"} aria-pressed={spinning} onClick={() => (interact(), orbit.spin(!spinning))} title={both(S.spin, lang)}>
             <Icon name="spin" />
             <span className="st-dock-text">{one(S.spin, lang)}</span>
@@ -640,21 +676,15 @@ export function Studio({
               <span className="st-dock-text">{one(openLabel, lang)}</span>
             </button>
           ) : null}
-          <span className="st-sep" aria-hidden="true" />
-          <button type="button" className="st-dock-btn" onClick={() => orbit.zoomBy(1 / 1.15)} aria-label={both(S.zoomOut, lang)}>
-            <Icon name="minus" />
-          </button>
-          <button type="button" className="st-dock-btn" onClick={() => orbit.zoomBy(1.15)} aria-label={both(S.zoomIn, lang)}>
-            <Icon name="plus" />
-          </button>
           <button
             type="button"
-            className="st-dock-btn"
+            className="st-dock-btn st-reset"
             onClick={() => {
               interact();
               setOpen(false);
               orbit.tween(REST_ANGLE, 800, 1);
             }}
+            title={both(S.reset, lang)}
             aria-label={both(S.reset, lang)}
           >
             <Icon name="reset" />
@@ -662,7 +692,7 @@ export function Studio({
           <span className="st-sep" aria-hidden="true" />
           <button
             type="button"
-            className={progress !== null ? "st-dock-btn is-active" : "st-dock-btn"}
+            className={progress !== null ? "st-dock-btn st-dock-strong is-active" : "st-dock-btn st-dock-strong"}
             onClick={() => {
               setHint(false);
               orbit.stop();
@@ -673,51 +703,21 @@ export function Studio({
             <Icon name="camera" />
             <span className="st-dock-text">{one(S.render, lang)}</span>
           </button>
-          <button type="button" className="st-dock-btn" onClick={exportImage} disabled={exporting} title={both(S.export, lang)}>
+          <button type="button" className="st-dock-btn" onClick={exportImage} disabled={exporting} title={both(S.export, lang)} aria-label={both(exporting ? S.exporting : S.export, lang)}>
             <Icon name="download" />
-            <span className="st-dock-text">{one(exporting ? S.exporting : S.export, lang)}</span>
           </button>
           <button type="button" className="st-dock-btn st-adjust" onClick={() => setPanel(!panel)} aria-expanded={panel}>
             <Icon name="sliders" />
             <span className="st-dock-text">{one(S.adjust, lang)}</span>
           </button>
         </div>
-
-        {showListing ? (
-          <section className="st-listing" aria-label={both(S.listing, lang)}>
-            <div className="st-listing-head">
-              <L p={S.listing} lang={lang} className="st-label" />
-              <button type="button" className="st-icon-btn" aria-label={both(S.close, lang)} onClick={() => setShowListing(false)}>
-                <Icon name="x" />
-              </button>
-            </div>
-            <div className="st-listing-body">
-              <div className="lt-main">
-                <canvas ref={ltMain} width={232} height={232} aria-label={both(S.listing, lang)} />
-              </div>
-              <div className="lt-grid" aria-hidden="true">
-                <ListingTile />
-                <ListingTile mine>
-                  <canvas ref={ltSmall} width={112} height={112} />
-                </ListingTile>
-                <ListingTile />
-                <ListingTile />
-              </div>
-            </div>
-            <L p={S.listingNote} lang={lang} className="st-small" />
-          </section>
-        ) : (
-          <button type="button" className="st-chip st-listing-open" onClick={() => setShowListing(true)}>
-            {one(S.listing, lang)}
-          </button>
-        )}
       </div>
 
       <aside className="st-panel" aria-label={both(S.adjust, lang)}>
         <button type="button" className="st-icon-btn st-panel-close" aria-label={both(S.close, lang)} onClick={() => setPanel(false)}>
           <Icon name="x" />
         </button>
-        <section className="st-sec">
+        <section className="st-dirhead">
           <div className="st-sec-head">
             <span className="dir-id">{d.id}</span>
             {board.recommendation.pick === d.id ? <L p={S.recommended} lang={lang} className="tag tag-accent" /> : null}
@@ -726,135 +726,200 @@ export function Studio({
             <L p={d.name} lang={lang} />
           </h1>
           <L p={d.tagline} lang={lang} className="st-tagline" />
-          <div className="st-swatches">
+          <div className="st-palette" role="img" aria-label={d.palette.map((s) => `${one(s.name, lang)} ${s.hex}`).join(", ")}>
             {d.palette.map((s) => (
-              <span key={s.hex} className="st-swatch" title={`${both(s.name, lang)} ${s.hex}`}>
+              <span key={s.hex} style={{ background: s.hex, flexGrow: s.share || 1 }} title={`${both(s.name, lang)} ${s.hex}`} />
+            ))}
+          </div>
+          <div className="st-palette-keys" aria-hidden="true">
+            {d.palette.map((s) => (
+              <span key={s.hex}>
                 <i style={{ background: s.hex }} />
-                <small>{s.hex}</small>
+                {one(s.name, lang)}
               </span>
             ))}
           </div>
         </section>
 
-        <section className="st-sec">
-          <L p={S.structure} lang={lang} className="st-label" />
-          <div role="radiogroup" aria-label={both(S.structure, lang)}>
-            {MATERIAL_GROUPS.map((g) => (
-              <div key={g.id}>
-                <p className="st-group-label">{both(g.label, lang)}</p>
-                <div className="st-forms">
-                  {g.forms.map((f) => (
-                    <button key={f} type="button" role="radio" aria-checked={spec.form === f} className={spec.form === f ? "st-form is-active" : "st-form"} onClick={() => changeForm(f)}>
-                      <FormGlyph form={f} />
-                      <span>{one(FORM_LABELS[f], lang)}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-          <p className="st-small">{one(FORM_NOTES[spec.form], lang)}</p>
+        <div className="st-tabs" role="tablist" aria-label={both(S.adjust, lang)}>
+          {panelTabs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              className={tab === t.id ? "st-tab is-active" : "st-tab"}
+              onClick={() => {
+                setTab(t.id);
+                if (t.id === "check") setTimeout(() => engine.current?.refresh(), 0);
+              }}
+            >
+              <L p={t.label} lang={lang} />
+            </button>
+          ))}
+        </div>
 
-          {isOuter(spec.form) ? (
-            <div className="st-combo">
-              <L p={S.combo} lang={lang} className="st-label" />
-              <L p={S.comboNote} lang={lang} className="st-small" />
-              <div className="st-forms" role="radiogroup" aria-label={both(S.combo, lang)}>
-                <button type="button" role="radio" aria-checked={!spec.inner} className={!spec.inner ? "st-form st-form-none is-active" : "st-form st-form-none"} onClick={() => changeInner(null)}>
-                  <span>{one(S.none, lang)}</span>
-                </button>
-                {INNER_FORMS.map((f) => (
-                  <button key={f} type="button" role="radio" aria-checked={spec.inner?.form === f} className={spec.inner?.form === f ? "st-form is-active" : "st-form"} onClick={() => changeInner(f)}>
+        {tab === "pack" ? (
+          <div className="st-tabpanel" role="tabpanel">
+            <section className="st-sec">
+              <L p={S.structure} lang={lang} className="st-label" />
+              <div className="st-mats" role="tablist" aria-label={both(S.material, lang)}>
+                {MATERIAL_GROUPS.map((g) => (
+                  <button key={g.id} type="button" role="tab" aria-selected={matGroup === g.id} className={matGroup === g.id ? "st-mat is-active" : "st-mat"} onClick={() => setMatGroup(g.id)}>
+                    {one(g.label, lang)}
+                    {g.forms.includes(spec.form) ? <i aria-hidden="true" /> : null}
+                  </button>
+                ))}
+              </div>
+              <div className="st-forms" role="radiogroup" aria-label={both(group.label, lang)}>
+                {group.forms.map((f) => (
+                  <button key={f} type="button" role="radio" aria-checked={spec.form === f} className={spec.form === f ? "st-form is-active" : "st-form"} onClick={() => changeForm(f)}>
                     <FormGlyph form={f} />
                     <span>{one(FORM_LABELS[f], lang)}</span>
                   </button>
                 ))}
               </div>
-              {spec.inner ? (
-                <>
-                  <div className="st-chips" role="group" aria-label={both(S.count, lang)}>
-                    <span className="st-small">{one(S.count, lang)}</span>
-                    {([1, 2] as const).map((n) => (
-                      <button key={n} type="button" className={spec.inner?.count === n ? "st-chip is-active" : "st-chip"} aria-pressed={spec.inner?.count === n} onClick={() => spec.inner && setSpec({ ...spec, inner: { ...spec.inner, count: n } })}>
-                        × {n}
-                      </button>
-                    ))}
-                  </div>
-                  {spec.form !== "carton" && spec.form !== "bag" ? (
-                    <div className="st-chips" role="group" aria-label={both(S.insert, lang)}>
-                      <span className="st-small">{one(S.insert, lang)}</span>
-                      {INSERTS.map((x) => {
-                        const on = (spec.inner?.insert ?? (spec.form === "mailer" ? "pulp" : "velvet")) === x;
-                        return (
-                          <button key={x} type="button" className={on ? "st-chip is-active" : "st-chip"} aria-pressed={on} onClick={() => spec.inner && setSpec({ ...spec, inner: { ...spec.inner, insert: x } })}>
-                            {one(INSERT_LABELS[x], lang)}
-                          </button>
-                        );
-                      })}
-                    </div>
+              <p className="st-note">{one(FORM_NOTES[spec.form], lang)}</p>
+            </section>
+
+            {isOuter(spec.form) ? (
+              <section className="st-sec">
+                <div className="st-sec-row">
+                  <L p={S.combo} lang={lang} className="st-label" />
+                  {spec.inner ? (
+                    <button type="button" className="st-link" onClick={() => changeInner(null)}>
+                      {one(S.none, lang)}
+                    </button>
                   ) : null}
-                </>
-              ) : null}
-            </div>
-          ) : null}
+                </div>
+                <L p={S.comboNote} lang={lang} className="st-small" />
+                <div className="st-inner" role="radiogroup" aria-label={both(S.combo, lang)}>
+                  {INNER_FORMS.map((f) => (
+                    <button key={f} type="button" role="radio" aria-checked={spec.inner?.form === f} className={spec.inner?.form === f ? "st-innerbtn is-active" : "st-innerbtn"} onClick={() => changeInner(f)}>
+                      <FormGlyph form={f} />
+                      <span>{one(FORM_LABELS[f], lang)}</span>
+                    </button>
+                  ))}
+                </div>
+                {spec.inner ? (
+                  <div className="st-combo-opts">
+                    <div className="st-opt">
+                      <span className="st-small">{one(S.count, lang)}</span>
+                      <div className="st-seg">
+                        {([1, 2] as const).map((n) => (
+                          <button key={n} type="button" aria-pressed={spec.inner?.count === n} className={spec.inner?.count === n ? "is-active" : ""} onClick={() => spec.inner && setSpec({ ...spec, inner: { ...spec.inner, count: n } })}>
+                            × {n}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {spec.form !== "carton" && spec.form !== "bag" ? (
+                      <div className="st-opt">
+                        <span className="st-small">{one(S.insert, lang)}</span>
+                        <div className="st-seg st-seg-wrap">
+                          {INSERTS.map((x) => {
+                            const on = (spec.inner?.insert ?? (spec.form === "mailer" ? "pulp" : "velvet")) === x;
+                            return (
+                              <button key={x} type="button" aria-pressed={on} className={on ? "is-active" : ""} onClick={() => spec.inner && setSpec({ ...spec, inner: { ...spec.inner, insert: x } })}>
+                                {one(INSERT_LABELS[x], lang)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
 
-          {spec.inner ? <p className="st-small">{both(S.productSize, lang)}</p> : null}
-          <div className="st-dims">
-            {(isRound(sizeForm) ? (["w", "h"] as const) : (["w", "h", "d"] as const)).map((k) => (
-              <label key={k} className="st-dim">
-                <span>{one(isRound(sizeForm) && k === "w" ? DIAMETER_LABEL : k === "d" && (sizeForm === "pouch" || sizeForm === "bag") ? GUSSET_LABEL : DIM_LABELS[k], lang)}</span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={DIM_RANGE.min}
-                  max={DIM_RANGE.max}
-                  step={1}
-                  value={sizeTarget[k]}
-                  onChange={(e) => {
-                    const v = Number(e.currentTarget.value);
-                    if (!Number.isFinite(v)) return;
-                    setSize(k, Math.max(DIM_RANGE.min, Math.min(DIM_RANGE.max, Math.round(v))));
-                  }}
-                />
-                <em>mm</em>
-              </label>
-            ))}
+            <section className="st-sec">
+              <L p={spec.inner ? S.productSize : S.size} lang={lang} className="st-label" />
+              <div className="st-dims">
+                {(isRound(sizeForm) ? (["w", "h"] as const) : (["w", "h", "d"] as const)).map((k) => (
+                  <label key={k} className="st-dim">
+                    <span>{one(isRound(sizeForm) && k === "w" ? DIAMETER_LABEL : k === "d" && (sizeForm === "pouch" || sizeForm === "bag") ? GUSSET_LABEL : DIM_LABELS[k], lang)}</span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={DIM_RANGE.min}
+                      max={DIM_RANGE.max}
+                      step={1}
+                      value={sizeTarget[k]}
+                      onChange={(e) => {
+                        const v = Number(e.currentTarget.value);
+                        if (!Number.isFinite(v)) return;
+                        setSize(k, Math.max(DIM_RANGE.min, Math.min(DIM_RANGE.max, Math.round(v))));
+                      }}
+                    />
+                    <em>mm</em>
+                  </label>
+                ))}
+              </div>
+              <p className="st-size">
+                {spec.inner ? <span>{one(S.outerFitted, lang)}</span> : null}
+                {formatSize(spec)}
+              </p>
+            </section>
           </div>
-          {spec.inner ? <p className="st-outer">{both(S.outerFitted, lang)}</p> : null}
-          <p className="st-size">{formatSize(spec)}</p>
-        </section>
+        ) : null}
 
-        <section className="st-sec">
-          <L p={S.finish} lang={lang} className="st-label" />
-          <div className="st-chips">
-            {FINISHES.map((f) => (
-              <button key={f} type="button" className={spec.finish === f ? "st-chip is-active" : "st-chip"} aria-pressed={spec.finish === f} onClick={() => setSpec({ ...spec, finish: f })}>
-                {one(FINISH_LABELS[f], lang)}
-              </button>
-            ))}
+        {tab === "look" ? (
+          <div className="st-tabpanel" role="tabpanel">
+            <section className="st-sec">
+              <L p={S.finish} lang={lang} className="st-label" />
+              <div className="st-finishes">
+                {FINISHES.map((f) => (
+                  <button key={f} type="button" className={spec.finish === f ? `st-finish st-finish-${f} is-active` : `st-finish st-finish-${f}`} aria-pressed={spec.finish === f} onClick={() => setSpec({ ...spec, finish: f })}>
+                    <i aria-hidden="true" />
+                    {one(FINISH_LABELS[f], lang)}
+                  </button>
+                ))}
+              </div>
+            </section>
+            <section className="st-sec">
+              <L p={S.backdrop} lang={lang} className="st-label" />
+              <div className="st-finishes">
+                {BACKDROPS.map((b) => (
+                  <button key={b.id} type="button" className={backdrop === b.id ? `st-finish st-bd-${b.id} is-active` : `st-finish st-bd-${b.id}`} aria-pressed={backdrop === b.id} onClick={() => setBackdrop(b.id)}>
+                    <i aria-hidden="true" />
+                    {one(b.label, lang)}
+                  </button>
+                ))}
+              </div>
+            </section>
           </div>
-        </section>
+        ) : null}
 
-        <section className="st-sec">
-          <L p={S.backdrop} lang={lang} className="st-label" />
-          <div className="st-chips">
-            {BACKDROPS.map((b) => (
-              <button key={b.id} type="button" className={backdrop === b.id ? `st-bd st-bd-${b.id} is-active` : `st-bd st-bd-${b.id}`} aria-pressed={backdrop === b.id} onClick={() => setBackdrop(b.id)}>
-                <i />
-                {one(b.label, lang)}
-              </button>
-            ))}
+        {tab === "check" ? (
+          <div className="st-tabpanel" role="tabpanel">
+            <section className="st-sec">
+              <L p={S.listing} lang={lang} className="st-label" />
+              <div className="st-listing-body">
+                <div className="lt-main">
+                  <canvas ref={ltMain} width={264} height={264} aria-label={both(S.listing, lang)} />
+                </div>
+                <div className="lt-grid" aria-hidden="true">
+                  <ListingTile />
+                  <ListingTile mine>
+                    <canvas ref={ltSmall} width={112} height={112} />
+                  </ListingTile>
+                  <ListingTile />
+                  <ListingTile />
+                </div>
+              </div>
+              <L p={S.listingNote} lang={lang} className="st-small" />
+            </section>
+            <section className="st-sec">
+              <div className="st-sec-row">
+                <L p={S.brief} lang={lang} className="st-label" />
+                <CopyButton text={briefText} label={one(S.copy, lang)} done={one(S.copied, lang)} />
+              </div>
+              <L p={S.briefNote} lang={lang} className="st-small" />
+              <pre className="st-brief">{lang === "en" ? brief.en : brief.zh}</pre>
+            </section>
           </div>
-        </section>
-
-        <section className="st-sec">
-          <div className="st-sec-row">
-            <L p={S.brief} lang={lang} className="st-label" />
-            <CopyButton text={briefText} label={one(S.copy, lang)} done={one(S.copied, lang)} />
-          </div>
-          <L p={S.briefNote} lang={lang} className="st-small" />
-          <pre className="st-brief">{lang === "en" ? brief.en : brief.zh}</pre>
-        </section>
+        ) : null}
 
         {saveNote ? <p className={`st-save${saveState === "error" ? " is-error" : ""}`}>{both(saveNote, lang)}</p> : null}
         <p className="st-small st-disclaimer">{both(S.disclaimer, lang)}</p>
