@@ -125,6 +125,7 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
         try {
           sc = new SymbiosisScene(canvas, items);
         } catch {
+          canvas.remove();
           setOk(false);
           return;
         }
@@ -170,7 +171,10 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
     <section className="sym" aria-label={lang === "en" ? "Packaging Advisor" : "包装视觉顾问"}>
       <div className="sym-stage" ref={host}>
         <svg ref={svg} className="sym-2d" aria-hidden="true" />
-        {!ok ? <div className="sym-fallback" aria-hidden="true" /> : null}
+        {!ok ? (
+          // no WebGL: the same film, pre-rendered
+          <video className="sym-video" src="/hero/symbiosis.mp4" poster="/hero/symbiosis-poster.jpg" autoPlay muted loop playsInline aria-hidden="true" />
+        ) : null}
       </div>
       <div className="sym-copy">{children}</div>
       {cur ? (

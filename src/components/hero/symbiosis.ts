@@ -455,6 +455,7 @@ export class SymbiosisScene {
   private shiftX = 0;
   /** Override for the sideways framing (fraction of the width; null = automatic). */
   private shiftOverride: number | null = null;
+  private shiftY = 0;
   private env: THREE.Texture;
   onFrame?: (f: FrameInfo, o: OverlayFrame) => void;
 
@@ -555,7 +556,7 @@ export class SymbiosisScene {
     // wide: the copy sits on the left, so the scene's centre moves right
     const wide = this.w / this.h > 1.25;
     this.shiftX = this.shiftOverride !== null ? -this.w * this.shiftOverride : wide ? -this.w * 0.24 : 0;
-    cam.setViewOffset(this.w, this.h, this.shiftX, 0, this.w, this.h);
+    cam.setViewOffset(this.w, this.h, this.shiftX, this.h * this.shiftY, this.w, this.h);
     const dist = wide ? 9.4 : 9.6 + Math.max(0, 1 - cam.aspect) * 7;
     const el = (40 * Math.PI) / 180;
     cam.position.set(0, dist * Math.sin(el), dist * Math.cos(el));
@@ -742,8 +743,9 @@ export class SymbiosisScene {
   }
 
   /** Frame the scene in the middle (e.g. for a video without the page copy). */
-  setShift(f: number | null) {
+  setShift(f: number | null, fy = 0) {
     this.shiftOverride = f;
+    this.shiftY = fy;
     this.resize(this.w, this.h);
   }
 
