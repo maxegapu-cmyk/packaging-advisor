@@ -20,8 +20,8 @@ const C = {
   spaceKicker: { zh: "核心功能", en: "The core" },
   spaceH: { zh: "像拿在手里一样看包装。", en: "See the packaging as if it were in your hand." },
   spaceSub: {
-    zh: "三个方向都画在真实的盒型上：直立盒、天地盖礼盒、圆罐，按你的尺寸。转一圈、打开盖子、展开刀模，在下单打样之前就把问题看出来。",
-    en: "All three directions are drawn on a real structure (tuck carton, lid-and-base gift box or round tin) at your size. Turn it, open the lid, unfold the net, and spot problems before you pay for a proof.",
+    zh: "三个方向都画在真实的包装上，按你的尺寸：纸盒、礼盒、飞机盒、自立袋、按压瓶、玻璃罐、铁罐、瓷罐等 14 种，还能把产品装进外盒看组合效果。转一圈、打开盖子、展开刀模，在下单打样之前就把问题看出来。",
+    en: "All three directions are drawn on real packaging at your size: 14 forms including cartons, gift boxes, mailers, pouches, pump bottles, glass jars, tins and porcelain caddies, and products can be packed into an outer box to see the set. Turn it, open the lid, unfold the net, and spot problems before you pay for a proof.",
   },
   spacePoints: [
     { t: { zh: "720° 无死角", en: "720°, no blind spots" }, d: { zh: "上下左右整圈翻转，连底部都能看；双指或滚轮缩放。", en: "Turn it all the way round in every direction, bottom included; pinch or scroll to zoom." } },

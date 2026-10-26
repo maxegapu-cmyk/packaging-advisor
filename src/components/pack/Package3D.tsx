@@ -33,6 +33,7 @@ export function Package3D({
   anatomy = false,
   onProgress,
   onPins,
+  category,
 }: {
   d: Direction;
   brand: string;
@@ -56,12 +57,14 @@ export function Package3D({
   anatomy?: boolean;
   onProgress?: (p: number | null) => void;
   onPins?: (pins: PinOnScreen[] | null) => void;
+  /** Board category: decides what jars, bottles and tubes hold. */
+  category?: string;
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const engine = useRef<PackScene | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "fallback">("loading");
-  const latest = useRef({ d, brand, spec, open, fit });
-  latest.current = { d, brand, spec, open, fit };
+  const latest = useRef({ d, brand, spec, open, fit, category });
+  latest.current = { d, brand, spec, open, fit, category };
   const after = useRef(afterRender);
   after.current = afterRender;
   const ready = useRef(onReady);
@@ -136,8 +139,8 @@ export function Package3D({
   }, [anatomy]);
 
   useEffect(() => {
-    engine.current?.update({ d, brand, spec, open, fit });
-  }, [d, brand, spec, open, fit]);
+    engine.current?.update({ d, brand, spec, open, fit, category });
+  }, [d, brand, spec, open, fit, category]);
 
   if (state === "fallback") return <PackageCSS d={d} brand={brand} spec={spec} fit={fit} open={open} orbit={orbit} />;
   return (

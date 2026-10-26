@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import type { Direction } from "@/lib/board/schema";
 import type { Lang, Pair } from "@/lib/i18n";
-import { FORM_LABELS, FORM_PRESET, FORMS, type Form, type PackSpec } from "@/lib/pack";
+import { FORM_LABELS, FORM_PRESET, type Form, type PackSpec } from "@/lib/pack";
+
+/** One form per material family, to show the range on the landing page. */
+const SHOW: Form[] = ["gift", "carton", "pouch", "jar", "tin"];
 import { SpaceIcon } from "./Box3D";
 import { FormGlyph } from "./pack/FormGlyph";
 import { Orbit, REST_ANGLE } from "./pack/orbit";
@@ -18,7 +21,7 @@ const C = {
   drag: { zh: "拖动试试", en: "Try dragging it" },
 } satisfies Record<string, Pair>;
 
-/** Landing-page demo of the 3D space: one direction on a slow turntable, three forms to try. */
+/** Landing-page demo of the 3D space: one direction on a slow turntable, one form per material to try. */
 export function SpaceShowcase({ d, brand, lang, href }: { d: Direction; brand: string; lang: Lang; href: string }) {
   const [orbit] = useState(() => new Orbit({ x: -18, y: -34 }, 1, { free: true }));
   const [form, setForm] = useState<Form>("gift");
@@ -54,7 +57,7 @@ export function SpaceShowcase({ d, brand, lang, href }: { d: Direction; brand: s
       </div>
       <div className="showcase-controls">
         <div className="showcase-forms" role="radiogroup" aria-label={lang === "en" ? "Structure" : "盒型"}>
-          {FORMS.map((f) => (
+          {SHOW.map((f) => (
             <button
               key={f}
               type="button"

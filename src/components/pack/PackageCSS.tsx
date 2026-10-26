@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import type { Direction } from "@/lib/board/schema";
-import { toPx, type PackSpec, type PxDims } from "@/lib/pack";
+import { isRound, outerSize, toPx, type Form, type PackSpec, type PxDims } from "@/lib/pack";
 import { BackFace, FrontFace, InnerAndManual, paletteVars, SideFace, TopFace } from "../BoxFaces";
 import { lightFaces } from "./light";
 import type { Orbit } from "./orbit";
@@ -15,7 +15,15 @@ const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayout
  *  - Faces are lit from the camera angle (see light.ts) and take the chosen finish.
  * The camera (rotation, zoom) comes from an Orbit, applied directly to the DOM.
  */
-export function PackageCSS({ d, brand, spec, fit, open = false, orbit }: { d: Direction; brand: string; spec: PackSpec; fit: number; open?: boolean; orbit: Orbit }) {
+/** The CSS version draws three shapes; every other form is shown as the nearest of them. */
+function cssSpec(spec: PackSpec): PackSpec {
+  const o = outerSize(spec);
+  const form: Form = isRound(spec.form) ? "tin" : spec.form === "gift" || spec.form === "bookBox" || spec.form === "mailer" || spec.form === "drawer" ? "gift" : "carton";
+  return { form, w: o.w, h: o.h, d: form === "tin" ? o.w : o.d, finish: spec.finish };
+}
+
+export function PackageCSS({ d, brand, spec: given, fit, open = false, orbit }: { d: Direction; brand: string; spec: PackSpec; fit: number; open?: boolean; orbit: Orbit }) {
+  const spec = cssSpec(given);
   const rig = useRef<HTMLDivElement>(null);
   const px = toPx(spec, fit);
 

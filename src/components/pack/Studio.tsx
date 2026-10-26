@@ -12,9 +12,17 @@ import {
   FORM_LABELS,
   FORM_NOTES,
   FORM_PRESET,
-  FORMS,
   formatSize,
+  CAN_OPEN,
+  GUSSET_LABEL,
+  INNER_FORMS,
+  INSERT_LABELS,
+  INSERTS,
+  isOuter,
+  isRound,
+  MATERIAL_GROUPS,
   type Form,
+  type InnerForm,
   type PackSpec,
 } from "@/lib/pack";
 import { renderBrief } from "@/lib/renderBrief";
@@ -43,6 +51,20 @@ const S = {
   fold: { zh: "折回盒子", en: "Fold up" },
   openLid: { zh: "打开盖子", en: "Open lid" },
   closeLid: { zh: "盖上", en: "Close lid" },
+  pullOut: { zh: "拉出抽屉", en: "Pull out" },
+  pushIn: { zh: "推回抽屉", en: "Push in" },
+  unscrew: { zh: "拧开盖子", en: "Unscrew" },
+  unstop: { zh: "拔出瓶塞", en: "Pull stopper" },
+  stopIn: { zh: "塞回瓶塞", en: "Stopper in" },
+  openBook: { zh: "翻开", en: "Open" },
+  closeBook: { zh: "合上", en: "Close" },
+  combo: { zh: "组合包装", en: "Combination" },
+  comboNote: { zh: "选一种产品装进这个外包装，外包装尺寸会按产品自动配好。", en: "Pick a product to pack in this outer pack; the outer size is fitted to it." },
+  none: { zh: "不装", en: "None" },
+  count: { zh: "数量", en: "Count" },
+  insert: { zh: "内托", en: "Insert" },
+  productSize: { zh: "内装产品尺寸", en: "Product size" },
+  outerFitted: { zh: "外包装（自动配）", en: "Outer pack (fitted)" },
   reset: { zh: "复位", en: "Reset" },
   zoomIn: { zh: "放大", en: "Zoom in" },
   zoomOut: { zh: "缩小", en: "Zoom out" },
@@ -89,21 +111,36 @@ function detailsFor(form: Form): Detail[] {
   const inner = (d: Direction) => d.carriers.inner;
   const type = (d: Direction) => d.styleDna.typography;
   const finish = (d: Direction) => d.styleDna.finish;
-  if (form === "gift")
+  const canOpen = CAN_OPEN.includes(form);
+  if (form === "gift" || form === "bookBox" || form === "mailer")
     return [
       { id: "lid", label: { zh: "盖面主视觉", en: "Lid artwork" }, angle: { x: -64, y: -8 }, zoom: 1.16, text: front },
-      { id: "band", label: { zh: "侧边与字体", en: "Band and type" }, angle: { x: -10, y: -22 }, zoom: 1.31, text: type },
+      { id: "band", label: { zh: "侧边与字体", en: "Sides and type" }, angle: { x: -10, y: -22 }, zoom: 1.31, text: type },
       { id: "inside", label: { zh: "开盒内部", en: "Inside" }, angle: { x: -46, y: -20 }, zoom: 0.98, open: true, text: inner },
       { id: "anchor", label: { zh: "视觉锚点", en: "Visual anchor" }, angle: { x: -30, y: 28 }, zoom: 1.09, text: anchor },
       { id: "finish", label: { zh: "工艺", en: "Finish" }, angle: { x: -38, y: -48 }, zoom: 1.23, text: finish },
     ];
-  if (form === "tin")
+  if (form === "drawer")
     return [
-      { id: "label", label: { zh: "罐身标签", en: "Label" }, angle: { x: -6, y: -22 }, zoom: 1.2, text: front },
+      { id: "front", label: { zh: "抽屉正面", en: "Tray front" }, angle: { x: -6, y: -8 }, zoom: 1.2, text: type },
+      { id: "lid", label: { zh: "外套主视觉", en: "Sleeve artwork" }, angle: { x: -64, y: -8 }, zoom: 1.16, text: front },
+      { id: "inside", label: { zh: "拉开内部", en: "Inside" }, angle: { x: -40, y: -26 }, zoom: 0.96, open: true, text: inner },
+      { id: "finish", label: { zh: "工艺", en: "Finish" }, angle: { x: -30, y: -48 }, zoom: 1.23, text: finish },
+    ];
+  if (isRound(form))
+    return [
+      { id: "label", label: { zh: "正面标签", en: "Label" }, angle: { x: -6, y: -8 }, zoom: 1.2, text: front },
       { id: "side", label: { zh: "侧面信息", en: "Side panel" }, angle: { x: -6, y: -150 }, zoom: 1.2, text: back },
-      { id: "lid", label: { zh: "罐盖", en: "Lid" }, angle: { x: -68, y: -22 }, zoom: 1.18, text: anchor },
-      { id: "seal", label: { zh: "开罐内封", en: "Inner seal" }, angle: { x: -44, y: -22 }, zoom: 0.95, open: true, text: inner },
+      { id: "top", label: form === "glassBottle" ? { zh: "瓶塞", en: "Stopper" } : form === "tube" ? { zh: "尾封", en: "Crimp" } : { zh: "顶部", en: "Top" }, angle: { x: -64, y: -12 }, zoom: 1.18, text: anchor },
+      ...(canOpen ? [{ id: "open", label: { zh: "打开", en: "Opened" }, angle: { x: -40, y: -22 }, zoom: 0.95, open: true, text: inner }] : []),
       { id: "finish", label: { zh: "工艺", en: "Finish" }, angle: { x: -14, y: 30 }, zoom: 1.27, text: finish },
+    ];
+  if (form === "pouch" || form === "bag")
+    return [
+      { id: "front", label: { zh: "正面主视觉", en: "Front artwork" }, angle: { x: -6, y: -8 }, zoom: 1.16, text: front },
+      { id: "side", label: form === "bag" ? { zh: "侧面风琴折", en: "Gusset" } : { zh: "侧封与拉链", en: "Seal and zip" }, angle: { x: -8, y: 70 }, zoom: 1.2, text: type },
+      { id: "back", label: { zh: "背面信息", en: "Back panel" }, angle: { x: -6, y: 180 }, zoom: 1.16, text: back },
+      { id: "finish", label: { zh: "工艺", en: "Finish" }, angle: { x: -24, y: -46 }, zoom: 1.28, text: finish },
     ];
   return [
     { id: "front", label: { zh: "正面主视觉", en: "Front artwork" }, angle: { x: -4, y: -8 }, zoom: 1.18, text: front },
@@ -112,6 +149,16 @@ function detailsFor(form: Form): Detail[] {
     { id: "top", label: { zh: "顶部开口", en: "Top flap" }, angle: { x: -70, y: -24 }, zoom: 1.18, text: type },
     { id: "finish", label: { zh: "工艺", en: "Finish" }, angle: { x: -20, y: -52 }, zoom: 1.31, text: finish },
   ];
+}
+
+/** What the open button says for each form. */
+function openLabelFor(form: Form, open: boolean): Pair {
+  if (form === "carton") return open ? S.fold : S.unfold;
+  if (form === "drawer") return open ? S.pushIn : S.pullOut;
+  if (form === "jar") return open ? S.closeLid : S.unscrew;
+  if (form === "glassBottle") return open ? S.stopIn : S.unstop;
+  if (form === "bookBox") return open ? S.closeBook : S.openBook;
+  return open ? S.closeLid : S.openLid;
 }
 
 /* ---------------------------------------------------------------- Small pieces */
@@ -388,8 +435,21 @@ export function Studio({
     if (form === spec.form) return;
     setDetail(null);
     setOpen(false);
-    setSpec({ ...FORM_PRESET[form], finish: spec.finish });
+    // a combination keeps its product when the outer pack changes
+    const keep = isOuter(form) && spec.inner ? { inner: spec.inner } : {};
+    setSpec({ ...FORM_PRESET[form], finish: spec.finish, ...keep });
     orbit.tween(REST_ANGLE, 700, 1);
+  };
+  const changeInner = (form: InnerForm | null) => {
+    setDetail(null);
+    if (!form) {
+      const { inner: _drop, ...rest } = spec; // eslint-disable-line @typescript-eslint/no-unused-vars
+      setSpec(rest);
+      return;
+    }
+    if (spec.inner?.form === form) return;
+    const p = FORM_PRESET[form];
+    setSpec({ ...spec, inner: { form, count: spec.inner?.count ?? 1, w: p.w, h: p.h, d: p.d, insert: spec.inner?.insert } });
   };
 
   const showDetail = (x: Detail) => {
@@ -408,7 +468,16 @@ export function Studio({
   const details = useMemo(() => detailsFor(spec.form), [spec.form]);
   const brief = useMemo(() => renderBrief(d, spec, board.meta.product, brand), [d, spec, board.meta.product, brand]);
   const briefText = lang === "zh" ? brief.zh : lang === "en" ? brief.en : `${brief.zh}\n\n${brief.en}`;
-  const openLabel = spec.form === "carton" ? (open ? S.fold : S.unfold) : open ? S.closeLid : S.openLid;
+  const openLabel = openLabelFor(spec.form, open);
+  const canOpen = CAN_OPEN.includes(spec.form);
+  // when a product is packed, the size fields edit the product and the outer pack follows
+  const sizeTarget = spec.inner ?? spec;
+  const sizeForm: Form = spec.inner?.form ?? spec.form;
+  const setSize = (k: "w" | "h" | "d", n: number) => {
+    const roundW = isRound(sizeForm) && k === "w" ? { d: n } : {};
+    if (spec.inner) setSpec({ ...spec, inner: { ...spec.inner, [k]: n, ...roundW } });
+    else setSpec({ ...spec, [k]: n, ...roundW });
+  };
   const ground = d.palette[0]?.hex ?? "#eee";
 
   const saveNote = isSample ? S.notSaved : saveState === "saving" ? S.saving : saveState === "saved" ? S.saved : saveState === "error" ? S.saveError : null;
@@ -445,6 +514,7 @@ export function Studio({
             open={open}
             orbit={orbit}
             quality="high"
+            category={board.meta.category}
             loader
             onEngine={(e) => (engine.current = e)}
             afterRender={snapshot}
@@ -492,6 +562,7 @@ export function Studio({
             <div className="st-caption-head">
               <span className="st-caption-title">
                 {one(S.anatomy, lang)} · {one(FORM_LABELS[spec.form], lang)}
+                {spec.inner ? ` + ${one(FORM_LABELS[spec.inner.form], lang)}` : ""}
               </span>
               <button type="button" className="st-icon-btn" aria-label={both(S.close, lang)} onClick={() => toggleAnatomy()}>
                 <Icon name="x" />
@@ -557,10 +628,12 @@ export function Studio({
             <Icon name="anatomy" />
             <span className="st-dock-text">{one(S.anatomy, lang)}</span>
           </button>
-          <button type="button" className={open ? "st-dock-btn is-active" : "st-dock-btn"} aria-pressed={open} onClick={toggleOpen} title={both(openLabel, lang)}>
-            <Icon name="open" />
-            <span className="st-dock-text">{one(openLabel, lang)}</span>
-          </button>
+          {canOpen ? (
+            <button type="button" className={open ? "st-dock-btn is-active" : "st-dock-btn"} aria-pressed={open} onClick={toggleOpen} title={both(openLabel, lang)}>
+              <Icon name="open" />
+              <span className="st-dock-text">{one(openLabel, lang)}</span>
+            </button>
+          ) : null}
           <span className="st-sep" aria-hidden="true" />
           <button type="button" className="st-dock-btn" onClick={() => orbit.zoomBy(1 / 1.15)} aria-label={both(S.zoomOut, lang)}>
             <Icon name="minus" />
@@ -659,37 +732,89 @@ export function Studio({
 
         <section className="st-sec">
           <L p={S.structure} lang={lang} className="st-label" />
-          <div className="st-forms" role="radiogroup" aria-label={both(S.structure, lang)}>
-            {FORMS.map((f) => (
-              <button key={f} type="button" role="radio" aria-checked={spec.form === f} className={spec.form === f ? "st-form is-active" : "st-form"} onClick={() => changeForm(f)}>
-                <FormGlyph form={f} />
-                <span>{one(FORM_LABELS[f], lang)}</span>
-              </button>
+          <div role="radiogroup" aria-label={both(S.structure, lang)}>
+            {MATERIAL_GROUPS.map((g) => (
+              <div key={g.id}>
+                <p className="st-group-label">{both(g.label, lang)}</p>
+                <div className="st-forms">
+                  {g.forms.map((f) => (
+                    <button key={f} type="button" role="radio" aria-checked={spec.form === f} className={spec.form === f ? "st-form is-active" : "st-form"} onClick={() => changeForm(f)}>
+                      <FormGlyph form={f} />
+                      <span>{one(FORM_LABELS[f], lang)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
           <p className="st-small">{one(FORM_NOTES[spec.form], lang)}</p>
+
+          {isOuter(spec.form) ? (
+            <div className="st-combo">
+              <L p={S.combo} lang={lang} className="st-label" />
+              <L p={S.comboNote} lang={lang} className="st-small" />
+              <div className="st-forms" role="radiogroup" aria-label={both(S.combo, lang)}>
+                <button type="button" role="radio" aria-checked={!spec.inner} className={!spec.inner ? "st-form st-form-none is-active" : "st-form st-form-none"} onClick={() => changeInner(null)}>
+                  <span>{one(S.none, lang)}</span>
+                </button>
+                {INNER_FORMS.map((f) => (
+                  <button key={f} type="button" role="radio" aria-checked={spec.inner?.form === f} className={spec.inner?.form === f ? "st-form is-active" : "st-form"} onClick={() => changeInner(f)}>
+                    <FormGlyph form={f} />
+                    <span>{one(FORM_LABELS[f], lang)}</span>
+                  </button>
+                ))}
+              </div>
+              {spec.inner ? (
+                <>
+                  <div className="st-chips" role="group" aria-label={both(S.count, lang)}>
+                    <span className="st-small">{one(S.count, lang)}</span>
+                    {([1, 2] as const).map((n) => (
+                      <button key={n} type="button" className={spec.inner?.count === n ? "st-chip is-active" : "st-chip"} aria-pressed={spec.inner?.count === n} onClick={() => spec.inner && setSpec({ ...spec, inner: { ...spec.inner, count: n } })}>
+                        × {n}
+                      </button>
+                    ))}
+                  </div>
+                  {spec.form !== "carton" && spec.form !== "bag" ? (
+                    <div className="st-chips" role="group" aria-label={both(S.insert, lang)}>
+                      <span className="st-small">{one(S.insert, lang)}</span>
+                      {INSERTS.map((x) => {
+                        const on = (spec.inner?.insert ?? (spec.form === "mailer" ? "pulp" : "velvet")) === x;
+                        return (
+                          <button key={x} type="button" className={on ? "st-chip is-active" : "st-chip"} aria-pressed={on} onClick={() => spec.inner && setSpec({ ...spec, inner: { ...spec.inner, insert: x } })}>
+                            {one(INSERT_LABELS[x], lang)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          ) : null}
+
+          {spec.inner ? <p className="st-small">{both(S.productSize, lang)}</p> : null}
           <div className="st-dims">
-            {(spec.form === "tin" ? (["w", "h"] as const) : (["w", "h", "d"] as const)).map((k) => (
+            {(isRound(sizeForm) ? (["w", "h"] as const) : (["w", "h", "d"] as const)).map((k) => (
               <label key={k} className="st-dim">
-                <span>{one(spec.form === "tin" && k === "w" ? DIAMETER_LABEL : DIM_LABELS[k], lang)}</span>
+                <span>{one(isRound(sizeForm) && k === "w" ? DIAMETER_LABEL : k === "d" && (sizeForm === "pouch" || sizeForm === "bag") ? GUSSET_LABEL : DIM_LABELS[k], lang)}</span>
                 <input
                   type="number"
                   inputMode="numeric"
                   min={DIM_RANGE.min}
                   max={DIM_RANGE.max}
                   step={1}
-                  value={spec[k]}
+                  value={sizeTarget[k]}
                   onChange={(e) => {
                     const v = Number(e.currentTarget.value);
                     if (!Number.isFinite(v)) return;
-                    const n = Math.max(DIM_RANGE.min, Math.min(DIM_RANGE.max, Math.round(v)));
-                    setSpec({ ...spec, [k]: n, ...(spec.form === "tin" && k === "w" ? { d: n } : {}) });
+                    setSize(k, Math.max(DIM_RANGE.min, Math.min(DIM_RANGE.max, Math.round(v))));
                   }}
                 />
                 <em>mm</em>
               </label>
             ))}
           </div>
+          {spec.inner ? <p className="st-outer">{both(S.outerFitted, lang)}</p> : null}
           <p className="st-size">{formatSize(spec)}</p>
         </section>
 

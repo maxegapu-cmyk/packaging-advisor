@@ -187,12 +187,15 @@ test("package structure defaults by category and saves only valid values", async
   const { setPack, getProject } = await import("../src/lib/projects");
   const [{ invite }] = createInvites(1);
   const tea = createProject(invite.id, { title: "龙井", category: "tea", brand: "", description: "", mustText: "" });
-  assert.equal(tea.pack.form, "tin");
+  // tea starts as two tins in a gift box (the usual tea gift set)
+  assert.equal(tea.pack.form, "gift");
+  assert.equal(tea.pack.inner?.form, "tin");
+  assert.equal(tea.pack.inner?.count, 2);
   const appliance = createProject(invite.id, { title: "电水壶", category: "appliance", brand: "", description: "", mustText: "" });
   assert.equal(appliance.pack.form, "carton");
 
   const saved = setPack(tea.id, { form: "gift", w: 9999, h: "120", d: -4, finish: "chrome" });
-  assert.deepEqual(saved, { form: "gift", w: 500, h: 120, d: 30, finish: "matte" });
+  assert.deepEqual(saved, { form: "gift", w: 500, h: 120, d: 20, finish: "matte" });
   assert.deepEqual(getProject(tea.id)!.pack, saved);
 
   // A tin's depth always equals its diameter.

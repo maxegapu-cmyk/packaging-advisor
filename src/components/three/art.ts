@@ -69,7 +69,7 @@ function fit(ctx: Ctx, text: string, weight: number, size: number, family: strin
 function wrap(ctx: Ctx, text: string, maxW: number, lines: number): string[] {
   const out: string[] = [];
   let cur = "";
-  const tokens = /[　-鿿]/.test(text) ? Array.from(text) : text.split(/(\s+)/);
+  const tokens = /[\u3000-\u9fff]/.test(text) ? Array.from(text) : text.split(/(\s+)/);
   for (const t of tokens) {
     const next = cur + t;
     if (ctx.measureText(next).width > maxW && cur.trim()) {
