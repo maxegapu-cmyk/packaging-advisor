@@ -74,6 +74,8 @@ const S = {
   zoomOut: { zh: "缩小", en: "Zoom out" },
   hint: { zh: "拖动或单指滑动任意翻转，双指捏合缩放、旋拧转动，双击复位", en: "Drag or swipe to turn it any way; pinch to zoom, twist to spin; double-tap to reset" },
   tabPack: { zh: "包装", en: "Pack" },
+  nextLabel: { zh: "打样完成后，下一步", en: "When the structure is settled" },
+  handoff: { zh: "交给设计师", en: "Hand it to your designer" },
   tabLook: { zh: "外观", en: "Look" },
   tabCheck: { zh: "检查", en: "Check" },
   material: { zh: "材料", en: "Material" },
@@ -275,6 +277,7 @@ export function Studio({
   lang,
   saveUrl,
   backHref,
+  handoffHref,
   isSample = false,
 }: {
   board: Board;
@@ -283,6 +286,8 @@ export function Studio({
   lang: Lang;
   saveUrl?: string;
   backHref: string;
+  /** The last step, once the structure is settled: back to the board's hand-off section. */
+  handoffHref?: string;
   isSample?: boolean;
 }) {
   const dirs = board.directions;
@@ -921,6 +926,14 @@ export function Studio({
           </div>
         ) : null}
 
+        {handoffHref ? (
+          <div className="st-next">
+            <span className="st-small">{one(S.nextLabel, lang)}</span>
+            <a className="btn btn-primary" href={handoffHref}>
+              <L p={S.handoff} lang={lang} />
+            </a>
+          </div>
+        ) : null}
         {saveNote ? <p className={`st-save${saveState === "error" ? " is-error" : ""}`}>{both(saveNote, lang)}</p> : null}
         <p className="st-small st-disclaimer">{both(S.disclaimer, lang)}</p>
       </aside>

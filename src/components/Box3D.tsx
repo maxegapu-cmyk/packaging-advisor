@@ -18,6 +18,8 @@ type PackCtxValue = {
   saving: "idle" | "saving" | "saved" | "error";
   /** Link to the full-screen 3D space for a direction, when there is one. */
   studioHref?: (directionId: string) => string;
+  /** The product's category: decides what jars and bottles are shown holding. */
+  category?: string;
 };
 const PackCtx = createContext<PackCtxValue | null>(null);
 
@@ -29,7 +31,7 @@ export function usePack(): PackCtxValue {
  * Holds the package structure for every box below it. With `saveUrl`, changes are saved
  * (debounced) so the board, the 3D space and share links all show the same structure.
  */
-export function PackProvider({ initial, saveUrl, studioBase, children }: { initial: PackSpec; saveUrl?: string; studioBase?: string; children: ReactNode }) {
+export function PackProvider({ initial, saveUrl, studioBase, category, children }: { initial: PackSpec; saveUrl?: string; studioBase?: string; category?: string; children: ReactNode }) {
   const [spec, setLocal] = useState(initial);
   const [saving, setSaving] = useState<PackCtxValue["saving"]>("idle");
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -49,7 +51,7 @@ export function PackProvider({ initial, saveUrl, studioBase, children }: { initi
   };
   useEffect(() => () => clearTimeout(timer.current), []);
   const studioHref = studioBase ? (id: string) => `${studioBase}${studioBase.includes("?") ? "&" : "?"}d=${encodeURIComponent(id)}` : undefined;
-  return <PackCtx.Provider value={{ spec, setSpec, saving, studioHref }}>{children}</PackCtx.Provider>;
+  return <PackCtx.Provider value={{ spec, setSpec, saving, studioHref, category }}>{children}</PackCtx.Provider>;
 }
 
 /* ------------------------------------------------------------------ Rotate together */
@@ -91,7 +93,7 @@ export function SpaceIcon() {
 /** A package on a board sheet or the landing page: drag to turn, shares the camera when synced. */
 export function Box3D({ d, brand, label, fit = 200, spaceLabel = SPACE_LABEL, lang = "bi" }: { d: Direction; brand: string; label: string; fit?: number; spaceLabel?: Pair; lang?: "bi" | "zh" | "en" }) {
   const sync = useContext(SyncCtx);
-  const { spec, studioHref } = usePack();
+  const { spec, studioHref, category } = usePack();
   const [own] = useState(() => new Orbit(undefined, 1, { free: true }));
   const shared = !!sync?.synced;
   // When "rotate together" is switched off, each box starts from where the shared view was.
@@ -103,7 +105,7 @@ export function Box3D({ d, brand, label, fit = 200, spaceLabel = SPACE_LABEL, la
   return (
     <div className="box3d">
       <Stage3D orbit={orbit} label={label}>
-        <Package3D d={d} brand={brand} spec={spec} fit={fit} orbit={orbit} />
+        <Package3D d={d} brand={brand} spec={spec} fit={fit} orbit={orbit} category={category} />
       </Stage3D>
       {href ? (
         <a className="space-btn" href={href}>

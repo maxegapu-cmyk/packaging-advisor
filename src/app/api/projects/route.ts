@@ -24,6 +24,8 @@ export async function POST(req: Request) {
   const category = text("category", 20);
   if (!title) return jsonError(400, "请填写产品名称 Enter a product name");
   if (!isCategory(category)) return jsonError(400, "请选择品类 Choose a category");
+  const itemType = text("itemType", 40);
+  if (category === "other" && !itemType) return jsonError(400, "请写一下这是什么产品 Say what the product is");
 
   const products = form.getAll("product").filter((f): f is File => f instanceof File && f.size > 0).slice(0, 2);
   const refs = form.getAll("reference").filter((f): f is File => f instanceof File && f.size > 0).slice(0, 4);
@@ -43,7 +45,7 @@ export async function POST(req: Request) {
     throw e;
   }
 
-  const project = createProject(invite.id, { title, category, brand: text("brand", 60), description: text("description", 2000), mustText: text("mustText", 2000) });
+  const project = createProject(invite.id, { title, category, itemType, brand: text("brand", 60), description: text("description", 2000), mustText: text("mustText", 2000) });
   for (const img of images) addUpload(project.id, img.kind, img.note, img.data);
 
   const modelId = Number(form.get("modelId")) || null;

@@ -10,8 +10,9 @@ import { SignInForm } from "./SignInForm";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
-  if (await currentInvite()) redirect("/products");
+export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  const next = (await searchParams).next ?? "";
+  if (await currentInvite()) redirect(next === "/new" ? "/new" : "/products");
   const lang = await getLang();
   const d = DEMO_BOARD.directions[1];
   return (
@@ -31,6 +32,7 @@ export default async function LoginPage() {
           <T k="signIn" lang={lang} as="h1" />
           <T k="tagline" lang={lang} as="p" className="muted" />
           <SignInForm
+            next={next}
             labels={{
               code: plain(UI.inviteCode, lang),
               help: plain(UI.inviteHelp, lang),

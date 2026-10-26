@@ -1,18 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import type { Direction } from "@/lib/board/schema";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Lang } from "@/lib/i18n";
-import { DEFAULT_PACK } from "@/lib/pack";
+import type { Sample } from "@/lib/samples";
 import { Package3D } from "./pack/Package3D";
 import { Orbit, REST_ANGLE, reducedMotion } from "./pack/orbit";
 import { Stage3D } from "./pack/Stage3D";
-import { ColorStrip, RegMarks } from "./PressSheet";
+import { ColorStrip, RegMarks, sheetVars } from "./PressSheet";
 
-const FOLD_MS = 2800;
 const HERO_FIT = 300;
-const HERO_PACK = { ...DEFAULT_PACK, w: 120, h: 156, d: 48 };
-const CYCLE_MS = 4200;
+const CYCLE_MS = 5200;
 
 /** A box net (dieline) drawn large behind the box. */
 function DielineDrawing() {
@@ -29,83 +26,74 @@ function DielineDrawing() {
 }
 
 /**
- * The landing hero is a press sheet in the colors of the packaging on show: a flat dieline
- * folds into a box, then the whole sheet re-inks itself for each sample direction.
- * With reduced motion the box is shown folded and only changes when a direction is chosen.
+ * The landing hero is a press sheet in the colors of the product on show. It goes through
+ * different kinds of product (tea, skincare, snacks, electronics), each on its own packaging
+ * in its recommended direction, and the whole sheet re-inks itself for each one.
+ * With reduced motion it stays on the first until a product is chosen.
  */
-export function HeroSection({ directions, brand, lang, children }: { directions: Direction[]; brand: string; lang: Lang; children: ReactNode }) {
-  const [i, setI] = useState(1);
+export function HeroSection({ samples, lang, children }: { samples: Sample[]; lang: Lang; children: ReactNode }) {
+  const [i, setI] = useState(0);
   const [auto, setAuto] = useState(true);
-  const [orbit] = useState(() => new Orbit({ x: 0, y: 0 }, 1, { free: true }));
-  const [flat, setFlat] = useState(true);
+  const [orbit] = useState(() => new Orbit({ x: -8, y: -210 }, 0.62, { free: true }));
   const started = useRef(false);
 
-  // The flat dieline folds itself into a box while the camera swings round,
-  // starting once the renderer has drawn its first frame.
-  const fold = () => {
+  const enter = () => {
     if (started.current) return;
     started.current = true;
-    if (reducedMotion()) {
-      setFlat(false);
-      orbit.set(REST_ANGLE, 1);
-      return;
-    }
-    setTimeout(() => {
-      setFlat(false);
-      orbit.tween(REST_ANGLE, FOLD_MS, 1);
-    }, 350);
+    if (reducedMotion()) orbit.set(REST_ANGLE, 1);
+    else orbit.tween(REST_ANGLE, 1800, 1);
   };
 
   useEffect(() => {
-    if (!auto) return;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-    let timer: ReturnType<typeof setInterval> | undefined;
-    const start = setTimeout(() => {
-      timer = setInterval(() => setI((v) => (v + 1) % directions.length), CYCLE_MS);
-    }, FOLD_MS + 1400);
-    return () => {
-      clearTimeout(start);
-      if (timer) clearInterval(timer);
-    };
-  }, [auto, directions.length]);
+    if (!auto || reducedMotion()) return;
+    const t = setInterval(() => {
+      setI((v) => (v + 1) % samples.length);
+      orbit.set({ x: -10, y: -150 }, 0.92);
+      orbit.tween(REST_ANGLE, 1400, 1);
+    }, CYCLE_MS);
+    return () => clearInterval(t);
+  }, [auto, samples.length, orbit]);
 
-  const d = directions[i];
-  const p = d.palette;
-  const sheetVars = {
-    "--h-ground": p[0]?.hex,
-    "--h-ink": p[1]?.hex,
-    "--h-key": p[2]?.hex,
-    "--h-accent": (p[3] ?? p[2])?.hex,
-  } as CSSProperties;
+  const s = samples[i];
+  const d = s.board.directions.find((x) => x.id === s.board.recommendation.pick) ?? s.board.directions[0];
 
   return (
-    <section className="hero-sheet" style={sheetVars}>
+    <section className="hero-sheet" style={sheetVars(d)}>
       <RegMarks />
       <div className="hero">
         <div className="hero-copy">{children}</div>
         <div className="hero-visual">
           <DielineDrawing />
-          <Stage3D orbit={orbit} label={lang === "en" ? `Sample box, ${d.name.en}. Drag to turn.` : `示例包装盒：${d.name.zh}。拖动旋转。`} className="hero-stage" onInteract={() => setAuto(false)}>
-            <Package3D d={d} brand={brand} spec={HERO_PACK} fit={HERO_FIT} open={flat} orbit={orbit} onReady={fold} />
+          <Stage3D orbit={orbit} label={lang === "en" ? `${s.board.meta.product.en}: ${d.name.en}. Drag to turn.` : `${s.board.meta.product.zh}：${d.name.zh}。拖动旋转。`} className="hero-stage" onInteract={() => setAuto(false)}>
+            <Package3D d={d} brand={s.board.meta.brand} spec={s.pack} fit={HERO_FIT} orbit={orbit} category={s.board.meta.category} onReady={enter} />
           </Stage3D>
-          <div className="hero-dirs" role="group" aria-label="示例方向 Sample directions">
-            {directions.map((x, j) => (
-              <button
-                key={x.id}
-                type="button"
-                className={j === i ? "hero-dir is-active" : "hero-dir"}
-                aria-pressed={j === i}
-                onClick={() => {
-                  setAuto(false);
-                  setI(j);
-                }}
-              >
-                <span className="hero-dir-swatch" style={{ background: x.palette[2]?.hex }} />
-                <span className="dir-id">{x.id}</span>
-                <span>{lang === "en" ? x.name.en : x.name.zh}</span>
-              </button>
-            ))}
+          <div className="hero-dirs" role="group" aria-label={lang === "en" ? "Sample products" : "示例产品"}>
+            {samples.map((x, j) => {
+              const xd = x.board.directions.find((y) => y.id === x.board.recommendation.pick) ?? x.board.directions[0];
+              return (
+                <button
+                  key={x.id}
+                  type="button"
+                  className={j === i ? "hero-dir is-active" : "hero-dir"}
+                  aria-pressed={j === i}
+                  onClick={() => {
+                    setAuto(false);
+                    setI(j);
+                    orbit.tween(REST_ANGLE, 700, 1);
+                  }}
+                >
+                  <span className="hero-dir-swatch" style={{ background: xd.palette[2]?.hex }} />
+                  <span>{lang === "en" ? x.label.en : x.label.zh}</span>
+                </button>
+              );
+            })}
           </div>
+          <p className="hero-caption">
+            {lang === "en" ? s.board.meta.product.en : s.board.meta.product.zh}
+            <span>
+              {d.id} · {lang === "en" ? d.name.en : d.name.zh}
+            </span>
+          </p>
         </div>
       </div>
       <ColorStrip d={d} />

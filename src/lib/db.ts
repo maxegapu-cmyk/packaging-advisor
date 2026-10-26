@@ -91,6 +91,8 @@ const MIGRATIONS: string[] = [
    CREATE INDEX IF NOT EXISTS idx_boards_project ON boards(project_id, version);`,
   // v2: package structure (form, size, finish) per product, as JSON. Empty = category default.
   `ALTER TABLE projects ADD COLUMN pack TEXT NOT NULL DEFAULT '';`,
+  // v3: what the product is, in the seller's words (required for "other", optional otherwise).
+  `ALTER TABLE projects ADD COLUMN item_type TEXT NOT NULL DEFAULT '';`,
 ];
 
 let db: DatabaseSync | null = null;

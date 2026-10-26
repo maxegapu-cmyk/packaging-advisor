@@ -5,6 +5,7 @@
  * Client-safe: no server imports.
  */
 import type { Pair } from "./i18n";
+import { isCategory, type Category } from "./categories";
 
 export const FORMS = ["carton", "gift", "bookBox", "mailer", "drawer", "paperTube", "bag", "aseptic", "pouch", "bottle", "tube", "blister", "jar", "glassBottle", "tin", "can", "ceramic", "woodBox"] as const;
 export type Form = (typeof FORMS)[number];
@@ -109,14 +110,24 @@ export const DIM_RANGE = { min: 20, max: 500 } as const;
 
 /**
  * Starting pack per category, after the usual pairings sellers use: tea in tins inside a gift
- * box, a specialty in a glass jar in a gift box, a pump bottle in its carton, an appliance in a
- * corrugated case.
+ * box, a specialty in a glass jar in a gift box, a pump bottle in its carton, snacks in a
+ * stand-up pouch, an appliance in a corrugated case, and so on.
  */
-export const CATEGORY_PACK: Record<string, PackSpec> = {
+export const CATEGORY_PACK: Record<Category, PackSpec> = {
   tea: { form: "gift", w: 236, h: 146, d: 142, finish: "matte", inner: { form: "tin", count: 2, w: 86, h: 120, d: 86, insert: "velvet" } },
   specialty: { form: "gift", w: 124, h: 121, d: 136, finish: "paper", inner: { form: "jar", count: 1, w: 80, h: 95, d: 80, insert: "pulp" } },
   cosmetics: { form: "carton", w: 56, h: 176, d: 56, finish: "gloss", inner: { form: "bottle", count: 1, w: 52, h: 170, d: 52 } },
   appliance: { form: "carton", w: 340, h: 260, d: 220, finish: "matte" },
+  snacks: { form: "pouch", w: 160, h: 230, d: 80, finish: "matte" },
+  beverage: { form: "gift", w: 274, h: 98, d: 128, finish: "paper", inner: { form: "glassBottle", count: 1, w: 72, h: 230, d: 72, insert: "velvet" } },
+  health: { form: "carton", w: 70, h: 120, d: 70, finish: "gloss" },
+  personalCare: { form: "bottle", w: 70, h: 220, d: 70, finish: "gloss" },
+  baby: { form: "tin", w: 100, h: 130, d: 100, finish: "gloss" },
+  pet: { form: "pouch", w: 200, h: 300, d: 90, finish: "matte" },
+  homeGoods: { form: "mailer", w: 260, h: 80, d: 200, finish: "matte" },
+  electronics: { form: "drawer", w: 140, h: 50, d: 100, finish: "gloss" },
+  apparel: { form: "mailer", w: 300, h: 80, d: 240, finish: "paper" },
+  toys: { form: "blister", w: 150, h: 220, d: 40, finish: "gloss" },
   other: { form: "carton", w: 120, h: 170, d: 60, finish: "matte" },
 };
 
@@ -150,7 +161,8 @@ export const isOuter = (f: Form): f is OuterForm => (OUTER_FORMS as readonly str
 export const isInner = (f: string): f is InnerForm => (INNER_FORMS as readonly string[]).includes(f);
 
 export function defaultPack(category: string): PackSpec {
-  return { ...(CATEGORY_PACK[category] ?? CATEGORY_PACK.other) };
+  const p = CATEGORY_PACK[isCategory(category) ? category : "other"];
+  return { ...p, ...(p.inner ? { inner: { ...p.inner } } : {}) };
 }
 
 const clampDim = (v: unknown, fallback: number) => {

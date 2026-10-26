@@ -161,7 +161,7 @@ export function BoardView({
       </div>
 
       <section aria-label={plain(UI.directions, lang)}>
-        <PackProvider initial={pack} saveUrl={packSaveUrl} studioBase={studioBase}>
+        <PackProvider initial={pack} saveUrl={packSaveUrl} studioBase={studioBase} category={board.meta.category}>
           <BoxSync label={plain(UI.rotateTogether, lang)} hint={plain(UI.dragHint, lang)} toolbar={<PackBar lang={lang} />}>
             <div className="sheets">
               {board.directions.map((d) => (

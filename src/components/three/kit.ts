@@ -62,6 +62,12 @@ const CONTENTS: Record<string, { dry: string; liquid: string; cream: string }> =
   specialty: { dry: "#8C5A2B", liquid: "#C77A12", cream: "#F1E4C8" },
   cosmetics: { dry: "#E9DFD3", liquid: "#F3D9D2", cream: "#F6F1EA" },
   appliance: { dry: "#9A9A96", liquid: "#DCE6EA", cream: "#F1F1EE" },
+  snacks: { dry: "#B8864E", liquid: "#C98A3A", cream: "#EADCC2" },
+  beverage: { dry: "#7A3B2E", liquid: "#8E2F3C", cream: "#EFE2D0" },
+  health: { dry: "#D9A441", liquid: "#E2B54A", cream: "#F3EAD6" },
+  personalCare: { dry: "#E7E3DA", liquid: "#CFE3E6", cream: "#F4F1EC" },
+  baby: { dry: "#F2EADB", liquid: "#F4EDE0", cream: "#FAF5EC" },
+  pet: { dry: "#8A5B34", liquid: "#B98A55", cream: "#EBDCC6" },
   other: { dry: "#8F8A7E", liquid: "#D8C6A0", cream: "#F2EEE6" },
 };
 

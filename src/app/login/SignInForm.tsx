@@ -3,10 +3,11 @@
 import { useActionState } from "react";
 import { signInAction } from "../actions";
 
-export function SignInForm({ labels }: { labels: { code: string; help: string; submit: string; bad: string } }) {
+export function SignInForm({ labels, next = "" }: { labels: { code: string; help: string; submit: string; bad: string }; next?: string }) {
   const [state, action, pending] = useActionState(signInAction, null);
   return (
     <form action={action} className="form">
+      <input type="hidden" name="next" value={next} />
       <div className="field">
         <label htmlFor="code">{labels.code}</label>
         <input id="code" name="code" type="text" autoComplete="one-time-code" autoCapitalize="characters" spellCheck={false} placeholder="XXXX-XXXX-XXXX" required aria-describedby="code-help" />

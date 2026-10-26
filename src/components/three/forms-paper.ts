@@ -136,7 +136,7 @@ export function buildDrawer(spec: PackSpec, k: Kit, holds?: Holds, insertKind: I
   const ribbonGeo = new THREE.TubeGeometry(ribbonCurve, 32, 0.7 * mm, 8, false);
   ribbonGeo.scale(7, 1, 1);
   const ribbon = new THREE.Mesh(ribbonGeo, k.rope);
-  ribbon.position.set(0, th * 0.5, td / 2);
+  ribbon.position.set(0, Math.min(th * 0.24, 9 * mm), td / 2); // low on the front, clear of the printed name
   tray.add(ribbon);
 
   const slotG = new THREE.Group();

@@ -13,9 +13,19 @@ export { CATEGORIES, isCategory, type Category } from "./categories";
 const CATEGORY_HINTS: Record<Category, string> = {
   tea: "茶叶：注意产地名称（含地理标志）、等级、净含量、冲泡与储存信息；食品不得宣称疾病预防或治疗功效。",
   specialty: "地方特产：先判断是食品还是工艺品。食品同样不得宣称医疗功效；产地故事只用卖家提供的事实，不编造历史或奖项。",
-  cosmetics: "化妆品：注意功效宣称的边界（如\"医用\"\"药妆\"\"治疗\"等措辞）、成分表与使用注意事项；需以占位符表示备案或注册信息。",
+  cosmetics: "美妆护肤：注意功效宣称的边界（如\"医用\"\"药妆\"\"治疗\"等措辞）、成分表与使用注意事项；需以占位符表示备案或注册信息。",
   appliance: "家用电器：说明书的安全警示与操作步骤优先于装饰；型号、参数、认证标志一律用占位符，不得杜撰。",
-  other: "其他品类：按产品照片与描述判断品类，相关法规信息一律用占位符。",
+  snacks: "休闲零食：配料、净含量、生产许可、保质期、过敏原提示一律用占位符；不得宣称疾病功效；\"0 添加\"\"无糖\"等说法需有依据，否则标为风险。",
+  beverage: "酒水饮料：酒类保留\"过量饮酒有害健康\"等警示与酒精度占位；饮料不得宣称功效；容量与容器材质用占位符。",
+  health: "保健食品：只能使用已批准的功能声称和对应标志，卖家没提供批准文号就用占位符；须提示\"本品不能代替药物\"；不得出现治疗、治愈类说法。",
+  personalCare: "个护清洁：先分清是化妆品（洗发、沐浴）还是日化清洁品；清洁剂要有远离儿童等安全警示；\"除菌率\"等数字需有证据，否则用占位符。",
+  baby: "母婴用品：适用年龄、材质、安全警示用占位符；婴幼儿食品不得暗示可替代母乳；配色与插画避免过度刺激，信息层级要让家长一眼找到安全说明。",
+  pet: "宠物用品：宠物食品标注适用对象与原料组成（占位）；不得宣称治疗；图片与文字不得夸大规格。",
+  homeGoods: "家居日用：材质、尺寸、容量、承重与使用注意事项用占位符；易碎品写明轻放提示；开箱体验与收纳展示比装饰更重要。",
+  electronics: "数码配件：型号、参数、认证（如 CCC、无线电型号核准）、电池运输标识一律用占位符，不得杜撰；说明书以配对、充电和安全为主。",
+  apparel: "服饰鞋包：纤维成分、号型、洗涤标识用占位符；包装重在开箱的仪式感和退换便利，避免过度包装。",
+  toys: "玩具文创：适用年龄与\"含小零件，不适合 3 岁以下儿童\"等警示、认证用占位符；不得夸大教育或益智效果。",
+  other: "其他品类：先按卖家写的产品类型和照片判断这是什么，再套用最接近品类的规则；相关法规信息一律用占位符。",
 };
 
 let cache: Record<string, string> | null = null;
@@ -71,7 +81,7 @@ const OUTPUT_CONTRACT = `
 mockup 中的字段是印在样张上的短文字，只写一种语言（按卖家品牌习惯，通常为中文），每项不超过 12 个字。
 
 {
-  "meta": {"product": {"zh","en"}, "brand": "品牌名（卖家未提供则写\\"[品牌]\\"）", "category": "tea|specialty|cosmetics|appliance|other"},
+  "meta": {"product": {"zh","en"}, "brand": "品牌名（卖家未提供则写\\"[品牌]\\"）", "category": "与输入的品类代码相同 the category code you were given"},
   "reading": {
     "product": {"zh","en"},              // 从照片与描述中看到的产品；推测要写明"推测"
     "references": [{"label": "参考图 1", "borrow": {"zh","en"}, "avoid": {"zh","en"}}],  // 没有参考图则为空数组
@@ -127,6 +137,7 @@ export function generationSystemPrompt(category: Category): string {
 export type GenerationInput = {
   title: string;
   category: Category;
+  itemType?: string;
   brand: string;
   description: string;
   mustText: string;
@@ -139,6 +150,7 @@ export function generationUserText(input: GenerationInput): string {
   const lines = [
     `产品名称 Product: ${input.title}`,
     `品类 Category: ${cat.zh} / ${cat.en} (${input.category})`,
+    ...(input.itemType ? [`具体是什么 Item type (seller's words): ${input.itemType}`] : []),
     `品牌 Brand: ${input.brand || "（未提供 not provided）"}`,
     `产品描述与卖点 Description: ${input.description || "（未提供 not provided）"}`,
     `必须出现的文字（同时请核查其中的风险措辞） Must-have text: ${input.mustText || "（无 none）"}`,

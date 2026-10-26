@@ -85,6 +85,7 @@ export async function generateBoard(projectId: string, actor: Actor, modelId?: n
       text: generationUserText({
         title: project.title,
         category: project.category,
+        itemType: project.itemType,
         brand: project.brand,
         description: project.description,
         mustText: project.mustText,

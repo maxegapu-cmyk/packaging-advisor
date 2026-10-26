@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { T } from "@/components/Bi";
+import { Bi, T } from "@/components/Bi";
+import { Journey, journeyOf } from "@/components/Journey";
 import { BoardView } from "@/components/BoardView";
 import { listModelChoices } from "@/lib/llm/providers";
 import { plain, UI } from "@/lib/i18n";
-import { canAccess, getBoard, getProject, listBoards, listUploads } from "@/lib/projects";
+import { canAccess, getBoard, getProject, isHandedOff, listBoards, listUploads } from "@/lib/projects";
 import { feedbackAction, handoffAction, pickAction, shareAction } from "../../../actions";
 import { getLang, requireInvite } from "../../../_server/session";
 import { RegenerateButton, ReviseForm } from "./BoardActions";
@@ -26,10 +27,11 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const origin = process.env.PUBLIC_URL?.replace(/\/+$/, "") || `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
 
   const uploadsStrip = uploads.length ? (
-    <div className="uploads-strip" aria-label={plain(UI.uploads, lang)}>
+    <div className="uploads-strip">
+      <T k="uploads" lang={lang} className="label" />
       {uploads.map((u) => (
         // eslint-disable-next-line @next/next/no-img-element
-        <img key={u.id} src={`/api/uploads/${u.id}`} alt={u.note || u.kind} title={u.note || u.kind} />
+        <img key={u.id} src={`/api/uploads/${u.id}`} alt={u.note || u.kind} title={u.note || u.kind} className={u.kind === "reference" ? "is-ref" : undefined} />
       ))}
     </div>
   ) : null;
@@ -37,6 +39,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   if (!current) {
     return (
       <main className="page page-narrow">
+        <Journey steps={[{ state: "done" }, { state: "current" }, { state: "todo" }, { state: "todo" }]} lang={lang} />
         <div className="page-head">
           <h1>{project.title}</h1>
         </div>
@@ -50,8 +53,35 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   }
 
   const board = current;
+  const handedOff = isHandedOff(project.id);
+  const states = journeyOf({ boards: versions.length, picked: !!board.picked, handedOff });
+  const spaceHref = `/space/${project.id}?v=${board.id}${board.picked ? `&d=${board.picked}` : ""}`;
   return (
     <main className="page board-layout">
+      <Journey steps={states.map((state, i) => ({ state, href: i === 2 && board.picked ? spaceHref : i === 3 && board.picked ? "#handoff" : undefined }))} lang={lang} />
+      <div className={`next-bar${board.picked ? " is-picked" : ""}`}>
+        {handedOff ? (
+          <Bi p={UI.nextDone} lang={lang} as="p" className="next-bar-text" />
+        ) : board.picked ? (
+          <>
+            <p className="next-bar-text">
+              <span className="next-bar-label">{plain(UI.next, lang)}</span>
+              <Bi p={UI.nextSpace} lang={lang} />
+            </p>
+            <a className="btn btn-primary" href={spaceHref}>
+              <Bi p={UI.step3} lang={lang} />
+            </a>
+            <a className="btn" href="#handoff">
+              <Bi p={UI.nextHandoff} lang={lang} />
+            </a>
+          </>
+        ) : (
+          <p className="next-bar-text">
+            <span className="next-bar-label">{plain(UI.next, lang)}</span>
+            <Bi p={UI.nextPick} lang={lang} />
+          </p>
+        )}
+      </div>
       <div className="toolbar">
         <Link href="/products" className="btn btn-small btn-quiet">
           <T k="backToProducts" lang={lang} />
@@ -98,7 +128,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         )}
       />
 
-      <section className="after-board">
+      <section className="after-board" id="handoff">
         <div className="share-box">
           <T k="share" lang={lang} as="h2" className="section-h" />
           {board.shareToken ? (

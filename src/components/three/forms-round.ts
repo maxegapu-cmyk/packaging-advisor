@@ -63,8 +63,9 @@ export function buildPouch(spec: PackSpec, k: Kit, own: { dispose: () => void }[
   foil.roughness = 0.38;
   foil.color.set("#C9CCCB");
   ownMats.push(foil);
-  const fIn = new THREE.Mesh(surface((u, v, o) => (frontFn(u, v, o), o.setZ(o.z - 0.05 * mm)), 48, 48, false), foil);
-  const bIn = new THREE.Mesh(surface((u, v, o) => (backFn(u, v, o), o.setZ(o.z + 0.05 * mm)), 48, 48, false), foil);
+  // just inside the print, never in front of it (it closes to nothing at the seals)
+  const fIn = new THREE.Mesh(surface((u, v, o) => (frontFn(u, v, o), o.setZ(o.z * 0.97)), 48, 48, false), foil);
+  const bIn = new THREE.Mesh(surface((u, v, o) => (backFn(u, v, o), o.setZ(o.z * 0.97)), 48, 48, false), foil);
   const gussetGeo = new THREE.CircleGeometry(1, 64);
   gussetGeo.rotateX(Math.PI / 2);
   gussetGeo.scale(W2, 1, D / 2);

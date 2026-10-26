@@ -16,7 +16,9 @@ export async function signInAction(_prev: { error: boolean } | null, form: FormD
   const res = signIn(String(form.get("code") ?? ""));
   if (!res) return { error: true };
   (await cookies()).set(SESSION_COOKIE, res.token, { httpOnly: true, sameSite: "lax", secure: secureCookies(), path: "/", expires: res.expiresAt });
-  redirect("/products");
+  // back to where the tester was going (e.g. "Upload your product" on the homepage)
+  const next = String(form.get("next") ?? "");
+  redirect(/^\/(new|products|p\/[\w-]+)$/.test(next) ? next : "/products");
 }
 
 export async function signOutAction() {
