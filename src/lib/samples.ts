@@ -1,9 +1,11 @@
 /**
  * Sample boards for different kinds of product, used by the homepage, the offline demo
  * provider and the preview. Tea is the original demo; the others show the same method on a
- * skincare serum, a snack pouch and a pair of earbuds.
+ * serum, a snack pouch, earbuds, a fruit wine, a shampoo, crayons, baby cotton buds, a ham
+ * in a crate and a tableware set: ten kinds of product on ten different package setups.
  */
 import type { Board, Direction } from "./board/schema";
+import { BUDS, CRAYONS, HAM, SHAMPOO, TABLEWARE, WINE } from "./board/more-samples";
 import { TEA_BOARD } from "./board/tea";
 import { CATEGORIES, type Category } from "./categories";
 import { defaultPack, type PackSpec } from "./pack";
@@ -468,24 +470,30 @@ export const SAMPLES: Sample[] = [
   { id: "cosmetics", label: CATEGORIES.cosmetics, board: SERUM, pack: defaultPack("cosmetics") },
   { id: "snacks", label: CATEGORIES.snacks, board: NUTS, pack: defaultPack("snacks") },
   { id: "electronics", label: CATEGORIES.electronics, board: EARBUDS, pack: defaultPack("electronics") },
+  { id: "beverage", label: CATEGORIES.beverage, board: WINE, pack: defaultPack("beverage") },
+  { id: "personalCare", label: CATEGORIES.personalCare, board: SHAMPOO, pack: defaultPack("personalCare") },
+  { id: "toys", label: CATEGORIES.toys, board: CRAYONS, pack: { form: "blister", w: 130, h: 200, d: 24, finish: "gloss" } },
+  { id: "baby", label: CATEGORIES.baby, board: BUDS, pack: { form: "tin", w: 84, h: 110, d: 84, finish: "matte" } },
+  { id: "specialty", label: CATEGORIES.specialty, board: HAM, pack: { form: "woodBox", w: 520, h: 150, d: 220, finish: "paper" } },
+  { id: "homeGoods", label: CATEGORIES.homeGoods, board: TABLEWARE, pack: defaultPack("homeGoods") },
 ];
 
 /** The sample closest to a category, for the demo provider. */
 const NEAREST: Record<Category, string> = {
   tea: "tea",
-  specialty: "tea",
-  beverage: "tea",
+  specialty: "specialty",
+  beverage: "beverage",
   cosmetics: "cosmetics",
-  personalCare: "cosmetics",
-  baby: "cosmetics",
+  personalCare: "personalCare",
+  baby: "baby",
   health: "cosmetics",
   snacks: "snacks",
   pet: "snacks",
-  homeGoods: "snacks",
-  apparel: "snacks",
+  homeGoods: "homeGoods",
+  apparel: "homeGoods",
   electronics: "electronics",
   appliance: "electronics",
-  toys: "electronics",
+  toys: "toys",
   other: "snacks",
 };
 
