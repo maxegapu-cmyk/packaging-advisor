@@ -56,12 +56,18 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const handedOff = isHandedOff(project.id);
   const states = journeyOf({ boards: versions.length, picked: !!board.picked, handedOff });
   const spaceHref = `/space/${project.id}?v=${board.id}${board.picked ? `&d=${board.picked}` : ""}`;
+  const finalHref = `/p/${project.id}/final`;
   return (
     <main className="page board-layout">
-      <Journey steps={states.map((state, i) => ({ state, href: i === 2 && board.picked ? spaceHref : i === 3 && board.picked ? "#handoff" : undefined }))} lang={lang} />
+      <Journey steps={states.map((state, i) => ({ state, href: i === 2 && board.picked ? spaceHref : i === 3 && board.picked ? finalHref : undefined }))} lang={lang} />
       <div className={`next-bar${board.picked ? " is-picked" : ""}`}>
         {handedOff ? (
-          <Bi p={UI.nextDone} lang={lang} as="p" className="next-bar-text" />
+          <>
+            <Bi p={UI.nextDone} lang={lang} as="p" className="next-bar-text" />
+            <a className="btn" href={finalHref}>
+              <Bi p={UI.step4} lang={lang} />
+            </a>
+          </>
         ) : board.picked ? (
           <>
             <p className="next-bar-text">
@@ -71,7 +77,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             <a className="btn btn-primary" href={spaceHref}>
               <Bi p={UI.step3} lang={lang} />
             </a>
-            <a className="btn" href="#handoff">
+            <a className="btn" href={finalHref}>
               <Bi p={UI.nextHandoff} lang={lang} />
             </a>
           </>

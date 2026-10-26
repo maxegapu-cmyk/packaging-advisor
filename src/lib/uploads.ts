@@ -30,14 +30,30 @@ export async function normalizeImage(input: Buffer): Promise<Buffer> {
     .toBuffer();
 }
 
+/** A logo: transparency kept (PNG), at most 1200 px, metadata stripped. */
+export async function normalizeLogo(input: Buffer): Promise<Buffer> {
+  if (input.byteLength > MAX_UPLOAD_BYTES) throw new UploadError("图片超过 15 MB Image is larger than 15 MB");
+  const meta = await sharp(input)
+    .metadata()
+    .catch(() => {
+      throw new UploadError("无法识别的图片文件 Not a readable image");
+    });
+  if (!meta.format || (!ACCEPTED.has(meta.format) && meta.format !== "svg")) throw new UploadError("标志请用 PNG、JPG、WebP 或 SVG Use PNG, JPG, WebP or SVG for the logo");
+  return sharp(input, { animated: false, density: 300 })
+    .rotate()
+    .resize({ width: 1200, height: 1200, fit: "inside", withoutEnlargement: meta.format !== "svg" })
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+}
+
 export function uploadPath(file: string): string {
   // file names are generated server-side; still refuse anything that is not a bare name.
-  if (!/^[A-Za-z0-9_-]+\.jpg$/.test(file)) throw new UploadError("Invalid file name");
+  if (!/^[A-Za-z0-9_-]+\.(jpg|png)$/.test(file)) throw new UploadError("Invalid file name");
   return path.join(dataDir(), "uploads", file);
 }
 
-export function writeUpload(id: string, data: Buffer): string {
-  const file = `${id}.jpg`;
+export function writeUpload(id: string, data: Buffer, ext: "jpg" | "png" = "jpg"): string {
+  const file = `${id}.${ext}`;
   fs.writeFileSync(uploadPath(file), data);
   return file;
 }

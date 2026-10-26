@@ -4,31 +4,43 @@
  * stamped), so the foil finish can become real metal in the material.
  * Layouts follow the direction's `layout` (offset / stripe / split) and palette roles.
  */
+import { rolesOf as libRolesOf, type Roles } from "@/lib/artwork";
 import type { Direction } from "@/lib/board/schema";
 import type { Finish } from "@/lib/pack";
+import { layoutBack } from "@/lib/print/backpanel";
+import { ean13Modules, isGuard } from "@/lib/print/ean13";
+import { WRAP_FRONT, type FaceKind } from "@/lib/print/layout";
 
-export type Roles = { ground: string; ink: string; key: string; accent: string };
+export type { Roles, FaceKind };
 export type Role = keyof Roles;
 
 export const GOLD = "#D6B460";
 const SERIF = '"Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", "Noto Serif CJK TC", serif';
 const SANS = '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "Helvetica Neue", Arial, sans-serif';
 
-export function rolesOf(d: Direction): Roles {
-  const p = d.palette;
-  const by = (r: string) => p.find((s) => s.role === r)?.hex;
-  const ground = by("background") ?? p[0]?.hex ?? "#eeeeea";
-  const ink = by("text") ?? p[1]?.hex ?? "#1a1a1a";
-  const key = by("brand") ?? p[2]?.hex ?? ink;
-  const accent = by("accent") ?? p[3]?.hex ?? key;
-  return { ground, ink, key, accent };
-}
+export const rolesOf = (d: Direction): Roles => libRolesOf(d);
 
 /** Paints a role. In mask mode everything is black except foil-stamped elements. */
 type Paint = (role: Role, foil?: boolean) => string;
 
 type Ctx = CanvasRenderingContext2D;
-export type ArtInput = { d: Direction; brand: string; finish: Finish };
+/**
+ * What a finished artwork adds to a direction: the real label text, barcode, net content and
+ * logo. Without it the faces show the direction as a concept (placeholder text lines).
+ */
+export type ArtInfo = {
+  intro: string;
+  rows: { label: string; value: string }[];
+  /** Valid EAN-13 digits, or "" for none. */
+  barcode: string;
+  net: string;
+  logo: CanvasImageSource | null;
+  /** Which face carries the label information on this package. */
+  on: FaceKind | null;
+  /** Changes whenever any of the above does (for caches). */
+  key: string;
+};
+export type ArtInput = { d: Direction; brand: string; finish: Finish; info?: ArtInfo | null };
 
 function canvas(w: number, h: number): [HTMLCanvasElement, Ctx] {
   const c = document.createElement("canvas");
@@ -98,13 +110,41 @@ function vertical(ctx: Ctx, text: string, x: number, yMid: number, size: number,
 
 /* ---------------------------------------------------------------- Front panels */
 
+/** Draws the logo into a box, keeping its proportions; returns the height used. */
+function drawLogo(ctx: Ctx, logo: CanvasImageSource, x: number, y: number, maxW: number, maxH: number, align: "left" | "center" = "left"): number {
+  const lw = (logo as HTMLImageElement).naturalWidth || (logo as HTMLCanvasElement).width || 1;
+  const lh = (logo as HTMLImageElement).naturalHeight || (logo as HTMLCanvasElement).height || 1;
+  const s = Math.min(maxW / lw, maxH / lh);
+  const w = lw * s;
+  const h = lh * s;
+  ctx.drawImage(logo, align === "center" ? x - w / 2 : x, y, w, h);
+  return h;
+}
+
+/** Net content on the front, big enough for the character-height rules. */
+function drawNet(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, ppm: number, corner: "bl" | "tr" | "br", onKey = false) {
+  const net = a.info?.net.trim();
+  if (!net) return;
+  const m = Math.min(W, H);
+  const size = Math.max(4.4 * ppm, Math.min(m * 0.055, 8 * ppm));
+  setFont(ctx, 600, size, SANS);
+  ctx.fillStyle = onKey ? P("ground") : P("ink");
+  const pad = Math.max(m * 0.06, 4 * ppm);
+  const tw = ctx.measureText(net).width;
+  const x = corner === "bl" ? pad : W - pad - tw;
+  const y = corner === "tr" ? pad + size : H - pad;
+  ctx.fillText(net, x, y);
+}
+
 /** The main face. Works for portrait and landscape panels. */
-function drawFront(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint) {
+function drawFront(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, ppm = 0) {
   const { d, brand } = a;
   const m = Math.min(W, H);
   const head = d.mockup.headline;
   const detail = d.mockup.detail;
-  const showBrand = !!brand && brand !== head;
+  const logo = a.info?.logo ?? null;
+  const showBrand = (!!brand && brand !== head) || !!logo;
+  const pxmm = ppm || m / 100;
   ctx.fillStyle = P("ground");
   ctx.fillRect(0, 0, W, H);
 
@@ -126,12 +166,16 @@ function drawFront(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint) {
     ctx.globalAlpha = 1;
     const x = bw + m * 0.075;
     if (showBrand) {
-      ctx.fillStyle = P("ink", true);
-      setFont(ctx, 700, m * 0.058, SANS);
-      spacing(ctx, 0.12, m * 0.058);
-      ctx.fillText(brand, x, m * 0.13);
-      spacing(ctx, 0, 0);
+      if (logo) drawLogo(ctx, logo, x, m * 0.07, W - x - m * 0.07, m * 0.11);
+      else {
+        ctx.fillStyle = P("ink", true);
+        setFont(ctx, 700, m * 0.058, SANS);
+        spacing(ctx, 0.12, m * 0.058);
+        ctx.fillText(brand, x, m * 0.13);
+        spacing(ctx, 0, 0);
+      }
     }
+    drawNet(ctx, W, H, a, P, pxmm, "tr");
     const s = fit(ctx, head, 800, m * 0.205, SANS, W - x - m * 0.07);
     ctx.fillStyle = P("ink", true);
     ctx.fillText(head, x, H - m * 0.2);
@@ -169,12 +213,16 @@ function drawFront(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint) {
     ctx.stroke();
     ctx.restore();
     if (showBrand) {
-      ctx.fillStyle = P("ink", true);
-      setFont(ctx, 700, m * 0.055, SANS);
-      spacing(ctx, 0.14, m * 0.055);
-      ctx.fillText(brand, m * 0.07, m * 0.12);
-      spacing(ctx, 0, 0);
+      if (logo) drawLogo(ctx, logo, m * 0.07, m * 0.06, kx - m * 0.14, m * 0.1);
+      else {
+        ctx.fillStyle = P("ink", true);
+        setFont(ctx, 700, m * 0.055, SANS);
+        spacing(ctx, 0.14, m * 0.055);
+        ctx.fillText(brand, m * 0.07, m * 0.12);
+        spacing(ctx, 0, 0);
+      }
     }
+    drawNet(ctx, kx, H, a, P, pxmm, "bl");
     const s = fit(ctx, head, 700, m * 0.33, SERIF, kx - m * 0.12);
     ctx.fillStyle = P("ink", true);
     ctx.fillText(head, m * 0.07, H * 0.5 + s * 0.3);
@@ -208,13 +256,17 @@ function drawFront(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint) {
   const x = m * 0.085;
   let y = m * 0.13;
   if (showBrand) {
-    ctx.fillStyle = P("ink", true);
-    setFont(ctx, 700, m * 0.056, SANS);
-    spacing(ctx, 0.16, m * 0.056);
-    ctx.fillText(brand, x, y);
-    spacing(ctx, 0, 0);
-    y += m * 0.06;
+    if (logo) y = m * 0.07 + drawLogo(ctx, logo, x, m * 0.07, W * 0.5, m * 0.1) + m * 0.03;
+    else {
+      ctx.fillStyle = P("ink", true);
+      setFont(ctx, 700, m * 0.056, SANS);
+      spacing(ctx, 0.16, m * 0.056);
+      ctx.fillText(brand, x, y);
+      spacing(ctx, 0, 0);
+      y += m * 0.06;
+    }
   }
+  drawNet(ctx, W, H, a, P, pxmm, "bl");
   setFont(ctx, 700, m * 0.215, SERIF);
   const lines = wrap(ctx, head, W - x * 2, 2);
   const s = fit(ctx, lines.reduce((a1, b) => (a1.length > b.length ? a1 : b), ""), 700, m * 0.215, SERIF, W - x * 2);
@@ -232,8 +284,60 @@ function drawFront(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint) {
 
 /* ---------------------------------------------------------------- Other panels */
 
+/** An EAN-13 in a white box with its digits, at x, y (top-left of the bars) in pixels. */
+export function drawBarcode(ctx: Ctx, digits: string, x: number, y: number, w: number, h: number) {
+  const mods = ean13Modules(digits);
+  // nominal 37.29 mm box = 11 + 95 + 7 modules wide; bars 22.85 of 25.93 mm high
+  const mw = w / 113;
+  const barsH = h * 0.86;
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = "#000000";
+  const x0 = x + 11 * mw;
+  for (let i = 0; i < 95; i++) if (mods[i] === "1") ctx.fillRect(x0 + i * mw, y + h * 0.03, mw + 0.15, isGuard(i) ? barsH + h * 0.05 : barsH - h * 0.03);
+  const ds = h * 0.11;
+  ctx.font = `500 ${ds.toFixed(1)}px "OCR-B", "Helvetica Neue", Arial, sans-serif`;
+  ctx.textAlign = "center";
+  const ty = y + h * 0.03 + barsH + ds * 0.95;
+  ctx.fillText(digits[0], x + 6 * mw, ty);
+  for (let i = 0; i < 6; i++) ctx.fillText(digits[1 + i], x0 + (3 + 7 * i + 3.5) * mw, ty);
+  for (let i = 0; i < 6; i++) ctx.fillText(digits[7 + i], x0 + (50 + 7 * i + 3.5) * mw, ty);
+  ctx.textAlign = "left";
+}
+
+/** The information panel from a finished artwork: brand, paragraph, label table, barcode. */
+function drawInfo(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, ppm: number) {
+  const info = a.info!;
+  const wMm = W / ppm;
+  const hMm = H / ppm;
+  const lay = layoutBack(wMm, hMm, { brand: a.brand, intro: info.intro, rows: info.rows, barcode: !!info.barcode });
+  ctx.fillStyle = P("ground");
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = P("ink");
+  ctx.lineWidth = Math.max(1, 0.15 * ppm);
+  ctx.globalAlpha = 0.45;
+  for (const r of lay.rules) {
+    ctx.beginPath();
+    ctx.moveTo(r.x0 * ppm, r.y * ppm);
+    ctx.lineTo(r.x1 * ppm, r.y * ppm);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = P("ink");
+  for (const l of lay.lines) {
+    setFont(ctx, l.bold ? 700 : 400, l.size * ppm, SANS);
+    ctx.fillText(l.text, l.x * ppm, l.y * ppm, l.maxW * ppm);
+  }
+  if (lay.barcode && info.barcode) drawBarcode(ctx, info.barcode, lay.barcode.x * ppm, lay.barcode.y * ppm, lay.barcode.w * ppm, lay.barcode.h * ppm);
+  // key accent rule, bottom right
+  const m = Math.min(W, H);
+  ctx.fillStyle = P("key");
+  ctx.fillRect(W - lay.pad * ppm - m * 0.18, H - lay.pad * ppm - m * 0.012, m * 0.18, Math.max(2, m * 0.012));
+}
+
 /** Back panel: copy blocks, an info table, a barcode. Placeholder copy, laid out like print. */
-function drawBack(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint) {
+function drawBack(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, ppm = 0) {
+  if (a.info && ppm > 0) return drawInfo(ctx, W, H, a, P, ppm);
   const m = Math.min(W, H);
   const pad = m * 0.1;
   ctx.fillStyle = P("ground");
@@ -348,10 +452,10 @@ function drawBand(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, withTex
 }
 
 /** A round tin's printed body, wrapping all the way round; front centred. */
-function drawTinWrap(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint) {
+function drawTinWrap(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, ppm = 0) {
   ctx.fillStyle = P("ground");
   ctx.fillRect(0, 0, W, H);
-  const fw = W * 0.3;
+  const fw = W * WRAP_FRONT;
   const sideW = W / 2 - fw;
   const section = (x0: number, w: number, draw: (c: Ctx, w: number, h: number) => void) => {
     ctx.save();
@@ -362,14 +466,14 @@ function drawTinWrap(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint) {
     draw(ctx, w, H);
     ctx.restore();
   };
-  section(W / 2 - fw / 2, fw, (c, w, h) => drawFront(c, w, h, a, P));
+  section(W / 2 - fw / 2, fw, (c, w, h) => drawFront(c, w, h, a, P, ppm));
   section(W / 2 + fw / 2, sideW, (c, w, h) => drawSide(c, w, h, a, P, "right"));
   section(W / 2 - fw / 2 - sideW, sideW, (c, w, h) => drawSide(c, w, h, a, P, "left"));
   section(0, fw / 2, (c, w, h) => {
     c.translate(-fw / 2, 0);
-    drawBack(c, fw, h, a, P);
+    drawBack(c, fw, h, a, P, ppm);
   });
-  section(W - fw / 2, fw / 2, (c, w, h) => drawBack(c, fw, h, a, P));
+  section(W - fw / 2, fw / 2, (c, w, h) => drawBack(c, fw, h, a, P, ppm));
 }
 
 /** Printed top of a tin lid (square texture mapped onto a disc). */
@@ -458,21 +562,6 @@ function drawManual(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint) {
 
 /* ---------------------------------------------------------------- Public */
 
-export type FaceKind =
-  | "front"
-  | "back"
-  | "left"
-  | "right"
-  | "top"
-  | "bottom"
-  | "flap"
-  | "band"
-  | "bandPlain"
-  | "baseSide"
-  | "tinWrap"
-  | "tinCap"
-  | "inner"
-  | "manual";
 
 export type Art = { color: HTMLCanvasElement; foil: HTMLCanvasElement | null };
 
@@ -487,10 +576,10 @@ export function drawFace(kind: FaceKind, wMm: number, hMm: number, ppm: number, 
     const P = painter(roles, a.finish, mask);
     switch (kind) {
       case "front":
-        drawFront(ctx, W, H, a, P);
+        drawFront(ctx, W, H, a, P, ppm);
         break;
       case "back":
-        drawBack(ctx, W, H, a, P);
+        drawBack(ctx, W, H, a, P, ppm);
         break;
       case "left":
       case "right":
@@ -500,6 +589,9 @@ export function drawFace(kind: FaceKind, wMm: number, hMm: number, ppm: number, 
         drawTop(ctx, W, H, a, P);
         break;
       case "bottom":
+        if (a.info?.on === "bottom") drawBack(ctx, W, H, a, P, ppm);
+        else drawPlain(ctx, W, H, "ground", P);
+        break;
       case "flap":
       case "baseSide":
         drawPlain(ctx, W, H, "ground", P);
@@ -511,7 +603,7 @@ export function drawFace(kind: FaceKind, wMm: number, hMm: number, ppm: number, 
         drawBand(ctx, W, H, a, P, false);
         break;
       case "tinWrap":
-        drawTinWrap(ctx, W, H, a, P);
+        drawTinWrap(ctx, W, H, a, P, ppm);
         break;
       case "tinCap":
         drawTinCap(ctx, W, a, P);

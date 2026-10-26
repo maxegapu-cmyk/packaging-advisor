@@ -16,7 +16,9 @@
     "preview:board": "tsx --tsconfig tsconfig.node.json scripts/render-preview.tsx"
   },
   "dependencies": {
+    "jszip": "^3.10.1",
     "next": "^15.5.0",
+    "pdf-lib": "^1.17.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "sharp": "^0.34.0",

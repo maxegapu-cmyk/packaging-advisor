@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Direction } from "@/lib/board/schema";
 import type { PackSpec } from "@/lib/pack";
+import type { ArtInfo } from "../three/art";
 import type { PackScene, PinOnScreen } from "../three/engine";
 import type { Backdrop } from "../three/studio";
 import type { Orbit } from "./orbit";
@@ -34,6 +35,7 @@ export function Package3D({
   onProgress,
   onPins,
   category,
+  info = null,
 }: {
   d: Direction;
   brand: string;
@@ -59,12 +61,14 @@ export function Package3D({
   onPins?: (pins: PinOnScreen[] | null) => void;
   /** Board category: decides what jars, bottles and tubes hold. */
   category?: string;
+  /** Finished label content (the final-files step). */
+  info?: ArtInfo | null;
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const engine = useRef<PackScene | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "fallback">("loading");
-  const latest = useRef({ d, brand, spec, open, fit, category });
-  latest.current = { d, brand, spec, open, fit, category };
+  const latest = useRef({ d, brand, spec, open, fit, category, info });
+  latest.current = { d, brand, spec, open, fit, category, info };
   const after = useRef(afterRender);
   after.current = afterRender;
   const ready = useRef(onReady);
@@ -139,8 +143,8 @@ export function Package3D({
   }, [anatomy]);
 
   useEffect(() => {
-    engine.current?.update({ d, brand, spec, open, fit, category });
-  }, [d, brand, spec, open, fit, category]);
+    engine.current?.update({ d, brand, spec, open, fit, category, info });
+  }, [d, brand, spec, open, fit, category, info]);
 
   if (state === "fallback") return <PackageCSS d={d} brand={brand} spec={spec} fit={fit} open={open} orbit={orbit} />;
   return (

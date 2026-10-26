@@ -75,7 +75,7 @@ const S = {
   hint: { zh: "拖动或单指滑动任意翻转，双指捏合缩放、旋拧转动，双击复位", en: "Drag or swipe to turn it any way; pinch to zoom, twist to spin; double-tap to reset" },
   tabPack: { zh: "包装", en: "Pack" },
   nextLabel: { zh: "打样完成后，下一步", en: "When the structure is settled" },
-  handoff: { zh: "交给设计师", en: "Hand it to your designer" },
+  handoff: { zh: "出成品文件", en: "Make the final files" },
   tabLook: { zh: "外观", en: "Look" },
   tabCheck: { zh: "检查", en: "Check" },
   material: { zh: "材料", en: "Material" },

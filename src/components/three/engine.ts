@@ -14,7 +14,7 @@
 import * as THREE from "three";
 import type { Direction } from "@/lib/board/schema";
 import type { PackSpec } from "@/lib/pack";
-import { rolesOf, type ArtInput } from "./art";
+import { rolesOf, type ArtInfo, type ArtInput } from "./art";
 import { aim, RAD, step, tw, type Built, type Pair, type PinOnScreen } from "./common";
 import { buildForm } from "./build";
 import { LIVE_SWEEP_ENV, makeKit, type Kit } from "./kit";
@@ -27,7 +27,7 @@ const PT_MIN_SAMPLES = 160;
 /** A photo render accumulates this many samples. */
 const PT_MAX_SAMPLES = 480;
 
-export type SceneInput = { d: Direction; brand: string; spec: PackSpec; open: boolean; fit: number; /** board category: what jars and bottles hold */ category?: string };
+export type SceneInput = { d: Direction; brand: string; spec: PackSpec; open: boolean; fit: number; /** board category: what jars and bottles hold */ category?: string; /** finished label content, when there is an artwork */ info?: ArtInfo | null };
 export type View = { x: number; y: number };
 
 export function webglAvailable(): boolean {
@@ -418,7 +418,7 @@ export class PackScene {
   update(input: SceneInput) {
     const prev = this.input;
     this.input = input;
-    const key = [input.d.id, input.d.layout, input.d.palette.map((p) => p.hex).join(), input.d.mockup.headline, input.d.mockup.detail, input.brand, input.spec.form, input.spec.w, input.spec.h, input.spec.d, input.spec.finish, JSON.stringify(input.spec.inner ?? null), input.category ?? ""].join("|");
+    const key = [input.d.id, input.d.layout, input.d.palette.map((p) => p.hex).join(), input.d.mockup.headline, input.d.mockup.detail, input.brand, input.spec.form, input.spec.w, input.spec.h, input.spec.d, input.spec.finish, JSON.stringify(input.spec.inner ?? null), input.category ?? "", input.info?.key ?? ""].join("|");
     let changed = false;
     if (key !== this.buildKey) {
       this.buildKey = key;
@@ -481,7 +481,7 @@ export class PackScene {
     const keepStages = !fresh && this.built?.stages ? this.built.stages.map((s) => ({ ...s })) : null;
     if (this.built) this.turn.remove(this.built.root);
     this.disposeBuilt();
-    const a: ArtInput = { d: input.d, brand: input.brand, finish: input.spec.finish };
+    const a: ArtInput = { d: input.d, brand: input.brand, finish: input.spec.finish, info: input.info ?? null };
     const category = input.category ?? "other";
     this.kit = makeKit(this.renderer, a, this.maxTex, category);
     const b = buildForm({ spec: input.spec, kit: this.kit, art: a, maxTex: this.maxTex, own: this.own, category });

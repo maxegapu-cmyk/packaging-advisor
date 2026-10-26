@@ -341,6 +341,10 @@ export function buildJar(spec: PackSpec, k: Kit, a: ArtInput, category: string):
   const ly1 = yS - 6 * mm;
   const label = band(R + 0.25 * mm, ly0, ly1, k.tex("front", ((R * arc) / U) | 0, (ly1 - ly0) / U), arc);
   root.add(label);
+  const backArc = 100 * RAD;
+  const backLabel = band(R + 0.25 * mm, ly0, ly1, k.tex("back", ((R * backArc) / U) | 0, (ly1 - ly0) / U), backArc);
+  backLabel.rotation.y = Math.PI;
+  root.add(backLabel);
 
   const rci = rnO + 1.2 * mm;
   const Rc = rci + 1.2 * mm;
@@ -456,6 +460,10 @@ export function buildGlassBottle(spec: PackSpec, k: Kit, a: ArtInput, category: 
   const ly1 = y0 - H * 0.06;
   const label = band(R + 0.25 * mm, ly0, ly1, k.tex("front", ((R * arc) / U) | 0, (ly1 - ly0) / U), arc);
   root.add(label);
+  const backArc = 100 * RAD;
+  const backLabel = band(R + 0.25 * mm, ly0, ly1, k.tex("back", ((R * backArc) / U) | 0, (ly1 - ly0) / U), backArc);
+  backLabel.rotation.y = Math.PI;
+  root.add(backLabel);
   const nb0 = yN + 4 * mm;
   const nb1 = Math.min(Hg - 9 * mm, nb0 + 18 * mm);
   const neckBand = nb1 - nb0 > 5 * mm ? band(rn + 0.2 * mm, nb0, nb1, k.tex("bandPlain", (2 * Math.PI * rn) / U, (nb1 - nb0) / U)) : null;

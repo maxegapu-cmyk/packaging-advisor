@@ -89,7 +89,7 @@ export async function generateBoard(projectId: string, actor: Actor, modelId?: n
         brand: project.brand,
         description: project.description,
         mustText: project.mustText,
-        images: uploads.map((u) => ({ kind: u.kind, note: u.note })),
+        images: uploads.map((u) => ({ kind: u.kind === "reference" ? ("reference" as const) : ("product" as const), note: u.note })),
         modelCanSeeImages: resolved.vision,
       }),
     },

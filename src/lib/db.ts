@@ -93,6 +93,8 @@ const MIGRATIONS: string[] = [
   `ALTER TABLE projects ADD COLUMN pack TEXT NOT NULL DEFAULT '';`,
   // v3: what the product is, in the seller's words (required for "other", optional otherwise).
   `ALTER TABLE projects ADD COLUMN item_type TEXT NOT NULL DEFAULT '';`,
+  // v4: the finished artwork (final files step), JSON
+  `ALTER TABLE projects ADD COLUMN artwork TEXT;`,
 ];
 
 let db: DatabaseSync | null = null;

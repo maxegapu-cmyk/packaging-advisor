@@ -37,7 +37,7 @@ export default async function SpacePage({ params, searchParams }: { params: Prom
       lang={lang}
       saveUrl={`/api/projects/${project.id}/pack`}
       backHref={`/p/${project.id}?v=${record.id}`}
-      handoffHref={`/p/${project.id}?v=${record.id}#handoff`}
+      handoffHref={`/p/${project.id}/final`}
     />
   );
 }
