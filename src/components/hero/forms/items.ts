@@ -57,7 +57,7 @@ export const PHASES: Pair[] = [
   { zh: "成品", en: "Finished" },
 ];
 /** Phase boundaries, in seconds into a pack's turn. */
-export const PHASE_AT = [0, 0.45, 1.15, 3.1];
+export const PHASE_AT = [0, 0.45, 1.1, 3.3];
 export const phaseOf = (t: number) => (t < PHASE_AT[1] ? 0 : t < PHASE_AT[2] ? 1 : t < PHASE_AT[3] ? 2 : 3);
 
 export const sizeText = (it: FilmItem) => (it.form === "tin" || it.form === "can" || it.form === "bottle" || it.form === "tube" || it.form === "jar" || it.form === "glassBottle" || it.form === "ceramic" || it.form === "paperTube" ? `Ø${it.w} × ${it.h} mm` : `${it.w} × ${it.d} × ${it.h} mm`);

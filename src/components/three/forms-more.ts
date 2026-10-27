@@ -271,7 +271,8 @@ export function buildAseptic(spec: PackSpec, k: Kit, a: ArtInput): Built {
   const f = (kind: Parameters<Kit["tex"]>[0], w: number, h: number) => k.tex(kind, w, h, "film");
   const plainF = k.plain("film");
   const bodyGeo = new RoundedBoxGeometry(W, Hb, D, 2, 1.6 * mm);
-  const body = splitMesh(bodyGeo, [f("right", spec.d, spec.h), f("left", spec.d, spec.h), f("top", spec.w, spec.d), plainF, f("front", spec.w, spec.h), f("back", spec.w, spec.h)]);
+  // the top is formed from the two unprinted flaps of the web (see the print net), so it is plain
+  const body = splitMesh(bodyGeo, [f("right", spec.d, spec.h), f("left", spec.d, spec.h), plainF, plainF, f("front", spec.w, spec.h), f("back", spec.w, spec.h)]);
   body.position.y = Hb / 2;
   root.add(body);
   // top seal fin, folded flat toward the back
@@ -284,7 +285,8 @@ export function buildAseptic(spec: PackSpec, k: Kit, a: ArtInput): Built {
     const tri = new THREE.Shape();
     tri.moveTo(-D / 2 + 1 * mm, 0);
     tri.lineTo(D / 2 - 1 * mm, 0);
-    tri.lineTo(0, -D * 0.42);
+    // as deep as the web's gusset that forms it (half the depth)
+    tri.lineTo(0, -(D / 2 - 0.5 * mm));
     tri.closePath();
     const g = new THREE.ExtrudeGeometry(tri, { depth: 0.7 * mm, bevelEnabled: false });
     // shape x → scene z, shape y → scene y, extrude → outward x

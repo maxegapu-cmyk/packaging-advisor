@@ -93,6 +93,7 @@ export function boardPanel(pw: number, ph: number, t: number): THREE.BufferGeome
     return Math.sign(v) * ((a * (half - e)) / (half - step));
   };
   const bulge = Math.min(0.6 * U, Math.min(pw, ph) * 0.006);
+  const uv = g.attributes.uv as THREE.BufferAttribute;
   for (let i = 0; i < pos.count; i++) {
     let x = pos.getX(i);
     let y = pos.getY(i);
@@ -101,6 +102,16 @@ export function boardPanel(pw: number, ph: number, t: number): THREE.BufferGeome
     const bx = 1 - Math.pow((2 * x) / pw, 2);
     const by = 1 - Math.pow((2 * y) / ph, 2);
     pos.setXYZ(i, x, y, pos.getZ(i) + bulge * Math.max(0, bx) * Math.max(0, by));
+    // the artwork follows the moved vertices: texture coordinates stay true to the face in
+    // millimetres, exactly as on the flat print (BoxGeometry's own UVs are per grid step)
+    const nx = nor.getX(i);
+    const ny = nor.getY(i);
+    const nz = nor.getZ(i);
+    const u = (x + pw / 2) / pw;
+    const v = (y + ph / 2) / ph;
+    if (Math.abs(nz) > 0.5) uv.setXY(i, nz > 0 ? u : 1 - u, v);
+    else if (Math.abs(nx) > 0.5) uv.setY(i, v);
+    else if (Math.abs(ny) > 0.5) uv.setX(i, u);
     // outer face: tilt normals at the rim toward the edge
     if (nor.getZ(i) > 0.9) {
       const ex = Math.abs(x) >= pw / 2 - 1e-7 ? Math.sign(x) : 0;
@@ -111,6 +122,7 @@ export function boardPanel(pw: number, ph: number, t: number): THREE.BufferGeome
   }
   pos.needsUpdate = true;
   nor.needsUpdate = true;
+  uv.needsUpdate = true;
   return g;
 }
 

@@ -34,9 +34,9 @@ const ROUND = new Set(["tin", "can", "bottle", "tube", "jar", "glassBottle", "ce
 const FOLDED = new Set(["carton", "mailer", "rsc", "gift", "bookBox", "drawer", "bag", "aseptic", "woodBox"]);
 
 /** Timing within a pack's turn (seconds). */
-const T_ = { draw: [0, 0.6], wipe: [0.45, 1.15], ghost: [0.8, 1.4], form: [1.15, 3.1], scan: [3.1, 3.75], dims: [3.4, 4.85], turn: [3.2, 5.1] } as const;
+const T_ = { draw: [0, 0.6], wipe: [0.45, 1.1], ghost: [0.8, 1.4], form: [1.1, 3.3], scan: [3.3, 3.9], dims: [3.6, 4.9], turn: [3.4, 5.1] } as const;
 /** Camera keys within a turn: on the sheet, leaving it, arriving at the pack, settled. */
-const CAM_T = [0, 1.15, 2.2, 3.2, 5.1];
+const CAM_T = [0, 1.1, 2.25, 3.35, 5.1];
 
 type Pt2 = [number, number];
 export type HudLine = { a: Pt2; b: Pt2; kind: "cut" | "crease"; p: number; alpha: number };
@@ -58,6 +58,8 @@ type Act = {
   tone: (dark: boolean) => void;
   /** How high the sheet is lifted to fold (scene units), for the camera to follow. */
   rise: (t: number) => number;
+  /** Where the folding sheet is (act units, smoothed), for packs folded from a net. */
+  sheetAt: (t: number) => { x0: number; y0: number; z0: number; x1: number; y1: number; z1: number } | null;
   dispose: () => void;
 };
 
@@ -274,6 +276,7 @@ export class FormsScene {
       const clipM = <T extends THREE.Material>(m: T): T => {
         const c = m.clone() as T;
         c.clippingPlanes = [planes.wipe, planes.above];
+        c.clipShadows = true;
         own.push(c);
         return c;
       };
@@ -301,6 +304,7 @@ export class FormsScene {
       let flat: { root: THREE.Group; lines: Line3[]; box: Act["box"]; pose: (f: number) => void; dispose: () => void };
       let extra: ((t: number) => void) | null = null;
       let rise: (f: number) => number = () => 0;
+      let sheet: (f: number) => ReturnType<Act["sheetAt"]> = () => null;
       let hasScan = true;
       if (FOLDED.has(item.form)) {
         const set = foldsFor(item.form as "carton", item.w, item.h, item.d)!;
@@ -349,8 +353,10 @@ export class FormsScene {
           } else if (piece.base === "key") {
             top = cached("key", () => clipM(new THREE.MeshPhysicalMaterial({ color: roles.key, roughness: 0.6 })));
           } else top = cached("plain", () => clipM(raw.plain(set.material === "film" ? "film" : "board")));
+          // an ear is two layers of web, printed side out: no foil shows as it folds down
+          if (p.ear) return { top, under: top, edge: cached("edge", () => clipM(raw.edge)) };
           const under = cached("under", () =>
-            set.material === "corrugated" ? clipM(raw.kraft) : set.material === "rigid" ? clipM(new THREE.MeshStandardMaterial({ color: "#8F8A80", roughness: 0.95 })) : set.material === "film" ? clipM(raw.bareMetal) : clipM(raw.inside),
+            set.material === "corrugated" ? clipM(raw.kraft) : set.material === "rigid" ? clipM(new THREE.MeshStandardMaterial({ color: "#8F8A80", roughness: 0.95 })) : set.material === "film" ? clipM(new THREE.MeshStandardMaterial({ color: "#CDD0CF", metalness: 0.55, roughness: 0.42 })) : clipM(raw.inside),
           );
           const edge = cached("edge", () => (set.material === "corrugated" ? clipM(new THREE.MeshStandardMaterial({ color: "#A27A4E", roughness: 0.95 })) : clipM(raw.edge)));
           return { top, under, edge };
@@ -369,6 +375,7 @@ export class FormsScene {
         const net = buildNet(set, look, zMid);
         flat = net;
         rise = net.liftAt;
+        sheet = net.boxAt;
         turn.add(net.root);
         yield;
         for (let k = 0; k < set.pieces.length; k++) {
@@ -380,7 +387,7 @@ export class FormsScene {
           const tp = tape(item.w, item.h, 3);
           own.push(tp);
           turn.add(tp.mesh);
-          extra = (t) => tp.set(ease(seg(t, [3.15, 3.8])));
+          extra = (t) => tp.set(ease(seg(t, [3.35, 3.95])));
         } else yield* withModel.call(this);
       } else if (ROUND.has(item.form)) {
         yield* withModel.call(this);
@@ -399,7 +406,8 @@ export class FormsScene {
         turn.add(mp.root);
       } else {
         hasScan = false;
-        const pl = buildPillow(item.w, item.d, item.h, art, this.renderer, planes, (item.d / 2 + 70 + item.d) * U);
+        // no hologram to sit beside: the web lies where the pack will be and is formed in place
+        const pl = buildPillow(item.w, item.d, item.h, art, this.renderer, planes, 0);
         flat = pl;
         turn.add(pl.root);
       }
@@ -433,12 +441,14 @@ export class FormsScene {
         // the print: a laser line sweeps the sheet; before it, only the vector dieline exists
         const wipeK = clamp((t - T_.wipe[0]) / (T_.wipe[1] - T_.wipe[0]));
         setWipe(planes, x + box.x0 - 0.02 + (box.x1 - box.x0 + 0.04) * wipeK + (wipeK >= 1 ? 1e5 : 0));
-        // the hologram waits for the pack, and quietens as the folded sheet fills it
-        const ghost = hasScan ? ease(seg(t, T_.ghost)) * (1 - 0.6 * ease(seg(t, [T_.form[1] - 0.8, T_.form[1] - 0.1]))) : 0;
+        // the hologram shows the target while the sheet folds, and is gone once the folded
+        // sheet fills it: otherwise its veil over the sheet would lift, band by band, as the
+        // scan swaps the sheet for the finished pack (which match exactly)
+        const ghost = hasScan ? ease(seg(t, T_.ghost)) * (1 - ease(seg(t, [T_.form[1] - 0.7, T_.form[1] - 0.05]))) : 0;
         const sk = seg(t, T_.scan);
         const scanY = !hasScan ? -1e6 : sk <= 0 ? -1e6 : sk >= 1 ? 1e6 : -0.005 + (top + 0.01) * ease(sk);
         setScan(planes, scanY);
-        (holo as Holo | null)?.set(ghost, scanY);
+        (holo as Holo | null)?.set(ghost, scanY, hasScan ? Math.min(1, sk * 8, (1 - sk) * 8) : 0);
         ring.visible = hasScan && sk > 0 && sk < 1;
         ring.position.y = scanY + 0.0005;
         ringMat.opacity = 0.95 * Math.min(1, sk * 8, (1 - sk) * 8);
@@ -466,6 +476,7 @@ export class FormsScene {
           ringMat.color.set(dark ? "#5ED6D2" : "#2B6966");
         },
         rise: (t) => rise(seg(t, T_.form)),
+        sheetAt: (t) => sheet(seg(t, T_.form)),
         dispose: () => {
           this.scene.remove(group);
           own.forEach((o) => o.dispose());
@@ -574,6 +585,33 @@ export class FormsScene {
 
   /* ---------------------------------------------------------------- camera */
 
+  /**
+   * How far back the camera must be, looking at `tgt` from (elev, azim) degrees, for every
+   * corner of the box to be inside the frame with a margin.
+   */
+  private fitBox(b: { x0: number; y0: number; z0: number; x1: number; y1: number; z1: number }, tgt: THREE.Vector3, elev: number, azim: number): number {
+    const fovY = (this.camera.fov * Math.PI) / 180;
+    const aspect = this.w / this.h;
+    const wide = aspect > 1.25 && this.shiftOverride === null;
+    const tanY = Math.tan(fovY / 2) * 0.86;
+    const tanX = Math.tan(fovY / 2) * aspect * (wide ? 0.5 : 0.9) * 0.9;
+    const e = (elev * Math.PI) / 180;
+    const az = (azim * Math.PI) / 180;
+    const back = new THREE.Vector3(Math.sin(az) * Math.cos(e), Math.sin(e), Math.cos(az) * Math.cos(e));
+    const right = new THREE.Vector3(Math.cos(az), 0, -Math.sin(az));
+    const up = new THREE.Vector3().crossVectors(back, right);
+    let need = 0;
+    const v = new THREE.Vector3();
+    for (const x of [b.x0, b.x1])
+      for (const y of [b.y0, b.y1])
+        for (const z of [b.z0, b.z1]) {
+          v.set(x, y, z).sub(tgt);
+          const along = v.dot(back);
+          need = Math.max(need, along + Math.abs(v.dot(right)) / tanX, along + Math.abs(v.dot(up)) / tanY);
+        }
+    return need;
+  }
+
   private fit(wd: number, ht: number): number {
     const fovY = (this.camera.fov * Math.PI) / 180;
     const aspect = this.w / this.h;
@@ -607,7 +645,42 @@ export class FormsScene {
     const out = {} as Cam;
     for (const k of KEYS) out[k] = spline(ts, v[k], t);
     // a sheet lifted to fold stays in frame: the camera rises with it (the lift is smooth)
-    out.ty += a.rise(t) * 0.6;
+    out.ty += a.rise(t) * 0.4;
+    // a net folds where it lies, in front of its hologram, then travels to it: the camera frames
+    // where the sheet actually is (with the hologram) all the way, rather than going on ahead
+    // to the finished pack and leaving the folding sheet at the edge of the shot
+    const track = (tt: number) => {
+      const sb = a.sheetAt(tt);
+      if (!sb) return null;
+      const u = { x0: Math.min(sb.x0, -W / 2), x1: Math.max(sb.x1, W / 2), y0: 0, y1: Math.max(sb.y1, H), z0: Math.min(sb.z0, -D / 2), z1: Math.max(sb.z1, D / 2) };
+      const tx = (u.x0 + u.x1) / 2;
+      const tz = (u.z0 + u.z1) / 2;
+      const ty = spline(ts, v.ty, tt) + a.rise(tt) * 0.4;
+      // far enough back that the sheet and the hologram are both wholly in the shot
+      const p = this.fitBox(u, new THREE.Vector3(tx, ty, tz), spline(ts, v.elev, tt), spline(ts, v.azim, tt)) * 1.08;
+      const q = fitProd * spline(ts, [0.4, 0.4, 1.1, 1.2, 1.08], tt);
+      // the larger of the two, without a corner where they cross
+      return { tx: tx + a.x, tz, dist: (p + q + Math.sqrt((p - q) ** 2 + (0.06 * (p + q)) ** 2)) / 2 };
+    };
+    if (track(t)) {
+      // and does it like a camera operator, not a servo: a weighted average over about half a
+      // second either side, so a quick move of the sheet becomes a calm move of the shot
+      let tx = 0;
+      let tz = 0;
+      let dist = 0;
+      let wsum = 0;
+      for (let k = -8; k <= 8; k++) {
+        const r = track(clamp(t + k * 0.07, 0, ts[ts.length - 1]))!;
+        const w = Math.exp(-((k / 3.5) ** 2));
+        tx += r.tx * w;
+        tz += r.tz * w;
+        dist += r.dist * w;
+        wsum += w;
+      }
+      out.tx = tx / wsum;
+      out.tz = tz / wsum;
+      out.dist = dist / wsum;
+    }
     return out;
   }
 

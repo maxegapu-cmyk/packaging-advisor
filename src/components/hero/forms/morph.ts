@@ -37,6 +37,7 @@ const boxOf = (lines: Line3[]) => {
 };
 const clip = <T extends THREE.Material>(m: T, planes: Planes): T => {
   m.clippingPlanes = [planes.wipe, planes.above];
+  m.clipShadows = true;
   return m;
 };
 
@@ -340,7 +341,9 @@ export function buildPillow(len: number, wid: number, th: number, a: ArtInput, r
     const sealP = ease(seg(f, [0.68, 0.95]));
     const kappa = (wrapP * 2 * Math.PI) / perim;
     const yTop = 0.3 + (2 * Rc + lift - 0.3) * wrapP;
-    const zOff = zMidMm * (1 - wrapP);
+    // the web travels to the pack's place over the whole phase, as the camera does, so the
+    // pack never runs ahead of the shot
+    const zOff = zMidMm * (1 - ease(seg(f, [0.05, 0.98])));
     // the web rolled round the length axis, its middle line on top (a lap seal underneath)
     const tube = (s: number): [number, number] => {
       const sb = Math.max(-half, Math.min(half, s));

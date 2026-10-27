@@ -22,6 +22,8 @@ type PieceState = {
   arc: number;
   /** How far the piece is lifted over the folding (mm, sampled on f), smoothed; see prepare. */
   lift: number[] | null;
+  /** Its bounding box (root units, lift included) at each sample, smoothed: [x0, y0, z0, x1, y1, z1]. */
+  boxes: number[][] | null;
 };
 
 export type NetBuild = {
@@ -34,14 +36,18 @@ export type NetBuild = {
   prepare: (k: number) => void;
   /** How high (scene units) the highest-lifted piece floats at `f`, from the prepared curves. */
   liftAt: (f: number) => number;
+  /** Where the sheet is at `f` (scene units, smoothed), once prepared: for the camera to frame. */
+  boxAt: (f: number) => { x0: number; y0: number; z0: number; x1: number; y1: number; z1: number } | null;
   materials: THREE.Material[];
   dispose: () => void;
 };
 
 const m4 = new THREE.Matrix4();
 /** Shares of the form phase for lifting the sheet before the folds, and setting the pack down after. */
-const LEAD = 0.14;
-const TAIL = 0.1;
+// a big net (a carton's walls fold down under its front) is lifted by about the pack's height:
+// that takes a third of the phase, unhurried, before the first fold starts
+const LEAD = 0.3;
+const TAIL = 0.12;
 /** Caps of the extruded edge geometry: drawn as separate faces instead. */
 const HIDDEN = new THREE.MeshBasicMaterial({ visible: false });
 const toM = (a: M4) => new THREE.Matrix4().fromArray(a);
@@ -130,6 +136,7 @@ export function buildNet(set: FoldSet, look: (piece: FoldPiece, p: FoldPanel) =>
       own.push(down);
       const under = new THREE.Mesh(down, L.under);
       under.receiveShadow = true;
+      under.castShadow = true;
       g.add(under);
       const face = new THREE.ShapeGeometry(shape, 4);
       face.rotateX(-Math.PI / 2);
@@ -138,7 +145,12 @@ export function buildNet(set: FoldSet, look: (piece: FoldPiece, p: FoldPanel) =>
       own.push(face);
       const top = new THREE.Mesh(face, L.top);
       top.receiveShadow = true;
+      // the sheet casts the shadow the finished pack will, so nothing changes at the swap
+      top.castShadow = true;
       g.add(top);
+      // a glue flap or seal strip ends up glued inside the wall it overlaps, not over its
+      // print: it lies one board below the others
+      if (p.glue || p.inner) for (const geo of [body, down, face]) geo.translate(0, -(t + 0.05), 0);
     }
     // the dieline, as it lies flat
     const y = piece.thick + 0.25;
@@ -153,7 +165,7 @@ export function buildNet(set: FoldSet, look: (piece: FoldPiece, p: FoldPanel) =>
     const qFinal = new THREE.Quaternion().setFromRotationMatrix(pm);
     const anc = piece.panels.find((p) => p.id === piece.anchor)!;
     const ab = bboxOf(anc.poly);
-    states.push({ piece, holder, panels: groups, origin, qFinal, anchor: new THREE.Vector3(ab.x + ab.w / 2, anc.thick ?? piece.thick, ab.y + ab.h / 2), arc: 0.16 * Math.max(f.box.w, f.box.h), lift: null });
+    states.push({ piece, holder, panels: groups, origin, qFinal, anchor: new THREE.Vector3(ab.x + ab.w / 2, anc.thick ?? piece.thick, ab.y + ab.h / 2), arc: 0.16 * Math.max(f.box.w, f.box.h), lift: null, boxes: null });
   });
 
   const tmpBox = new THREE.Box3();
@@ -205,7 +217,11 @@ export function buildNet(set: FoldSet, look: (piece: FoldPiece, p: FoldPanel) =>
     const st = states[k];
     if (!st || st.lift) return;
     const need: number[] = [];
-    for (let i = 0; i <= N; i++) need.push(fold(st, i / N));
+    const raw: number[][] = [];
+    for (let i = 0; i <= N; i++) {
+      need.push(fold(st, i / N));
+      raw.push([tmpBox.min.x, tmpBox.min.y, tmpBox.min.z, tmpBox.max.x, tmpBox.max.y, tmpBox.max.z]);
+    }
     // the most that will be needed a little ahead (and just behind), so the piece rises before
     // a panel swings down and stays up while it folds; then smoothed, so it floats up and down
     // instead of being pushed frame by frame
@@ -215,12 +231,29 @@ export function buildNet(set: FoldSet, look: (piece: FoldPiece, p: FoldPanel) =>
     for (let pass = 0; pass < 6; pass++) v = v.map((_, i) => (v[Math.max(0, i - 2)] + v[Math.max(0, i - 1)] + v[i] + v[Math.min(N, i + 1)] + v[Math.min(N, i + 2)]) / 5);
     // on the table at the start and at the end, never lower than needed in between
     st.lift = v.map((x, i) => Math.max(x * smooth(Math.min(i / (LEAD * N), (N - i) / (TAIL * N))), need[i]));
+    // where it is, lifted, smoothed the same way (the camera follows this, not every panel)
+    let bx = raw.map((b, i) => [b[0], b[1] + st.lift![i] * U, b[2], b[3], b[4] + st.lift![i] * U, b[5]]);
+    for (let pass = 0; pass < 6; pass++) bx = bx.map((_, i) => [0, 1, 2, 3, 4, 5].map((k) => (bx[Math.max(0, i - 2)][k] + bx[Math.max(0, i - 1)][k] + bx[i][k] + bx[Math.min(N, i + 1)][k] + bx[Math.min(N, i + 2)][k]) / 5));
+    st.boxes = bx;
     fold(st, 0);
   };
   const curveAt = (c: number[], f: number) => {
     const x = clamp(f) * N;
     const i = Math.min(N - 1, Math.floor(x));
     return c[i] + (c[i + 1] - c[i]) * (x - i);
+  };
+  const boxAt = (f: number) => {
+    if (!states.every((st) => st.boxes)) return null;
+    const x = clamp(f) * N;
+    const i = Math.min(N - 1, Math.floor(x));
+    const k = x - i;
+    const b = [1e9, 1e9, 1e9, -1e9, -1e9, -1e9];
+    for (const st of states)
+      for (let c = 0; c < 6; c++) {
+        const v = st.boxes![i][c] + (st.boxes![i + 1][c] - st.boxes![i][c]) * k;
+        b[c] = c < 3 ? Math.min(b[c], v) : Math.max(b[c], v);
+      }
+    return { x0: b[0], y0: b[1], z0: b[2], x1: b[3], y1: b[4], z1: b[5] };
   };
   const liftAt = (f: number) => Math.max(0, ...states.map((st) => (st.lift ? curveAt(st.lift, f) : 0))) * U;
   const pose = (f: number) => {
@@ -243,6 +276,7 @@ export function buildNet(set: FoldSet, look: (piece: FoldPiece, p: FoldPanel) =>
     pose,
     prepare,
     liftAt,
+    boxAt,
     materials: [...mats],
     dispose: () => own.forEach((o) => o.dispose()),
   };

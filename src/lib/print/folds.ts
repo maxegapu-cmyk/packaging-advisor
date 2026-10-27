@@ -36,6 +36,10 @@ export type FoldPanel = {
   glue?: boolean;
   /** Board thickness of this panel if it differs from the piece's (crate boards). */
   thick?: number;
+  /** Folded down flat onto the outside (an aseptic brick's ears): it shows the outer face both ways. */
+  ear?: boolean;
+  /** Ends up tucked against the inside of another panel (dust flaps, tuck flaps). */
+  inner?: boolean;
 };
 
 export type FoldPiece = {
@@ -95,18 +99,18 @@ function carton(w: number, h: number, d: number): FoldSet {
     { id: "right", poly: rect(xR, yT, d, h), parent: "front", hinge: seg(xR, yT, xR, yB), angle: 90, at: [0.05, 0.35], art: { kind: "right", rot: 0 } },
     { id: "back", poly: rect(xB, yT, w, h), parent: "right", hinge: seg(xB, yT, xB, yB), angle: 90, at: [0.1, 0.4], art: { kind: "back", rot: 0, info: true } },
     { id: "left", poly: rect(xL, yT, d, h), parent: "back", hinge: seg(xL, yT, xL, yB), angle: 90, at: [0.15, 0.45], art: { kind: "left", rot: 0 } },
-    { id: "dustRT", poly: [[xR, yT], [xR + 1.5, yT - 3], [xR + 2.5, yT - dust], [xB - d * 0.3, yT - dust], [xB, yT - 3], [xB, yT]], parent: "right", hinge: seg(xR, yT, xB, yT), angle: 90, at: [0.45, 0.62] },
-    { id: "dustLT", poly: [[xL, yT], [xL, yT - 3], [xL + d * 0.3, yT - dust], [xE - 2.5, yT - dust], [xE - 1.5, yT - 3], [xE, yT]], parent: "left", hinge: seg(xL, yT, xE, yT), angle: 90, at: [0.45, 0.62] },
-    { id: "dustRB", poly: [[xR, yB], [xB, yB], [xB, yB + 3], [xB - d * 0.3, yB + dust], [xR + 2.5, yB + dust], [xR + 1.5, yB + 3]], parent: "right", hinge: seg(xR, yB, xB, yB), angle: 90, at: [0.45, 0.62] },
-    { id: "dustLB", poly: [[xL, yB], [xE, yB], [xE - 1.5, yB + 3], [xE - 2.5, yB + dust], [xL + d * 0.3, yB + dust], [xL, yB + 3]], parent: "left", hinge: seg(xL, yB, xE, yB), angle: 90, at: [0.45, 0.62] },
+    { id: "dustRT", poly: [[xR, yT], [xR + 1.5, yT - 3], [xR + 2.5, yT - dust], [xB - d * 0.3, yT - dust], [xB, yT - 3], [xB, yT]], parent: "right", hinge: seg(xR, yT, xB, yT), angle: 90, at: [0.45, 0.62], inner: true },
+    { id: "dustLT", poly: [[xL, yT], [xL, yT - 3], [xL + d * 0.3, yT - dust], [xE - 2.5, yT - dust], [xE - 1.5, yT - 3], [xE, yT]], parent: "left", hinge: seg(xL, yT, xE, yT), angle: 90, at: [0.45, 0.62], inner: true },
+    { id: "dustRB", poly: [[xR, yB], [xB, yB], [xB, yB + 3], [xB - d * 0.3, yB + dust], [xR + 2.5, yB + dust], [xR + 1.5, yB + 3]], parent: "right", hinge: seg(xR, yB, xB, yB), angle: 90, at: [0.45, 0.62], inner: true },
+    { id: "dustLB", poly: [[xL, yB], [xE, yB], [xE - 1.5, yB + 3], [xE - 2.5, yB + dust], [xL + d * 0.3, yB + dust], [xL, yB + 3]], parent: "left", hinge: seg(xL, yB, xE, yB), angle: 90, at: [0.45, 0.62], inner: true },
     { id: "top", poly: rect(xF, yT - d, w, d), parent: "front", hinge: seg(xF, yT, xR, yT), angle: 90, at: [0.62, 0.92], art: { kind: "top", rot: 0 } },
-    { id: "tuckT", poly: [[xF, yT - d], [xF + 1.5, yT - d - T + ch], [xF + ch * 1.4, yT - d - T], [xR - ch * 1.4, yT - d - T], [xR - 1.5, yT - d - T + ch], [xR, yT - d]], parent: "top", hinge: seg(xF, yT - d, xR, yT - d), angle: 90, at: [0.55, 0.8] },
+    { id: "tuckT", poly: [[xF, yT - d], [xF + 1.5, yT - d - T + ch], [xF + ch * 1.4, yT - d - T], [xR - ch * 1.4, yT - d - T], [xR - 1.5, yT - d - T + ch], [xR, yT - d]], parent: "top", hinge: seg(xF, yT - d, xR, yT - d), angle: 90, at: [0.55, 0.8], inner: true },
     { id: "bottom", poly: rect(xB, yB, w, d), parent: "back", hinge: seg(xB, yB, xL, yB), angle: 90, at: [0.62, 0.92], art: { kind: "bottom", rot: 180 } },
-    { id: "tuckB", poly: [[xB, yB + d], [xL, yB + d], [xL - 1.5, yB + d + T - ch], [xL - ch * 1.4, yB + d + T], [xB + ch * 1.4, yB + d + T], [xB + 1.5, yB + d + T - ch]], parent: "bottom", hinge: seg(xB, yB + d, xL, yB + d), angle: 90, at: [0.55, 0.8] },
+    { id: "tuckB", poly: [[xB, yB + d], [xL, yB + d], [xL - 1.5, yB + d + T - ch], [xL - ch * 1.4, yB + d + T], [xB + ch * 1.4, yB + d + T], [xB + 1.5, yB + d + T - ch]], parent: "bottom", hinge: seg(xB, yB + d, xL, yB + d), angle: 90, at: [0.55, 0.8], inner: true },
   ];
   return {
     material: "board",
-    pieces: [{ id: "net", name: P("盒身展开图", "Carton net"), panels, anchor: "front", final: { c: [0, h / 2, d / 2], n: [0, 0, 1], u: [0, 1, 0] }, move: [0.55, 1], base: "ground", thick: 0.45 }],
+    pieces: [{ id: "net", name: P("盒身展开图", "Carton net"), panels, anchor: "front", final: { c: [0, h / 2, d / 2], n: [0, 0, 1], u: [0, 1, 0] }, move: [0.3, 1], base: "ground", thick: 0.45 }],
   };
 }
 
@@ -233,7 +237,7 @@ function gift(w: number, h: number, d: number): FoldSet {
     material: "rigid",
     pieces: [
       { id: "lid", name: P("盖面裱纸", "Lid wrap"), panels: lid, anchor: "lidC", final: { c: [0, h, 0], n: [0, 1, 0], u: [0, 0, -1] }, move: [0.56, 1], base: "key", thick: 0.3 },
-      { id: "base", name: P("底盒裱纸", "Base wrap"), panels: base, anchor: "baseC", final: { c: [0, 0, 0], n: [0, -1, 0], u: [0, 0, -1] }, move: [0.3, 0.68], base: "ground", thick: 0.3 },
+      { id: "base", name: P("底盒裱纸", "Base wrap"), panels: base, anchor: "baseC", final: { c: [0, 0, 0], n: [0, -1, 0], u: [0, 0, -1] }, move: [0.22, 0.74], base: "ground", thick: 0.3 },
     ],
   };
 }
@@ -350,15 +354,16 @@ function aseptic(w: number, h: number, d: number): FoldSet {
       panels.push({ id: `${wl.id}T`, poly: rect(x, 0, w, fin), parent: wl.id, hinge: seg(x, fin, x + w, fin), angle: 90, at: [0.6, 0.8] });
       panels.push({ id: `${wl.id}B`, poly: rect(x, fin + h, w, fin), parent: wl.id, hinge: seg(x, fin + h, x + w, fin + h), angle: 90, at: [0.6, 0.8] });
     } else {
-      // the gusset triangles fold in under the end panels
-      panels.push({ id: `${wl.id}T`, poly: [[x, fin], [x + d / 2, 0.5], [x + d, fin]], parent: wl.id, hinge: seg(x, fin, x + d, fin), angle: 93, at: [0.45, 0.62] });
+      // the top gussets become the ears, folded down flat onto the narrow sides; the bottom
+      // ones fold in under the base
+      panels.push({ id: `${wl.id}T`, poly: [[x, fin], [x + d / 2, 0.5], [x + d, fin]], parent: wl.id, hinge: seg(x, fin, x + d, fin), angle: -178, at: [0.62, 0.86], ear: true });
       panels.push({ id: `${wl.id}B`, poly: [[x, fin + h], [x + d, fin + h], [x + d / 2, fin + h + fin - 0.5]], parent: wl.id, hinge: seg(x, fin + h, x + d, fin + h), angle: 93, at: [0.45, 0.62] });
     }
   });
   panels.push({ id: "seal", poly: rect(xs[4], fin, seal, h), parent: "left", hinge: seg(xs[4], fin, xs[4], fin + h), angle: 90, at: [0.3, 0.45], glue: true });
   return {
     material: "film",
-    pieces: [{ id: "web", name: P("包材展开", "Packaging web"), panels, anchor: "front", final: { c: [0, h / 2, d / 2], n: [0, 0, 1], u: [0, 1, 0] }, move: [0.55, 1], base: "ground", thick: 0.4 }],
+    pieces: [{ id: "web", name: P("包材展开", "Packaging web"), panels, anchor: "front", final: { c: [0, h / 2, d / 2], n: [0, 0, 1], u: [0, 1, 0] }, move: [0.3, 1], base: "ground", thick: 0.4 }],
   };
 }
 

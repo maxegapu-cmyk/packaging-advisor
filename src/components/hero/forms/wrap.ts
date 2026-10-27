@@ -80,6 +80,7 @@ export function buildWraps(model: THREE.Object3D, planes: Planes, zMid: number):
     const mat = src.clone();
     mat.side = THREE.DoubleSide;
     mat.clippingPlanes = [planes.wipe, planes.above];
+    mat.clipShadows = true;
     own.push(mat);
     mats.push(mat);
     const mesh = new THREE.Mesh(g, mat);
@@ -113,6 +114,7 @@ export function buildWraps(model: THREE.Object3D, planes: Planes, zMid: number):
     own.push(g);
     const mat = (d.material as THREE.Material).clone();
     mat.clippingPlanes = [planes.wipe, planes.above];
+    mat.clipShadows = true;
     own.push(mat);
     mats.push(mat);
     const mesh = new THREE.Mesh(g, mat);

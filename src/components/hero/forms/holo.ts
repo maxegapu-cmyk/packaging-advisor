@@ -50,6 +50,7 @@ const FRAG = /* glsl */ `
   uniform float uScan;
   uniform float uBand;
   uniform float uEdge;
+  uniform float uBandA;
   varying vec3 vN;
   varying vec3 vV;
   varying float vY;
@@ -62,15 +63,15 @@ const FRAG = /* glsl */ `
     float lines = 0.75 + 0.25 * smoothstep(0.35, 0.5, abs(fract(vY / uBand) - 0.5));
     // the band traces the sides only: on a flat top it would light the whole face at once
     float edge = exp(-pow((vY - uScan) / (uBand * 0.9), 2.0)) * (1.0 - smoothstep(0.55, 0.9, vUp));
-    float a = (0.035 + 0.5 * rim) * lines * uAlpha + edge * uEdge * step(0.001, uAlpha);
+    float a = (0.035 + 0.5 * rim) * lines * uAlpha + edge * uEdge * uBandA;
     gl_FragColor = vec4(uColor * (0.7 + 1.6 * edge), a);
   }`;
 
 export type Holo = {
   mat: THREE.ShaderMaterial;
   line: THREE.LineBasicMaterial;
-  /** 0–1 overall visibility. */
-  set: (alpha: number, scanY: number) => void;
+  /** `alpha`: 0–1 visibility of the hologram itself; `band`: of the glow at the scan line. */
+  set: (alpha: number, scanY: number, band?: number) => void;
   /** Light for the dark film (added light), ink for the light one (laid over). */
   tone: (dark: boolean) => void;
   dispose: () => void;
@@ -91,7 +92,7 @@ export function holographic(root: THREE.Object3D, planes: Planes, band: number, 
 export function* holographicSteps(root: THREE.Object3D, planes: Planes, band: number, dark = true): Generator<void, Holo, void> {
   const own: { dispose(): void }[] = [];
   const mat = new THREE.ShaderMaterial({
-    uniforms: { uColor: { value: HOLO.dark.clone() }, uAlpha: { value: 0 }, uScan: { value: -1e6 }, uBand: { value: band }, uEdge: { value: 0.85 } },
+    uniforms: { uColor: { value: HOLO.dark.clone() }, uAlpha: { value: 0 }, uScan: { value: -1e6 }, uBand: { value: band }, uEdge: { value: 0.85 }, uBandA: { value: 0 } },
     vertexShader: VERT,
     fragmentShader: FRAG,
     transparent: true,
@@ -138,16 +139,19 @@ export function* holographicSteps(root: THREE.Object3D, planes: Planes, band: nu
       if (seen.has(x)) continue;
       seen.add(x);
       x.clippingPlanes = [planes.below];
+      // its shadow too: only the part already revealed casts one
+      x.clipShadows = true;
     }
   }
   return {
     mat,
     line,
-    set: (alpha, scanY) => {
+    set: (alpha, scanY, band = 0) => {
       mat.uniforms.uAlpha.value = alpha;
       mat.uniforms.uScan.value = scanY;
+      mat.uniforms.uBandA.value = band;
       line.opacity = 0.55 * alpha;
-      mat.visible = alpha > 0.001 || scanY > -1e5;
+      mat.visible = alpha > 0.001 || (band > 0.001 && mat.uniforms.uEdge.value > 0);
       line.visible = alpha > 0.001;
     },
     tone,
