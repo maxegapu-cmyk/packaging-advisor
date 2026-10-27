@@ -127,7 +127,9 @@ export function buildDrawer(spec: PackSpec, k: Kit, holds?: Holds, insertKind: I
   const tray = new THREE.Group();
   root.add(tray);
   const closedZ = D / 2 - td / 2;
-  tray.add(slab(tw, t, td, [P, P, L, P, P, P], 0, t / 2, 0));
+  // the floor sits between the four walls: running under them, its edges shared the walls' outer
+  // planes and flickered through the printed front as the box turned
+  tray.add(slab(tw - 2 * t, t, td - 2 * t, [P, P, L, P, P, P], 0, t / 2, 0));
   tray.add(slab(tw, th, t, [P, P, P, P, k.tex("band", tw / U, th / U), L], 0, th / 2, td / 2 - t / 2));
   tray.add(slab(tw, th, t, [P, P, P, P, L, P], 0, th / 2, -td / 2 + t / 2));
   for (const s of [-1, 1]) tray.add(slab(t, th, td - 2 * t, s > 0 ? [P, L, P, P, P, P] : [L, P, P, P, P, P], s * (tw / 2 - t / 2), th / 2, 0));
@@ -277,11 +279,25 @@ export function buildPaperTube(spec: PackSpec, k: Kit, category: string): Built 
   lid.position.y = yBody;
   root.add(lid);
   const lIn = R - T + 0.35 * mm;
-  const lidWall = tubeWall(lIn, R, 0.5 * mm, lidH - T, k.tex("band", circ / U, lidH / U), k.kraft, k.edge);
+  const lidWall = tubeWall(lIn, R, 0.5 * mm, lidH - T, k.tex("band", circ / U, lidH / U, "board", 360), k.kraft, k.edge);
   lidWall.children[0].userData.wrap = { r: R, arc: Math.PI * 2 };
   lid.add(lidWall);
   // cylinder groups: side, top, bottom
-  const cap = splitMesh(new THREE.CylinderGeometry(R, R, T, 128), [k.plain(), k.tex("tinCap", spec.w, spec.w), k.kraft]);
+  const capGeo = new THREE.CylinderGeometry(R, R, T, 128);
+  // a cylinder's top cap is mapped with the print's top toward +x; turn it so the top of the
+  // print points to the back and it reads upright from the front, like every other lid
+  {
+    const pos = capGeo.attributes.position as THREE.BufferAttribute;
+    const uv = capGeo.attributes.uv as THREE.BufferAttribute;
+    const top = capGeo.groups[1];
+    const idx = capGeo.index!;
+    for (let i = top.start; i < top.start + top.count; i++) {
+      const v = idx.getX(i);
+      uv.setXY(v, (pos.getX(v) / R + 1) / 2, (-pos.getZ(v) / R + 1) / 2);
+    }
+    uv.needsUpdate = true;
+  }
+  const cap = splitMesh(capGeo, [k.plain(), k.tex("tinCap", spec.w, spec.w), k.kraft]);
   cap.position.y = lidH - T / 2;
   cap.children[1].userData.decal = { r: R };
   lid.add(cap);

@@ -197,7 +197,9 @@ export function buildBlister(spec: PackSpec, k: Kit): Built {
     const g = new THREE.ShapeGeometry(outline, 16);
     const pos = g.attributes.position as THREE.BufferAttribute;
     const uv = g.attributes.uv as THREE.BufferAttribute;
-    for (let i = 0; i < pos.count; i++) uv.setXY(i, front ? (pos.getX(i) + W / 2) / W : (W / 2 - pos.getX(i)) / W, pos.getY(i) / H);
+    // the back is the same sheet turned round: rotating it reverses left and right on its own,
+    // so the print reads correctly from behind without also flipping u
+    for (let i = 0; i < pos.count; i++) uv.setXY(i, (pos.getX(i) + W / 2) / W, pos.getY(i) / H);
     if (!front) g.rotateY(Math.PI);
     g.translate(0, 0, front ? t / 2 + 0.02 * mm : -t / 2 - 0.02 * mm);
     return new THREE.Mesh(g, k.tex(front ? "front" : "back", spec.w, spec.h));
@@ -377,7 +379,9 @@ export function buildWoodBox(spec: PackSpec, k: Kit, holds?: Holds, insertKind: 
   const lid = new THREE.Group();
   root.add(lid);
   lid.add(slab(lw, lidT, ld, [wEnd, wEnd, k.engraved("front", spec.w, spec.d), k.wood(spec.w, spec.d), wTop, wTop], 0, lidT / 2, 0));
-  const lidZ = D / 2 - ld / 2;
+  // 0.3 mm behind the front of the side walls: flush, the ends of its tongues (inside the
+  // grooves) shared that plane with the walls and their two grains flickered
+  const lidZ = D / 2 - 0.3 * mm - ld / 2;
   lid.position.set(0, lidBottom, lidZ);
 
   const slotG = new THREE.Group();

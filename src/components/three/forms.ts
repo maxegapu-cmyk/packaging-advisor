@@ -213,16 +213,20 @@ export function buildGift(spec: PackSpec, k: Kit, holds?: Holds, insertKind: Ins
   root.add(base);
   const sideFB = k.tex("baseSide", spec.w, spec.h);
   const sideLR = k.tex("baseSide", spec.d, spec.h);
-  const floor = rb(bw, T, bd, [L, L, L, k.tex("bottom", spec.w, spec.d), L, L]);
+  // the walls stand on the floor rather than through it: overlapping, their outer faces and the
+  // floor's edges shared a plane and flickered against each other as the box turned. The
+  // floor's edges carry the same wrap as the walls above them.
+  const floor = rb(bw, T, bd, [sideLR, sideLR, L, k.tex("bottom", spec.w, spec.d), sideFB, sideFB]);
   floor.position.y = T / 2;
-  const wf = rb(bw, bh, T, [L, L, L, L, sideFB, L]);
-  wf.position.set(0, bh / 2, bd / 2 - T / 2);
-  const wb = rb(bw, bh, T, [L, L, L, L, L, sideFB]);
-  wb.position.set(0, bh / 2, -bd / 2 + T / 2);
-  const wl = rb(T, bh, bd - 2 * T, [L, sideLR, L, L, L, L]);
-  wl.position.set(-bw / 2 + T / 2, bh / 2, 0);
-  const wr = rb(T, bh, bd - 2 * T, [sideLR, L, L, L, L, L]);
-  wr.position.set(bw / 2 - T / 2, bh / 2, 0);
+  const wh = bh - T;
+  const wf = rb(bw, wh, T, [L, L, L, L, sideFB, L]);
+  wf.position.set(0, T + wh / 2, bd / 2 - T / 2);
+  const wb = rb(bw, wh, T, [L, L, L, L, L, sideFB]);
+  wb.position.set(0, T + wh / 2, -bd / 2 + T / 2);
+  const wl = rb(T, wh, bd - 2 * T, [L, sideLR, L, L, L, L]);
+  wl.position.set(-bw / 2 + T / 2, T + wh / 2, 0);
+  const wr = rb(T, wh, bd - 2 * T, [sideLR, L, L, L, L, L]);
+  wr.position.set(bw / 2 - T / 2, T + wh / 2, 0);
   base.add(floor, wf, wb, wl, wr);
 
   // An insert holding the packed products, or (alone) a velvet tray with the inner pack and
