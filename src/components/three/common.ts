@@ -164,9 +164,64 @@ export function box(w: number, h: number, t: number, mats: THREE.Material[]) {
 const _tmpBox = new THREE.Box3();
 const _inv = new THREE.Matrix4();
 const _rel = new THREE.Matrix4();
+const _c = new THREE.Vector3();
+const _p = new THREE.Vector3();
+const FULL = Math.PI * 2 - 1e-6;
+
+/** The axis of a full solid of revolution (lathe, cylinder, disc, ring, torus) in its geometry's own frame; null for anything else. */
+function roundAxis(g: THREE.BufferGeometry): 1 | 2 | null {
+  const p = (g as THREE.BufferGeometry & { parameters?: Record<string, number> }).parameters;
+  if (!p) return null;
+  switch (g.type) {
+    case "LatheGeometry":
+      return p.phiLength >= FULL && p.segments >= 12 ? 1 : null;
+    case "CylinderGeometry":
+      return p.thetaLength >= FULL && p.radialSegments >= 12 ? 1 : null;
+    case "CircleGeometry":
+    case "RingGeometry":
+      return p.thetaLength >= FULL && (p.segments ?? p.thetaSegments) >= 12 ? 2 : null;
+    case "TorusGeometry":
+      return p.arc >= FULL && p.tubularSegments >= 12 ? 2 : null;
+  }
+  return null;
+}
+
+/**
+ * Box of a round part under `m`: the box of its bounding cylinder, which stays the same however
+ * the part spins about its own axis (a cap being unscrewed). The box of its corner-to-corner
+ * bounding box would swell and shrink four times a turn. False when the geometry is not a full,
+ * centred solid of revolution.
+ */
+function roundBox(g: THREE.BufferGeometry, m: THREE.Matrix4, out: THREE.Box3): boolean {
+  const k = roundAxis(g);
+  if (k === null) return false;
+  const [i, j] = k === 1 ? [0, 2] : [0, 1];
+  const b = g.boundingBox!;
+  const lo = b.min.toArray();
+  const hi = b.max.toArray();
+  const r = (hi[i] - lo[i]) / 2;
+  const tol = Math.max(r * 1e-3, 1e-9);
+  // centred on its axis and round in plan: not moved or squashed inside the geometry itself
+  if (!(r > 0) || Math.abs(hi[i] + lo[i]) > tol || Math.abs(hi[j] + lo[j]) > tol || Math.abs(hi[j] - lo[j] - 2 * r) > tol) return false;
+  const e = m.elements;
+  // a circle of radius r spanned by the local axes i and j reaches r·|(Mi, Mj)| along each world axis
+  const ex = r * Math.hypot(e[i * 4], e[j * 4]);
+  const ey = r * Math.hypot(e[i * 4 + 1], e[j * 4 + 1]);
+  const ez = r * Math.hypot(e[i * 4 + 2], e[j * 4 + 2]);
+  out.makeEmpty();
+  for (const h of [lo[k], hi[k]]) {
+    _c.set(0, 0, 0).setComponent(k, h).applyMatrix4(m);
+    out.expandByPoint(_p.set(_c.x - ex, _c.y - ey, _c.z - ez));
+    out.expandByPoint(_p.set(_c.x + ex, _c.y + ey, _c.z + ez));
+  }
+  return true;
+}
+
 /**
  * Bounding box of the visible meshes under `obj`, in the coordinates of `ref` (an ancestor).
  * Rotation-safe: the engine turns the product, but this box stays in the product's own frame.
+ * Round parts are measured by their bounding cylinder, so a spinning or tilted cap neither
+ * pumps the camera nor lifts the package off the floor.
  */
 export function boxIn(obj: THREE.Object3D, ref: THREE.Object3D, out = new THREE.Box3()): THREE.Box3 {
   out.makeEmpty();
@@ -177,7 +232,8 @@ export function boxIn(obj: THREE.Object3D, ref: THREE.Object3D, out = new THREE.
     const m = o as THREE.Mesh;
     if (!m.isMesh || !m.geometry) return;
     if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
-    _tmpBox.copy(m.geometry.boundingBox!).applyMatrix4(_rel.multiplyMatrices(_inv, o.matrixWorld));
+    _rel.multiplyMatrices(_inv, o.matrixWorld);
+    if (!roundBox(m.geometry, _rel, _tmpBox)) _tmpBox.copy(m.geometry.boundingBox!).applyMatrix4(_rel);
     out.union(_tmpBox);
   });
   return out;
