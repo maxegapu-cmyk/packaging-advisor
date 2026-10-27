@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import type { Direction } from "@/lib/board/schema";
-import { isRound, outerSize, toPx, type Form, type PackSpec, type PxDims } from "@/lib/pack";
+import { foilOf, isRound, outerSize, toPx, type Form, type PackSpec, type PxDims } from "@/lib/pack";
 import { BackFace, FrontFace, InnerAndManual, paletteVars, SideFace, TopFace } from "../BoxFaces";
 import { lightFaces } from "./light";
 import type { Orbit } from "./orbit";
@@ -19,7 +19,7 @@ const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayout
 function cssSpec(spec: PackSpec): PackSpec {
   const o = outerSize(spec);
   const form: Form = isRound(spec.form) ? "tin" : spec.form === "gift" || spec.form === "bookBox" || spec.form === "mailer" || spec.form === "drawer" || spec.form === "woodBox" ? "gift" : "carton";
-  return { form, w: o.w, h: o.h, d: form === "tin" ? o.w : o.d, finish: spec.finish };
+  return { form, w: o.w, h: o.h, d: form === "tin" ? o.w : o.d, finish: spec.finish, effects: spec.effects };
 }
 
 export function PackageCSS({ d, brand, spec: given, fit, open = false, orbit }: { d: Direction; brand: string; spec: PackSpec; fit: number; open?: boolean; orbit: Orbit }) {
@@ -56,8 +56,9 @@ export function PackageCSS({ d, brand, spec: given, fit, open = false, orbit }: 
   const yaw0 = spec.form === "tin" ? 22 : 0;
   const transform = `scale(${orbit.zoom.toFixed(4)}) rotateX(${orbit.angle.x.toFixed(2)}deg) rotateY(${(orbit.angle.y + yaw0).toFixed(2)}deg)`;
 
+  const foil = foilOf(spec);
   return (
-    <div ref={rig} className={`pk-rig pk-${spec.form} fin-${spec.finish}${open ? " is-open" : ""}`} style={{ ...paletteVars(d), transform }}>
+    <div ref={rig} className={`pk-rig pk-${spec.form} fin-${spec.finish}${foil ? ` fin-foil fx-${foil}` : ""}${open ? " is-open" : ""}`} style={{ ...paletteVars(d), transform }}>
       <div
         className="pk-shadow"
         aria-hidden="true"

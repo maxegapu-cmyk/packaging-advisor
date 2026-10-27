@@ -79,7 +79,7 @@ function combo(c: BuildCtx): Built {
   const spec = c.spec;
   const L = comboLayout(spec)!;
   const inner = spec.inner!;
-  const outerSpec: PackSpec = { form: spec.form, w: L.outer.w, h: L.outer.h, d: L.outer.d, finish: spec.finish };
+  const outerSpec: PackSpec = { form: spec.form, w: L.outer.w, h: L.outer.h, d: L.outer.d, finish: spec.finish, effects: spec.effects };
   const n = L.n;
   const fw = L.foot.w * U;
   const fd = L.foot.d * U;
@@ -102,7 +102,7 @@ function combo(c: BuildCtx): Built {
   const content = new THREE.Group();
   root.add(content);
   content.add(outer.root);
-  const innerSpec: PackSpec = { form: inner.form, w: inner.w, h: inner.h, d: inner.d, finish: spec.finish };
+  const innerSpec: PackSpec = { form: inner.form, w: inner.w, h: inner.h, d: inner.d, finish: spec.finish, effects: spec.effects };
   const products: Placed[] = [];
   for (let i = 0; i < n; i++) {
     const b = single(innerSpec, c);

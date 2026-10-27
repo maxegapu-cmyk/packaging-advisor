@@ -6,7 +6,7 @@
  */
 import { rolesOf as libRolesOf, type Roles } from "@/lib/artwork";
 import type { Direction } from "@/lib/board/schema";
-import type { Finish } from "@/lib/pack";
+import type { Effect, Finish } from "@/lib/pack";
 import { layoutBack } from "@/lib/print/backpanel";
 import { ean13Modules, isGuard } from "@/lib/print/ean13";
 import { WRAP_FRONT, type FaceKind } from "@/lib/print/layout";
@@ -40,7 +40,17 @@ export type ArtInfo = {
   /** Changes whenever any of the above does (for caches). */
   key: string;
 };
-export type ArtInput = { d: Direction; brand: string; finish: Finish; info?: ArtInfo | null };
+export type ArtInput = { d: Direction; brand: string; finish: Finish; effects?: Effect[]; info?: ArtInfo | null };
+
+export const SILVER = "#C9CDD2";
+export const HOLO = "#D6DAE0";
+/** The foil color, or null when there is no foil. */
+function foilColor(a: ArtInput): string | null {
+  const f = a.effects?.find((e) => e === "goldFoil" || e === "silverFoil" || e === "holo");
+  return f === "goldFoil" ? GOLD : f === "silverFoil" ? SILVER : f === "holo" ? HOLO : null;
+}
+/** Whether the accent elements are stamped (foil) rather than printed. */
+const foiled = (a: ArtInput) => foilColor(a) !== null;
 
 function canvas(w: number, h: number): [HTMLCanvasElement, Ctx] {
   const c = document.createElement("canvas");
@@ -49,11 +59,15 @@ function canvas(w: number, h: number): [HTMLCanvasElement, Ctx] {
   return [c, c.getContext("2d")!];
 }
 
-function painter(roles: Roles, finish: Finish, mask: boolean): Paint {
-  const foilOn = finish === "foil";
+/**
+ * Paints a role. Accent elements (`foil` = true) carry the effects: they turn foil-colored when
+ * foiled, and in mask mode they are white (everything else black), for every effect.
+ */
+function painter(roles: Roles, a: ArtInput, mask: boolean): Paint {
+  const fc = foilColor(a);
   return (role, foil = false) => {
-    if (mask) return foilOn && foil ? "#ffffff" : "#000000";
-    return foilOn && foil ? GOLD : roles[role];
+    if (mask) return foil ? "#ffffff" : "#000000";
+    return fc && foil ? fc : roles[role];
   };
 }
 
@@ -154,7 +168,7 @@ function drawFront(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, ppm = 
     ctx.fillRect(0, 0, bw, H);
     // fine contour lines inside the band
     ctx.strokeStyle = P("ground", true);
-    ctx.globalAlpha = a.finish === "foil" ? 0.95 : 0.32;
+    ctx.globalAlpha = foiled(a) ? 0.95 : 0.32;
     ctx.lineWidth = Math.max(1, m * 0.0045);
     const step = m * 0.054;
     for (let y = m * 0.083; y < H - m * 0.083; y += step) {
@@ -248,7 +262,7 @@ function drawFront(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, ppm = 
   ctx.restore();
   ctx.strokeStyle = P("accent", true);
   ctx.lineWidth = Math.max(1.5, m * 0.012);
-  ctx.globalAlpha = a.finish === "foil" ? 1 : 0.85;
+  ctx.globalAlpha = foiled(a) ? 1 : 0.85;
   ctx.beginPath();
   ctx.arc(W - m * 0.255, H - m * 0.425, m * 0.17, 0, Math.PI * 2);
   ctx.stroke();
@@ -484,7 +498,7 @@ function drawTinCap(ctx: Ctx, S: number, a: ArtInput, P: Paint) {
   ctx.strokeStyle = P("ground", true);
   ctx.lineWidth = S * 0.006;
   for (const r of [0.44, 0.405]) {
-    ctx.globalAlpha = a.finish === "foil" ? 1 : 0.55;
+    ctx.globalAlpha = foiled(a) ? 1 : 0.55;
     ctx.beginPath();
     ctx.arc(c, c, S * r, 0, Math.PI * 2);
     ctx.stroke();
@@ -573,7 +587,7 @@ export function drawFace(kind: FaceKind, wMm: number, hMm: number, ppm: number, 
   const run = (mask: boolean) => {
     const [c, ctx] = canvas(W, H);
     ctx.textBaseline = "alphabetic";
-    const P = painter(roles, a.finish, mask);
+    const P = painter(roles, a, mask);
     switch (kind) {
       case "front":
         drawFront(ctx, W, H, a, P, ppm);
@@ -617,7 +631,8 @@ export function drawFace(kind: FaceKind, wMm: number, hMm: number, ppm: number, 
     }
     return c;
   };
-  return { color: run(false), foil: a.finish === "foil" ? run(true) : null };
+  // one mask of the accent elements serves every effect (foil, spot UV, emboss)
+  return { color: run(false), foil: a.effects?.length ? run(true) : null };
 }
 
 /* ---------------------------------------------------------------- Surface textures */

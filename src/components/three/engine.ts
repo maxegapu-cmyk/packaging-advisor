@@ -15,6 +15,8 @@ import * as THREE from "three";
 import type { Direction } from "@/lib/board/schema";
 import type { PackSpec } from "@/lib/pack";
 import { rolesOf, type ArtInfo, type ArtInput } from "./art";
+import type { Reference } from "@/lib/reference";
+import { buildReference } from "./reference";
 import { aim, RAD, step, tw, type Built, type Pair, type PinOnScreen } from "./common";
 import { buildForm } from "./build";
 import { LIVE_SWEEP_ENV, makeKit, type Kit } from "./kit";
@@ -101,6 +103,12 @@ class ContactShadow {
     this.plane.rotation.x = -Math.PI / 2;
     this.plane.position.y = 0.0006;
     this.plane.renderOrder = -1;
+  }
+
+  /** Moves the shadow area sideways (when a reference object stands next to the package). */
+  setCenter(x: number) {
+    this.cam.position.x = x;
+    this.plane.position.x = x;
   }
 
   setSize(size: number, height: number) {
@@ -205,6 +213,10 @@ export class PackScene {
   private sweepMap: THREE.DataTexture | null = null;
   private backdrop: Backdrop = "studio";
   private built: Built | null = null;
+  /** An everyday object at real size next to the package (null = none). */
+  private ref: { kind: Reference; root: THREE.Group; size: THREE.Vector3; dispose: () => void } | null = null;
+  /** Where the camera aims sideways (moves when a reference object is shown). */
+  private centreX = 0;
   private kit: Kit | null = null;
   private own: { dispose: () => void }[] = [];
   private input: SceneInput | null = null;
@@ -420,7 +432,7 @@ export class PackScene {
   update(input: SceneInput) {
     const prev = this.input;
     this.input = input;
-    const key = [input.d.id, input.d.layout, input.d.palette.map((p) => p.hex).join(), input.d.mockup.headline, input.d.mockup.detail, input.brand, input.spec.form, input.spec.w, input.spec.h, input.spec.d, input.spec.finish, JSON.stringify(input.spec.inner ?? null), input.category ?? "", input.info?.key ?? ""].join("|");
+    const key = [input.d.id, input.d.layout, input.d.palette.map((p) => p.hex).join(), input.d.mockup.headline, input.d.mockup.detail, input.brand, input.spec.form, input.spec.w, input.spec.h, input.spec.d, input.spec.finish, (input.spec.effects ?? []).join("+"), JSON.stringify(input.spec.inner ?? null), input.category ?? "", input.info?.key ?? ""].join("|");
     let changed = false;
     if (key !== this.buildKey) {
       this.buildKey = key;
@@ -446,6 +458,22 @@ export class PackScene {
     this.openT = tw(p);
     if (this.built?.stages) for (const s of this.built.stages) Object.assign(s, tw(1 - p));
     this.anatomyT = tw(x);
+    this.invalidate();
+  }
+
+  /** Shows an everyday object at real size next to the package, or none. */
+  setReference(kind: Reference | null) {
+    if (this.ref?.kind === kind) return;
+    if (this.ref) {
+      this.scene.remove(this.ref.root);
+      this.ref.dispose();
+      this.ref = null;
+    }
+    if (kind) {
+      const r = buildReference(kind);
+      this.ref = { kind, ...r };
+      this.scene.add(r.root);
+    }
     this.invalidate();
   }
 
@@ -483,7 +511,7 @@ export class PackScene {
     const keepStages = !fresh && this.built?.stages ? this.built.stages.map((s) => ({ ...s })) : null;
     if (this.built) this.turn.remove(this.built.root);
     this.disposeBuilt();
-    const a: ArtInput = { d: input.d, brand: input.brand, finish: input.spec.finish, info: input.info ?? null };
+    const a: ArtInput = { d: input.d, brand: input.brand, finish: input.spec.finish, effects: input.spec.effects ?? [], info: input.info ?? null };
     const category = input.category ?? "other";
     this.kit = makeKit(this.renderer, a, this.maxTex, category);
     const b = buildForm({ spec: input.spec, kit: this.kit, art: a, maxTex: this.maxTex, own: this.own, category });
@@ -604,14 +632,28 @@ export class PackScene {
     b.explode(x);
     // a tin turns its label a little toward the camera at the resting angle
     this.turn.rotation.y = (this.view.y + (b.turn ?? 0)) * RAD;
-    const fr = b.frame!(p, x);
+    const fr0 = b.frame!(p, x);
+    let fr = fr0;
+    let cx = 0;
+    if (this.ref) {
+      // the object stands to the right; frame both and aim between them
+      const hw = this.ref.size.x / 2;
+      const gap = Math.max(0.1, fr0.r * 0.22);
+      const rx = fr0.r * 0.92 + gap + hw;
+      this.ref.root.position.set(rx, 0, 0);
+      const left = -fr0.r;
+      const right = rx + hw;
+      cx = (left + right) / 2;
+      fr = { r: Math.max(fr0.r, ((right - left) / 2) * 1.04, this.ref.size.y * 0.6), y: Math.max(fr0.y, this.ref.size.y / 2) };
+    }
+    this.centreX = cx;
     const fill = Math.min(0.92, Math.max(0.22, input.fit / Math.min(this.w, this.h)));
     const vt = Math.tan((this.camera.fov * RAD) / 2);
     const ht = vt * this.camera.aspect;
     const dist = fr.r / (fill * Math.min(vt, ht)) / this.zoom;
     const phi = -this.view.x * RAD;
-    const target = new THREE.Vector3(0, fr.y, 0);
-    this.camera.position.set(0, fr.y + Math.sin(phi) * dist, Math.cos(phi) * dist);
+    const target = new THREE.Vector3(cx, fr.y, 0);
+    this.camera.position.set(cx, fr.y + Math.sin(phi) * dist, Math.cos(phi) * dist);
     this.camera.up.set(0, Math.cos(phi), -Math.sin(phi));
     this.camera.lookAt(target);
     // near enough that the floor in front of the package is never clipped (tall phone screens)
@@ -633,6 +675,7 @@ export class PackScene {
     // contact shadow under the product, faded when seen from below or when the carton is flat
     const above = Math.sin(phi) > -0.02;
     const size = Math.max(2.4 * fr.r, 1.2);
+    this.shadow.setCenter(this.centreX);
     this.shadow.setSize(size * 2, fr.y * 2 + 0.5 + fr.r);
     this.shadow.plane.visible = above;
     // the floor itself must not occlude in the shadow's depth pass
@@ -712,6 +755,7 @@ export class PackScene {
 
   dispose() {
     if (this.frame) cancelAnimationFrame(this.frame);
+    this.ref?.dispose();
     this.disposeBuilt();
     this.shadow.dispose();
     this.env.dispose();

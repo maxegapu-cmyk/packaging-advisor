@@ -101,7 +101,7 @@ test("pack: normalize and fit to pixels", async () => {
 test("render brief protects structure and states the studio lighting, in both languages", async () => {
   const { renderBrief } = await import("../src/lib/renderBrief");
   const d = DEMO_BOARD.directions[1];
-  const b = renderBrief(d, { form: "tin", w: 86, h: 120, d: 86, finish: "foil" }, DEMO_BOARD.meta.product, "山径");
+  const b = renderBrief(d, { form: "tin", w: 86, h: 120, d: 86, finish: "matte", effects: ["goldFoil"] }, DEMO_BOARD.meta.product, "山径");
   assert.match(b.zh, /Ø86 × 120 mm/);
   assert.match(b.zh, /不改动/);
   assert.match(b.zh, /无缝棚拍/);

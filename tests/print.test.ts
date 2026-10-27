@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { applyArtwork, defaultArtwork, labelFields, normalizeArtwork, renderPalette, rolesOf } from "../src/lib/artwork";
 import { CATEGORY_KEYS } from "../src/lib/categories";
-import { CATEGORY_PACK, FORMS, FORM_PRESET, type PackSpec } from "../src/lib/pack";
+import { CATEGORY_PACK, FORMS, FORM_PRESET, normalizePack, takesEffects, type PackSpec } from "../src/lib/pack";
 import { breakLines, layoutBack, MIN_TEXT_MM, textWidth } from "../src/lib/print/backpanel";
 import { barcodePcs, cmykText, contrast, deltaE, deltaE2000, hexToLab, toCmyk } from "../src/lib/print/color";
 import { checkDigit, checkEan13, ean13Modules } from "../src/lib/print/ean13";
@@ -64,7 +64,7 @@ test("information panel: wraps, shrinks, keeps text legible or reports overflow"
 function specsToTry(): PackSpec[] {
   const out: PackSpec[] = Object.values(CATEGORY_PACK).map((s) => ({ ...s }));
   for (const f of FORMS) out.push({ ...FORM_PRESET[f], finish: "matte" });
-  out.push({ ...FORM_PRESET.carton, finish: "foil", w: 340, h: 260, d: 220 });
+  out.push({ ...FORM_PRESET.carton, finish: "softTouch", effects: ["goldFoil", "spotUV", "emboss"], w: 340, h: 260, d: 220 });
   return out;
 }
 
@@ -223,4 +223,32 @@ test("preflight: every check has its own id (they are list keys on the page)", (
       assert.equal(new Set(ids).size, ids.length, `${x.id}: ${ids.join(",")}`);
     }
   }
+});
+
+test("material use: piece areas add up and the largest part is reported", async () => {
+  const { materialUse, pieceArea } = await import("../src/lib/print/layout");
+  const lay = printLayout({ form: "pouch", w: 160, h: 230, d: 80, finish: "matte" });
+  const front = lay.sheets[0].pieces[0];
+  assert.ok(Math.abs(pieceArea(front) - 160 * 230) < 1, "rectangle area");
+  const tin = printLayout({ form: "tin", w: 86, h: 120, d: 86, finish: "matte" });
+  const cap = tin.sheets[0].pieces.find((p) => p.id === "cap")!;
+  assert.ok(Math.abs(pieceArea(cap) - Math.PI * 43 ** 2) < 1, "disc area");
+  const m = materialUse({ form: "carton", w: 110, h: 150, d: 46, finish: "matte" });
+  // the net is at least the four walls plus the two closures, and less than its bounding box
+  const walls = 2 * (110 + 46) * 150 + 2 * 110 * 46;
+  assert.ok(m.m2 * 1e6 > walls && m.m2 * 1e6 < m.largest.w * m.largest.h, `${m.m2}`);
+});
+
+test("special effects go only where something is printed, and every printed part can carry them", () => {
+  for (const form of FORMS) {
+    const spec = normalizePack({ ...FORM_PRESET[form], form, finish: "matte", effects: ["goldFoil", "spotUV"] });
+    const printed = printLayout(spec).sheets.some((s) => s.process === "print");
+    assert.equal(takesEffects(spec), printed, form);
+    assert.equal(!!spec.effects?.length, printed, `${form}: effects kept only when printed`);
+  }
+  // a crate of labelled bottles: the labels take the effects, the engraved lid does not
+  const crate = normalizePack({ form: "woodBox", w: 300, h: 140, d: 220, finish: "paper", effects: ["goldFoil"], inner: { form: "bottle", count: 2, w: 60, h: 180, d: 60 } });
+  assert.deepEqual(crate.effects, ["goldFoil"]);
+  const lay = printLayout(crate);
+  assert.ok(lay.sheets.some((s) => s.process === "print") && lay.sheets.some((s) => s.process === "engrave"));
 });

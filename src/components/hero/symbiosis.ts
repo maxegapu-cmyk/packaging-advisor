@@ -38,10 +38,10 @@ export type FrameInfo = { item: number; stage: Stage; t: number };
 
 export const DUR = 11;
 const T = { print: [0, 1.5], cut: [1.5, 2.7], lift: [2.7, 3.4], fold: [3.4, 5.7], stand: [5.7, 6.5], hold: [6.5, 9.0], back: [9.0, 10.6] } as const;
-const clamp = (x: number, a = 0, b = 1) => Math.max(a, Math.min(b, x));
-const seg = (t: number, [a, b]: readonly [number, number]) => clamp((t - a) / (b - a));
-const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
-const easeOut = (x: number) => 1 - Math.pow(1 - x, 3);
+export const clamp = (x: number, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+export const seg = (t: number, [a, b]: readonly [number, number]) => clamp((t - a) / (b - a));
+export const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+export const easeOut = (x: number) => 1 - Math.pow(1 - x, 3);
 
 /** 0 print, 1 cut, 2 fold or wrap, 3 finished. */
 export function stageAt(t: number): Stage {
@@ -53,7 +53,7 @@ export function stageAt(t: number): Stage {
 
 /* ---------------------------------------------------------------- textures */
 
-function tex(c: HTMLCanvasElement, r: THREE.WebGLRenderer): THREE.CanvasTexture {
+export function tex(c: HTMLCanvasElement, r: THREE.WebGLRenderer): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = Math.min(8, r.capabilities.getMaxAnisotropy());
@@ -139,7 +139,7 @@ type Hinge = { pivot: THREE.Group; angle: number; sign: number; axis: "x" | "z";
  * A reverse-tuck carton net built from hinged panels. Coordinates in mm on the net (x right,
  * y down), mapped to the table as x → X, y → Z.
  */
-function buildCarton(it: HeroItem, r: THREE.WebGLRenderer, s: number, own: { dispose(): void }[]) {
+export function buildCarton(it: HeroItem, r: THREE.WebGLRenderer, s: number, own: { dispose(): void }[]) {
   const { w, h, dep: d } = it;
   const T2 = Math.max(10, Math.min(d * 0.55, 34));
   const dust = Math.min(d * 0.8, w * 0.5, 40);
@@ -434,6 +434,33 @@ export type OverlayFrame = {
   alpha2d: number;
 };
 
+export type CartonBuild = ReturnType<typeof buildCarton>;
+
+/**
+ * Poses a carton net: `lift` raises it off the sheet, `fold` (0–1) folds the panels in order,
+ * `stand` turns the folded box upright facing the camera, `back` returns everything.
+ */
+export function cartonPose(c: CartonBuild, it: { h: number; dep: number }, s: number, k: { lift: number; fold: number; stand: number; back: number }) {
+  for (const hg of c.hinges) {
+    const a0 = 0.06 + hg.order * 0.11;
+    const p = ease(clamp((k.fold - a0) / 0.4)) * (1 - k.back);
+    const ax = hg.axis === "x" ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1);
+    hg.pivot.setRotationFromAxisAngle(ax, hg.sign * hg.angle * p);
+  }
+  // Lying folded, the front is on top at height Y0 and the box hangs below it. Standing,
+  // the holder turns it about its centre so the front faces the camera, base on the table.
+  const dep = it.dep * s;
+  const hgt = it.h * s;
+  const Y0 = dep + c.thick * s;
+  const C = c.centre;
+  c.root.position.set(-C.x, dep / 2, -C.z);
+  const lying = new THREE.Vector3(C.x, k.lift * Y0 - dep / 2, C.z);
+  const up = new THREE.Vector3(0, hgt / 2 + 0.002, 0);
+  c.holder.position.copy(lying.lerp(up, k.stand));
+  c.holder.rotation.set((k.stand * Math.PI) / 2, 0, 0);
+  c.holder.updateMatrixWorld(true);
+}
+
 export class SymbiosisScene {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
@@ -597,24 +624,7 @@ export class SymbiosisScene {
       const stand = ease(seg(t, T.stand)) * (1 - back);
       const tmp = new THREE.Vector3();
       for (const m of c.arts) m.opacity = fadeIn(m.userData.x as number);
-      for (const hg of c.hinges) {
-        const a0 = 0.06 + hg.order * 0.11;
-        const p = ease(clamp((fold - a0) / 0.4)) * (1 - back);
-        const ax = hg.axis === "x" ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1);
-        hg.pivot.setRotationFromAxisAngle(ax, hg.sign * hg.angle * p);
-      }
-      // Lying folded, the front is on top at height Y0 and the box hangs below it. Standing,
-      // the holder turns it about its centre so the front faces the camera, base on the table.
-      const dep = it.dep * s;
-      const hgt = it.h * s;
-      const Y0 = dep + c.thick * s;
-      const C = c.centre;
-      c.root.position.set(-C.x, dep / 2, -C.z);
-      const lying = new THREE.Vector3(C.x, lift * Y0 - dep / 2, C.z);
-      const up = new THREE.Vector3(0, hgt / 2 + 0.002, 0);
-      c.holder.position.copy(lying.lerp(up, stand));
-      c.holder.rotation.set((stand * Math.PI) / 2, 0, 0);
-      c.holder.updateMatrixWorld(true);
+      cartonPose(c, it, s, { lift, fold, stand, back });
       // 2D: cut trace
       const cutP = seg(t, T.cut);
       if (cutP > 0 && t < T.fold[0]) of.cut = { pts: c.cut.map((v) => this.project(v)), p: cutP };

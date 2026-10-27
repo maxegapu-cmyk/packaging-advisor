@@ -8,13 +8,21 @@
  */
 import type { Direction } from "./board/schema";
 import type { Pair } from "./i18n";
-import { FORM_LABELS, formatInner, formatSize, INSERT_LABELS, type PackSpec } from "./pack";
+import { FORM_LABELS, formatInner, formatSize, INSERT_LABELS, type Effect, type PackSpec } from "./pack";
 
 const FINISH_TEXT: Record<PackSpec["finish"], Pair> = {
   matte: { zh: "哑光纸面，低反射，颜色饱满不发灰", en: "matte paper stock, low reflection, colors full and not greyed" },
   gloss: { zh: "亮面覆膜，高光柔和连续、形状干净，不出现杂乱热点", en: "gloss laminate, soft continuous highlights with clean shapes, no random hot spots" },
+  softTouch: { zh: "触感膜，丝绒般细腻的柔光，几乎没有高光", en: "soft-touch laminate, a fine velvety sheen with almost no highlight" },
   paper: { zh: "特种纹理纸，近看可见细微纸纤维，整体仍然干净", en: "textured specialty paper, fine fibres visible up close, still clean overall" },
-  foil: { zh: "品名与重点图形烫金，金属高光随角度变化，其余为哑光纸面", en: "foil-stamped name and key graphic with highlights that shift with the angle; the rest matte paper" },
+};
+
+const EFFECT_TEXT: Record<Effect, Pair> = {
+  goldFoil: { zh: "品名与重点图形烫金，金属高光随角度变化", en: "gold-foiled name and key graphic, highlights shifting with the angle" },
+  silverFoil: { zh: "品名与重点图形烫银，冷色金属高光", en: "silver-foiled name and key graphic, cool metallic highlights" },
+  holo: { zh: "品名与重点图形镭射烫印，随角度出现彩虹色", en: "holographic foil on the name and key graphic, rainbow shifts with the angle" },
+  spotUV: { zh: "品名与重点图形局部 UV 亮油，与周围哑面形成反差", en: "spot-UV gloss on the name and key graphic against the surrounding surface" },
+  emboss: { zh: "品名与重点图形击凸，侧光下可见浮雕阴影", en: "embossed name and key graphic, relief visible under side light" },
 };
 
 const FORM_TEXT: Record<PackSpec["form"], Pair> = {
@@ -74,7 +82,7 @@ export function renderBrief(d: Direction, spec: PackSpec, product: Pair, brand: 
     `版式：${d.carriers.outerFront.zh}`,
     `视觉锚点：${d.anchor.zh}`,
     `配色：${colors.map((c) => c.zh).join("、")}。底色 ${ground.hex} 与品牌色 ${key.hex} 在成片中必须准确，不受背景光污染。`,
-    `材质：${FINISH_TEXT[spec.finish].zh}${surface ? `；${surface.zh}` : ""}。`,
+    `材质：${[FINISH_TEXT[spec.finish].zh, ...(spec.effects ?? []).map((e) => EFFECT_TEXT[e].zh)].join("；")}${surface ? `；${surface.zh}` : ""}。`,
     "灯光与背景：浅灰到白色无缝棚拍背景；左上方大面积柔光作主光，一条窄长轮廓光勾出盒边，弱正面补光；自然接触阴影。高光连续、受控，用来说明形体；不过度 HDR、不发光、不过度锐化。",
     "镜头：四分之三视角，略高于产品俯视，产品居中，约占画面 60%；另出一张正面平视图。",
     "检查：轮廓与部件数量未变，文字清楚可读，看起来是真实可售的商品，而不是概念图。",
@@ -86,7 +94,7 @@ export function renderBrief(d: Direction, spec: PackSpec, product: Pair, brand: 
     `Layout: ${d.carriers.outerFront.en}`,
     `Visual anchor: ${d.anchor.en}`,
     `Colors: ${colors.map((c) => c.en).join(", ")}. The ground ${ground.hex} and brand color ${key.hex} must stay accurate and must not be tinted by the background light.`,
-    `Material: ${FINISH_TEXT[spec.finish].en}${surface ? `; ${surface.en}` : ""}.`,
+    `Material: ${[FINISH_TEXT[spec.finish].en, ...(spec.effects ?? []).map((e) => EFFECT_TEXT[e].en)].join("; ")}${surface ? `; ${surface.en}` : ""}.`,
     "Light and background: light-grey-to-white seamless studio sweep; a large soft key light from the upper left, one narrow rim light along the box edge, weak front fill; natural contact shadow. Highlights continuous and controlled, describing the form; no heavy HDR, bloom or over-sharpening.",
     "Camera: three-quarter view from slightly above, product centred at about 60% of the frame; plus one straight-on front view.",
     "Check: silhouette and part count unchanged, text legible, and it reads as a real product for sale rather than a concept image.",

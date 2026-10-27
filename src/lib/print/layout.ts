@@ -9,7 +9,7 @@
  * file says so. Client-safe and pure.
  */
 import type { Pair } from "../i18n";
-import type { Finish, Form, PackSpec } from "../pack";
+import type { Effect, Finish, Form, PackSpec } from "../pack";
 
 export type FaceKind = "front" | "back" | "left" | "right" | "top" | "bottom" | "flap" | "band" | "bandPlain" | "baseSide" | "tinWrap" | "tinCap" | "inner" | "manual";
 
@@ -386,16 +386,25 @@ const MAT: Record<Form, Pair> = {
 export const FINISH_NOTE: Record<Finish, Pair> = {
   matte: P("表面处理：覆哑膜", "Finish: matte lamination"),
   gloss: P("表面处理：覆亮膜或过光油", "Finish: gloss lamination or varnish"),
+  softTouch: P("表面处理：覆触感膜（丝绒膜）", "Finish: soft-touch (velvet) lamination"),
   paper: P("表面处理：特种纸，不覆膜", "Finish: textured paper, no lamination"),
-  foil: P("表面处理：哑膜 + 烫金（烫金版单独一页）", "Finish: matte lamination + hot foil (foil plate on its own page)"),
+};
+
+/** Each extra effect gets its own plate in the print file. */
+export const EFFECT_NOTE: Record<Effect, Pair> = {
+  goldFoil: P("烫金：品名与重点图形，烫金版单独一页（黑色为烫印区域）", "Gold foil on the name and key graphics; the foil plate is on its own page (black = foil)"),
+  silverFoil: P("烫银：品名与重点图形，烫银版单独一页", "Silver foil on the name and key graphics; plate on its own page"),
+  holo: P("镭射膜烫印：品名与重点图形，镭射版单独一页", "Holographic foil on the name and key graphics; plate on its own page"),
+  spotUV: P("局部 UV：品名与重点图形上亮油，UV 版单独一页", "Spot UV gloss on the name and key graphics; UV plate on its own page"),
+  emboss: P("击凸：品名与重点图形凸起，击凸版单独一页，印厂据此做阴阳模", "Emboss on the name and key graphics; the emboss plate is on its own page for the printer's male and female dies"),
 };
 
 const DIE = P("刀线和压痕为标准结构，开模前请以印厂刀模为准。", "Cut and crease lines are a standard structure; use your printer's die line before cutting.");
 const CURVED = P("此为平面展开示意，曲面印刷的变形由印厂补偿。", "A flat representation; the printer compensates for printing on the curve.");
 
-function sheetsFor(form: Form, w: number, h: number, d: number, finish: Finish, prefix = "", qty = 1): Sheet[] {
+function sheetsFor(form: Form, w: number, h: number, d: number, finish: Finish, prefix = "", qty = 1, effects: Effect[] = []): Sheet[] {
   const mat = MAT[form];
-  const notes = [FINISH_NOTE[finish]];
+  const notes = [FINISH_NOTE[finish], ...effects.map((e) => EFFECT_NOTE[e])];
   const id = (s: string) => prefix + s;
   const nm = (p: Pair): Pair => (prefix ? { zh: `内装 · ${p.zh}`, en: `Inside · ${p.en}` } : p);
   const ra = roundAreas(form, w, h);
@@ -601,8 +610,9 @@ function sheetsFor(form: Form, w: number, h: number, d: number, finish: Finish, 
 
 /** Every printed part of a package, including the products packed inside a combination. */
 export function printLayout(spec: PackSpec): PrintLayout {
-  const sheets = sheetsFor(spec.form, spec.w, spec.h, spec.d, spec.finish);
-  if (spec.inner) sheets.push(...sheetsFor(spec.inner.form, spec.inner.w, spec.inner.h, spec.inner.d, spec.finish, "inner-", spec.inner.count));
+  const fx = spec.effects ?? [];
+  const sheets = sheetsFor(spec.form, spec.w, spec.h, spec.d, spec.finish, "", 1, fx);
+  if (spec.inner) sheets.push(...sheetsFor(spec.inner.form, spec.inner.w, spec.inner.h, spec.inner.d, spec.finish, "inner-", spec.inner.count, fx));
   return { sheets, bleed: BLEED, margin: MARGIN };
 }
 
@@ -620,3 +630,28 @@ export const artSize = (p: Panel) => (p.rot === 90 || p.rot === 270 ? { w: p.h, 
 export const wrapBack = (circ: number, h: number) => ({ w: circ * WRAP_FRONT, h });
 
 export { rectPath };
+
+/** Area of a piece inside its cut line, in mm² (shoelace for polygons, πr² for discs). */
+export function pieceArea(p: Piece): number {
+  const arc = p.cut.match(/A(-?\d+(?:\.\d+)?)/);
+  if (arc) return Math.PI * Number(arc[1]) ** 2;
+  const pts = (p.cut.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+  let a = 0;
+  for (let i = 0; i + 3 < pts.length; i += 2) a += pts[i] * pts[i + 3] - pts[i + 2] * pts[i + 1];
+  const n = pts.length;
+  if (n >= 4) a += pts[n - 2] * pts[1] - pts[0] * pts[n - 1];
+  return Math.abs(a) / 2;
+}
+
+/** Printed material for one package: total area (m²) and the largest part (mm). */
+export function materialUse(spec: PackSpec): { m2: number; largest: { w: number; h: number; name: Pair } } {
+  const lay = printLayout(spec);
+  let m2 = 0;
+  let largest = { w: 0, h: 0, name: { zh: "", en: "" } };
+  for (const s of lay.sheets)
+    for (const p of s.pieces) {
+      m2 += (pieceArea(p) * s.qty) / 1e6;
+      if (p.w * p.h > largest.w * largest.h) largest = { w: Math.round(p.w), h: Math.round(p.h), name: p.name };
+    }
+  return { m2, largest };
+}

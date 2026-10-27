@@ -11,7 +11,7 @@
 import type { Artwork } from "@/lib/artwork";
 import type { Board } from "@/lib/board/schema";
 import type { Lang } from "@/lib/i18n";
-import { FINISH_LABELS, FORM_LABELS, type PackSpec } from "@/lib/pack";
+import { EFFECT_LABELS, finishText, FORM_LABELS, type Effect, type PackSpec } from "@/lib/pack";
 import { cmykText } from "@/lib/print/color";
 import { BLEED, type PrintLayout, type Sheet } from "@/lib/print/layout";
 import type { Check } from "@/lib/print/preflight";
@@ -144,7 +144,9 @@ function invert(c: HTMLCanvasElement): HTMLCanvasElement {
   return c;
 }
 
-type PageKind = "art" | "foil";
+/** "art" is the color page; an effect name is that effect's plate (black = where it goes). */
+type PageKind = "art" | Effect;
+const PLATE: Record<Effect, string> = { goldFoil: "GOLD FOIL PLATE", silverFoil: "SILVER FOIL PLATE", holo: "HOLOGRAPHIC FOIL PLATE", spotUV: "SPOT UV PLATE", emboss: "EMBOSS PLATE" };
 
 async function artPage(L: Lib, doc: import("pdf-lib").PDFDocument, sheet: Sheet, a: ArtInput, kind: PageKind, dpi: number, font: import("pdf-lib").PDFFont, slug: string) {
   const W = sheet.w * PT;
@@ -166,7 +168,7 @@ async function artPage(L: Lib, doc: import("pdf-lib").PDFDocument, sheet: Sheet,
     for (const p of piece.panels) {
       const ppm = panelPpm(p, dpi);
       const art = panelArt(p, a, ppm, BLEED);
-      let src = kind === "foil" ? (art.foil ? invert(art.foil) : null) : art.color;
+      let src = kind !== "art" ? (art.foil ? invert(art.foil) : null) : art.color;
       if (!src) continue;
       if (engrave) src = threshold(src, ground);
       const img = await doc.embedJpg(await toJpeg(src));
@@ -214,7 +216,7 @@ async function artPage(L: Lib, doc: import("pdf-lib").PDFDocument, sheet: Sheet,
   if (creases.length) page.pushOperators(L.pushGraphicsState(), ...strokeSpot(L, "CSCrease"), L.setLineWidth(0.25), L.setDashPattern([3 * PT, 2 * PT], 0), ...creases, L.stroke(), L.popGraphicsState());
   page.pushOperators(L.pushGraphicsState(), ...strokeSpot(L, "CSReg"), L.setLineWidth(0.25), ...cropMarks(L, sheet, H), L.stroke(), L.popGraphicsState());
 
-  const label = kind === "foil" ? `${slug}  |  FOIL PLATE (black = foil)` : `${slug}  |  ${sheet.name.en}  |  1:1 mm  |  bleed ${BLEED} mm  |  CutContour = cut  |  Crease = fold`;
+  const label = kind !== "art" ? `${slug}  |  ${sheet.name.en}  |  ${PLATE[kind]} (black = ${EFFECT_LABELS[kind].en.toLowerCase()})` : `${slug}  |  ${sheet.name.en}  |  1:1 mm  |  bleed ${BLEED} mm  |  CutContour = cut  |  Crease = fold`;
   page.drawText(label.replace(/[^\x20-\x7E\xA0-\xFF]/g, ""), { x: 6 * PT, y: 5 * PT, size: 6.5, font, color: L.rgb(0.25, 0.25, 0.25) });
 }
 
@@ -262,7 +264,7 @@ function jobSheet(inp: PdfInput): HTMLCanvasElement {
   text(inp.lang === "en" ? "Package" : "包装  Package", 14, y, 3.6, 700);
   y += 7;
   const dims = (s: { w: number; h: number; d: number }) => `${s.w} × ${s.h} × ${s.d} mm`;
-  text(`${two(FORM_LABELS[spec.form])}   ${dims(spec)}   ${two(FINISH_LABELS[spec.finish])}`, 14, y, 3.1);
+  text(`${two(FORM_LABELS[spec.form])}   ${dims(spec)}   ${inp.lang === "en" ? finishText(spec, "en") : finishText(spec, "zh")}`, 14, y, 3.1);
   if (spec.inner) {
     y += 5.5;
     text(`${inp.lang === "en" ? "Inside" : "内装"}: ${spec.inner.count} × ${two(FORM_LABELS[spec.inner.form])}  ${dims(spec.inner)}`, 14, y, 3.1);
@@ -335,8 +337,8 @@ export async function buildPrintPdf(inp: PdfInput): Promise<Uint8Array> {
   doc.setCreator("Packaging Advisor");
   doc.setProducer("Packaging Advisor (pdf-lib)");
   const font = await doc.embedFont(L.StandardFonts.Helvetica);
-  const foil = inp.spec.finish === "foil";
-  const total = 1 + inp.layout.sheets.length * (foil ? 2 : 1);
+  const fx = inp.spec.effects ?? [];
+  const total = 1 + inp.layout.sheets.reduce((n, s) => n + 1 + (s.process === "print" ? fx.length : 0), 0);
   let done = 0;
   const tick = () => inp.onProgress?.(++done, total);
 
@@ -350,10 +352,11 @@ export async function buildPrintPdf(inp: PdfInput): Promise<Uint8Array> {
   for (const s of inp.layout.sheets) {
     await artPage(L, doc, s, inp.art, "art", dpi, font, slug);
     tick();
-    if (foil && s.process === "print") {
-      await artPage(L, doc, s, inp.art, "foil", dpi, font, slug);
-      tick();
-    }
+    if (s.process === "print")
+      for (const e of fx) {
+        await artPage(L, doc, s, inp.art, e, dpi, font, slug);
+        tick();
+      }
   }
   return doc.save();
 }

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { applyArtwork, labelFields, renderPalette, rolesOf, type Artwork, type Roles } from "@/lib/artwork";
 import type { Board } from "@/lib/board/schema";
 import type { Lang, Pair } from "@/lib/i18n";
-import { FINISH_LABELS, FORM_LABELS, type PackSpec } from "@/lib/pack";
+import { finishText, FORM_LABELS, type PackSpec } from "@/lib/pack";
 import { cmykText } from "@/lib/print/color";
 import { checkEan13 } from "@/lib/print/ean13";
 import { infoPanels, printLayout } from "@/lib/print/layout";
@@ -200,12 +200,12 @@ export function FinalStudio({
   const errors = blocking(checks).length;
   const fields = useMemo(() => labelFields(board.meta.category), [board.meta.category]);
   const bc = checkEan13(art.barcode);
-  const artInput = useMemo(() => ({ d, brand: art.brand, finish: pack.finish, info }), [d, art.brand, pack.finish, info]);
+  const artInput = useMemo(() => ({ d, brand: art.brand, finish: pack.finish, effects: pack.effects ?? [], info }), [d, art.brand, pack.finish, pack.effects, info]);
   // what the product looks like: the sample's measured colors when chosen (print keeps the design)
   const shown = useMemo(() => {
     const dd = art.proof.useSample ? applyArtwork(base, { ...art, palette: renderPalette(art) }) : d;
-    return { d: dd, brand: art.brand, finish: pack.finish, info };
-  }, [art, base, d, pack.finish, info]);
+    return { d: dd, brand: art.brand, finish: pack.finish, effects: pack.effects ?? [], info };
+  }, [art, base, d, pack.finish, pack.effects, info]);
   const view = useSettled(artInput, 400);
   const view3d = useSettled(shown, 400);
 
@@ -475,7 +475,7 @@ export function FinalStudio({
                 {art.proof.confirmed ? " ✓" : ""}
               </button>
               <span className="final-pack">
-                {one(FORM_LABELS[pack.form], lang)} · {pack.w}×{pack.h}×{pack.d} mm · {one(FINISH_LABELS[pack.finish], lang)}
+                {one(FORM_LABELS[pack.form], lang)} · {pack.w}×{pack.h}×{pack.d} mm · {finishText(pack, lang)}
               </span>
             </div>
             {tab === "3d" ? (

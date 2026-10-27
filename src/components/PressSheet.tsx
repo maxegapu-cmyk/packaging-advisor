@@ -29,13 +29,15 @@ export function RegMarks() {
 }
 
 /** Press color-control strip: the direction's palette next to process C, M, Y, K. */
-export function ColorStrip({ d, cells = 48, className = "" }: { d: Direction; cells?: number; className?: string }) {
-  const inks = [...d.palette.map((p) => p.hex), "#00A0E9", "#E4007F", "#FFF100", "#1A1A1A"];
-  const run = Array.from({ length: cells }, (_, i) => inks[i % inks.length]);
+/**
+ * A hairline band of the direction's colors, each as wide as its share of the surface: the
+ * color card drawn as an edge. Quiet enough to sit under a header.
+ */
+export function ColorStrip({ d, className = "" }: { d: Direction; cells?: number; className?: string }) {
   return (
     <div className={`press-strip ${className}`} aria-hidden="true">
-      {run.map((c, i) => (
-        <span key={i} style={{ background: c, opacity: i % inks.length >= d.palette.length ? 0.85 : 1 }} />
+      {d.palette.map((p, i) => (
+        <span key={i} style={{ background: p.hex, flexGrow: Math.max(3, p.share) }} />
       ))}
     </div>
   );

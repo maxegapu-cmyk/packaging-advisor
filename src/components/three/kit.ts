@@ -52,9 +52,42 @@ export const LIVE_SWEEP_ENV = 0.92;
 const FINISH = {
   matte: { rough: 0.74, bump: 0.1, clearcoat: 0, ccRough: 0.1, sheen: 0.15, film: 0.5 },
   gloss: { rough: 0.42, bump: 0.04, clearcoat: 1, ccRough: 0.04, sheen: 0, film: 0.18 },
+  softTouch: { rough: 0.9, bump: 0.05, clearcoat: 0, ccRough: 0.1, sheen: 0.6, film: 0.72 },
   paper: { rough: 0.9, bump: 0.38, clearcoat: 0, ccRough: 0.1, sheen: 0.35, film: 0.62 },
-  foil: { rough: 0.72, bump: 0.1, clearcoat: 0, ccRough: 0.1, sheen: 0.12, film: 0.3 },
 } as const;
+
+/** Tangent-space normal map of a raised mask (emboss): white areas stand up, edges slope. */
+function embossNormal(mask: HTMLCanvasElement, strength = 3): HTMLCanvasElement {
+  const k = Math.min(1, 1024 / Math.max(mask.width, mask.height));
+  const W = Math.max(4, Math.round(mask.width * k));
+  const H = Math.max(4, Math.round(mask.height * k));
+  const b = document.createElement("canvas");
+  b.width = W;
+  b.height = H;
+  const bx = b.getContext("2d", { willReadFrequently: true })!;
+  bx.filter = `blur(${Math.max(1, W / 512).toFixed(1)}px)`;
+  bx.drawImage(mask, 0, 0, W, H);
+  const h = bx.getImageData(0, 0, W, H).data;
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext("2d")!;
+  const out = ctx.createImageData(W, H);
+  const at = (x: number, y: number) => h[(Math.min(H - 1, Math.max(0, y)) * W + Math.min(W - 1, Math.max(0, x))) * 4] / 255;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const dx = (at(x + 1, y) - at(x - 1, y)) * strength;
+      const dy = (at(x, y + 1) - at(x, y - 1)) * strength;
+      const l = Math.hypot(dx, dy, 1);
+      const o = (y * W + x) * 4;
+      out.data[o] = Math.round(((-dx / l) * 0.5 + 0.5) * 255);
+      out.data[o + 1] = Math.round(((dy / l) * 0.5 + 0.5) * 255);
+      out.data[o + 2] = Math.round(((1 / l) * 0.5 + 0.5) * 255);
+      out.data[o + 3] = 255;
+    }
+  ctx.putImageData(out, 0, 0);
+  return c;
+}
 
 /** Contents by category: tea leaves, a specialty's amber, a cosmetic's cream. */
 const CONTENTS: Record<string, { dry: string; liquid: string; cream: string }> = {
@@ -202,18 +235,40 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
       metalness: surface === "metal" ? 0.18 : 0,
       normalMap: fib,
       normalScale: nScale(f.bump),
-      clearcoat: surface === "metal" ? Math.max(0.6, f.clearcoat) : surface === "film" ? (a.finish === "gloss" ? 1 : 0.25) : surface === "plastic" ? 0.5 : surface === "glaze" ? 1 : f.clearcoat,
+      clearcoat: surface === "metal" ? Math.max(0.6, f.clearcoat) : surface === "film" ? (a.finish === "gloss" ? 1 : a.finish === "softTouch" ? 0 : 0.25) : surface === "plastic" ? 0.5 : surface === "glaze" ? 1 : f.clearcoat,
       clearcoatRoughness: surface === "metal" ? 0.08 : surface === "film" ? (a.finish === "gloss" ? 0.03 : 0.4) : surface === "glaze" ? 0.03 : f.ccRough,
       sheen: board ? f.sheen : 0,
       sheenRoughness: 0.8,
       sheenColor: new THREE.Color(1, 1, 1),
     });
+    const fx = a.effects ?? [];
     if (art.foil) {
-      const rm = canvasTex(foilRoughMetal(art.foil, rough, 0.3), false);
-      m.roughness = 1;
-      m.metalness = 1;
-      m.roughnessMap = rm;
-      m.metalnessMap = rm;
+      const foil = fx.find((e) => e === "goldFoil" || e === "silverFoil" || e === "holo");
+      if (foil) {
+        // stamped foil: metal where the mask is white
+        const rm = canvasTex(foilRoughMetal(art.foil, rough, foil === "holo" ? 0.18 : 0.3), false);
+        m.roughness = 1;
+        m.metalness = 1;
+        m.roughnessMap = rm;
+        m.metalnessMap = rm;
+        if (foil === "holo") {
+          // thin-film interference: rainbow colors that shift with the angle
+          m.iridescence = 1;
+          m.iridescenceMap = canvasTex(art.foil, false);
+          m.iridescenceIOR = 1.7;
+          m.iridescenceThicknessRange = [180, 820];
+        }
+      }
+      if (fx.includes("spotUV")) {
+        // a clear gloss coat on the accent elements only
+        m.clearcoat = 1;
+        m.clearcoatMap = canvasTex(art.foil, false);
+        m.clearcoatRoughness = 0.03;
+      }
+      if (fx.includes("emboss")) {
+        m.normalMap = canvasTex(embossNormal(art.foil), false);
+        m.normalScale = nScale(1.6);
+      }
     }
     return live(m);
   };
@@ -294,7 +349,7 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
   };
   const engraved = (kind: FaceKind, wMm: number, hMm: number) => {
     const ppm = Math.min(8, maxTex / Math.max(wMm, hMm));
-    const art = drawFace(kind, wMm, hMm, ppm, { ...a, finish: "matte" }).color;
+    const art = drawFace(kind, wMm, hMm, ppm, { ...a, finish: "matte", effects: [] }).color;
     const W = art.width;
     const H = art.height;
     const c = document.createElement("canvas");

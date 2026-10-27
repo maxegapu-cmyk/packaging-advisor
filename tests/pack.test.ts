@@ -44,3 +44,22 @@ test("the outer pack is sized to its products", () => {
   assert.equal(crate.lying, true);
   assert.deepEqual(crate.outer, { w: 2 * 115 + 3 * 22 + 20, h: 66 + 30, d: 66 + 64 });
 });
+
+test("finishes: a base plus combinable effects, one foil at most; old 'foil' packs still load", async () => {
+  const { normalizePack, withEffect, foilOf, finishText, printLayoutNotes } = await import("../src/lib/pack").then(async (m) => ({ ...m, printLayoutNotes: (await import("../src/lib/print/layout")).printLayout }));
+  const legacy = normalizePack({ form: "carton", w: 110, h: 150, d: 46, finish: "foil" });
+  assert.equal(legacy.finish, "matte");
+  assert.deepEqual(legacy.effects, ["goldFoil"]);
+  let s = normalizePack({ form: "gift", w: 236, h: 146, d: 142, finish: "softTouch", effects: ["emboss", "silverFoil", "goldFoil", "nope", "spotUV"] });
+  assert.equal(s.finish, "softTouch");
+  assert.deepEqual(s.effects, ["silverFoil", "spotUV", "emboss"], "one foil kept, unknown dropped, canonical order");
+  s = withEffect(s, "holo", true);
+  assert.equal(foilOf(s), "holo");
+  assert.deepEqual(s.effects, ["holo", "spotUV", "emboss"]);
+  s = withEffect(s, "spotUV", false);
+  assert.deepEqual(s.effects, ["holo", "emboss"]);
+  assert.equal(finishText(s, "zh"), "触感膜 + 镭射 + 击凸");
+  assert.equal(normalizePack({ form: "carton", w: 110, h: 150, d: 46, finish: "gloss" }).effects, undefined);
+  const notes = printLayoutNotes(s).sheets[0].notes.map((n) => n.zh).join("|");
+  assert.ok(/触感膜/.test(notes) && /镭射/.test(notes) && /击凸/.test(notes), notes);
+});

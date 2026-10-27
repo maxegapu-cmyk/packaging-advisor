@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Direction } from "@/lib/board/schema";
 import type { PackSpec } from "@/lib/pack";
+import type { Reference } from "@/lib/reference";
 import type { ArtInfo } from "../three/art";
 import type { PackScene, PinOnScreen } from "../three/engine";
 import type { Backdrop } from "../three/studio";
@@ -36,6 +37,7 @@ export function Package3D({
   onPins,
   category,
   info = null,
+  reference = null,
 }: {
   d: Direction;
   brand: string;
@@ -63,6 +65,8 @@ export function Package3D({
   category?: string;
   /** Finished label content (the final-files step). */
   info?: ArtInfo | null;
+  /** An everyday object at real size beside the package. */
+  reference?: Reference | null;
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const engine = useRef<PackScene | null>(null);
@@ -101,6 +105,7 @@ export function Package3D({
         e.onPins = (p) => pinsCb.current?.(p);
         e.setBackdrop(backdrop);
         e.setAnatomy(anatomy);
+        e.setReference(refNow.current);
         engine.current = e;
         e.onFirstFrame = () => {
           if (!alive) return;
@@ -141,6 +146,11 @@ export function Package3D({
   useEffect(() => {
     engine.current?.setAnatomy(anatomy);
   }, [anatomy]);
+  const refNow = useRef(reference);
+  refNow.current = reference;
+  useEffect(() => {
+    engine.current?.setReference(reference);
+  }, [reference]);
 
   useEffect(() => {
     engine.current?.update({ d, brand, spec, open, fit, category, info });

@@ -10,8 +10,17 @@ import { isCategory, type Category } from "./categories";
 export const FORMS = ["carton", "gift", "bookBox", "mailer", "drawer", "paperTube", "bag", "aseptic", "pouch", "bottle", "tube", "blister", "jar", "glassBottle", "tin", "can", "ceramic", "woodBox"] as const;
 export type Form = (typeof FORMS)[number];
 
-export const FINISHES = ["matte", "gloss", "paper", "foil"] as const;
+/** The base surface: one per package (lamination or the bare stock). */
+export const FINISHES = ["matte", "gloss", "softTouch", "paper"] as const;
 export type Finish = (typeof FINISHES)[number];
+
+/**
+ * Extra print effects on top of the base, applied to the brand name and key graphics.
+ * Any combination, except that a package takes one foil (gold, silver or holographic).
+ */
+export const EFFECTS = ["goldFoil", "silverFoil", "holo", "spotUV", "emboss"] as const;
+export type Effect = (typeof EFFECTS)[number];
+export const FOILS: readonly Effect[] = ["goldFoil", "silverFoil", "holo"];
 
 /** Forms that can hold products (combinations). */
 export const OUTER_FORMS = ["carton", "gift", "bookBox", "mailer", "drawer", "woodBox", "bag"] as const;
@@ -36,7 +45,24 @@ export const INSERT_LABELS: Record<Insert, Pair> = {
 };
 
 export type InnerSpec = { form: InnerForm; count: 1 | 2; w: number; h: number; d: number; insert?: Insert };
-export type PackSpec = { form: Form; w: number; h: number; d: number; finish: Finish; inner?: InnerSpec | null };
+export type PackSpec = { form: Form; w: number; h: number; d: number; finish: Finish; effects?: Effect[]; inner?: InnerSpec | null };
+
+/** Turns an effect on or off, keeping a single foil. */
+export function withEffect(spec: PackSpec, e: Effect, on: boolean): PackSpec {
+  let list = (spec.effects ?? []).filter((x) => x !== e);
+  if (on) {
+    if (FOILS.includes(e)) list = list.filter((x) => !FOILS.includes(x));
+    list.push(e);
+  }
+  return { ...spec, effects: EFFECTS.filter((x) => list.includes(x)) };
+}
+
+/** Forms with no printed surface: the pine crate is laser-engraved, so it takes no foil, spot UV or embossing. */
+export const ENGRAVED_FORMS: readonly Form[] = ["woodBox"];
+/** Whether any printed part of the package can carry the extra effects (a crate's packed products can). */
+export const takesEffects = (spec: { form: Form; inner?: unknown }): boolean => !ENGRAVED_FORMS.includes(spec.form) || !!spec.inner;
+
+export const foilOf = (spec: { effects?: Effect[] }): Effect | null => spec.effects?.find((e) => FOILS.includes(e)) ?? null;
 
 export const MATERIAL_GROUPS: { id: string; label: Pair; forms: readonly Form[] }[] = [
   { id: "paper", label: { zh: "纸与卡纸", en: "Paper and board" }, forms: ["carton", "gift", "bookBox", "mailer", "drawer", "paperTube", "bag"] },
@@ -91,11 +117,32 @@ export const FORM_NOTES: Record<Form, Pair> = {
 };
 
 export const FINISH_LABELS: Record<Finish, Pair> = {
-  matte: { zh: "哑光", en: "Matte" },
-  gloss: { zh: "亮面", en: "Gloss" },
-  paper: { zh: "纸感", en: "Textured paper" },
-  foil: { zh: "烫金点缀", en: "Foil accent" },
+  matte: { zh: "哑膜", en: "Matte" },
+  gloss: { zh: "亮膜", en: "Gloss" },
+  softTouch: { zh: "触感膜", en: "Soft-touch" },
+  paper: { zh: "不覆膜纸感", en: "Uncoated paper" },
 };
+
+export const FINISH_HINTS: Record<Finish, Pair> = {
+  matte: { zh: "低反光，颜色沉稳", en: "Low glare, settled color" },
+  gloss: { zh: "高光亮，颜色更艳", en: "Bright highlights, vivid color" },
+  softTouch: { zh: "丝绒手感，略带柔光", en: "Velvety feel, a soft sheen" },
+  paper: { zh: "纸纹可见，自然质朴", en: "Visible paper texture, natural" },
+};
+
+export const EFFECT_LABELS: Record<Effect, Pair> = {
+  goldFoil: { zh: "烫金", en: "Gold foil" },
+  silverFoil: { zh: "烫银", en: "Silver foil" },
+  holo: { zh: "镭射", en: "Holographic foil" },
+  spotUV: { zh: "局部 UV", en: "Spot UV" },
+  emboss: { zh: "击凸", en: "Emboss" },
+};
+
+/** Short wording of a finish with its effects, e.g. "哑膜 + 烫金 + 击凸". */
+export function finishText(spec: { finish: Finish; effects?: Effect[] }, lang: "zh" | "en" | "bi"): string {
+  const one = (p: Pair) => (lang === "en" ? p.en : p.zh);
+  return [one(FINISH_LABELS[spec.finish]), ...(spec.effects ?? []).map((e) => one(EFFECT_LABELS[e]))].join(" + ");
+}
 
 /** Size labels. For round forms, "w" is the diameter and "d" is not used. */
 export const DIM_LABELS: Record<"w" | "h" | "d", Pair> = {
@@ -185,7 +232,13 @@ export function normalizePack(v: unknown, fallback: PackSpec = DEFAULT_PACK): Pa
   else return { ...fallback };
 
   const form = (FORMS as readonly string[]).includes(o.form as string) ? (o.form as Form) : fallback.form;
-  const finish = (FINISHES as readonly string[]).includes(o.finish as string) ? (o.finish as Finish) : fallback.finish;
+  // "foil" was a finish before effects existed: matte with gold foil
+  const legacyFoil = o.finish === "foil";
+  const finish = legacyFoil ? "matte" : (FINISHES as readonly string[]).includes(o.finish as string) ? (o.finish as Finish) : fallback.finish;
+  const rawFx = Array.isArray(o.effects) ? o.effects : o.effects === undefined ? (legacyFoil ? ["goldFoil"] : (fallback.effects ?? [])) : [];
+  // one foil: the first one asked for
+  const firstFoil = (rawFx as unknown[]).find((e) => FOILS.includes(e as Effect)) as Effect | undefined;
+  const effects: Effect[] = EFFECTS.filter((e) => rawFx.includes(e) && (!FOILS.includes(e) || e === firstFoil));
   const w = clampDim(o.w, fallback.w);
   const h = clampDim(o.h, fallback.h);
   const d = isRound(form) ? w : clampDim(o.d, fallback.d);
@@ -198,7 +251,10 @@ export function normalizePack(v: unknown, fallback: PackSpec = DEFAULT_PACK): Pa
     inner = { form: f, count: io.count === 2 ? 2 : 1, w: iw, h: clampDim(io.h, p.h), d: isRound(f) ? iw : clampDim(io.d, p.d) };
     if ((INSERTS as readonly string[]).includes(io.insert as string)) inner.insert = io.insert as Insert;
   }
-  return inner ? { form, w, h, d, finish, inner } : { form, w, h, d, finish };
+  const base: PackSpec = { form, w, h, d, finish };
+  if (effects.length && takesEffects({ form, inner })) base.effects = effects;
+  if (inner) base.inner = inner;
+  return base;
 }
 
 /**

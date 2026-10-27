@@ -17,7 +17,12 @@ import {
   GUSSET_LABEL,
   INNER_FORMS,
   INSERT_LABELS,
+  EFFECT_LABELS,
+  EFFECTS,
+  FINISH_HINTS,
   INSERTS,
+  withEffect,
+  takesEffects,
   isOuter,
   isRound,
   MATERIAL_GROUPS,
@@ -25,9 +30,9 @@ import {
   type InnerForm,
   type PackSpec,
 } from "@/lib/pack";
-import { renderBrief } from "@/lib/renderBrief";
+import { materialUse } from "@/lib/print/layout";
+import { REFERENCE_INFO, REFERENCES, type Reference } from "@/lib/reference";
 import { paletteVars } from "../BoxFaces";
-import { CopyButton } from "../CopyButton";
 import { Package3D } from "./Package3D";
 import type { PackScene, PinOnScreen } from "../three/engine";
 import type { Backdrop } from "../three/studio";
@@ -43,6 +48,9 @@ const S = {
   space: { zh: "3D 空间", en: "3D space" },
   direction: { zh: "方向", en: "Direction" },
   structure: { zh: "盒型与尺寸", en: "Structure and size" },
+  effects: { zh: "附加工艺", en: "Extra effects" },
+  effectsWood: { zh: "松木箱盖面是激光雕刻，不做烫金、UV 或击凸。箱里装了带标签的产品时，标签可以加这些工艺。", en: "The pine crate's lid is laser-engraved, so it takes no foil, UV or embossing. When it holds labelled products, their labels can." },
+  effectsNote: { zh: "可多选，作用在品名和重点图形上；烫金、烫银、镭射三选一。", en: "Combine freely; they apply to the name and key graphics. Gold, silver and holographic foil are one-of." },
   finish: { zh: "表面工艺", en: "Finish" },
   backdrop: { zh: "背景", en: "Backdrop" },
   views: { zh: "视角", en: "Views" },
@@ -77,7 +85,16 @@ const S = {
   nextLabel: { zh: "打样完成后，下一步", en: "When the structure is settled" },
   handoff: { zh: "出成品文件", en: "Make the final files" },
   tabLook: { zh: "外观", en: "Look" },
-  tabCheck: { zh: "检查", en: "Check" },
+  tabCheck: { zh: "尺寸", en: "Size" },
+  refH: { zh: "放个东西对比大小", en: "Compare with something familiar" },
+  refNote: { zh: "常见物品按真实尺寸放在包装旁边，一眼看出包装有多大。", en: "Everyday objects at their real size, beside the package, so you can see how big it is." },
+  refNone: { zh: "不放", en: "None" },
+  measures: { zh: "尺寸与用料", en: "Size and material" },
+  outside: { zh: "外尺寸", en: "Outside size" },
+  volume: { zh: "外部体积", en: "Outside volume" },
+  printedMaterial: { zh: "印刷用料", en: "Printed material" },
+  materialNote: { zh: "每套包装所有印刷部件的面积，用于向印厂询价。", en: "Area of all printed parts for one package, for getting a printer's quote." },
+  largest: { zh: "最大部件", en: "Largest part" },
   material: { zh: "材料", en: "Material" },
   size: { zh: "尺寸", en: "Size" },
   anatomy: { zh: "结构解剖", en: "Anatomy" },
@@ -88,8 +105,6 @@ const S = {
   rendering: { zh: "正在出图后导出…", en: "Rendering, then exporting…" },
   listing: { zh: "主图测试", en: "Listing test" },
   listingNote: { zh: "左：800×800 白底主图。右：在搜索结果里大约这么大，品牌名还看得清吗？", en: "Left: an 800×800 white main image. Right: about this size in search results. Can you still read the brand?" },
-  brief: { zh: "渲染简报", en: "Render brief" },
-  briefNote: { zh: "给设计师或出图工具：结构、配色、材质、灯光一次说清，按电商棚拍标准。", en: "For a designer or an image tool: structure, colors, material and light in one go, to an e-commerce studio standard." },
   copy: { zh: "复制", en: "Copy" },
   copied: { zh: "已复制", en: "Copied" },
   saved: { zh: "已保存", en: "Saved" },
@@ -258,15 +273,6 @@ function Icon({ name }: { name: string }) {
 }
 
 /** Tiny static thumbnail of the package for the listing test. */
-function ListingTile({ children, mine }: { children?: ReactNode; mine?: boolean }) {
-  return (
-    <div className={`lt-tile${mine ? " is-mine" : ""}`}>
-      <div className="lt-img">{children}</div>
-      <i />
-      <i className="short" />
-    </div>
-  );
-}
 
 /* ---------------------------------------------------------------- Studio */
 
@@ -300,7 +306,9 @@ export function Studio({
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const setSpec = useCallback(
-    (s: PackSpec) => {
+    (next: PackSpec) => {
+      // an engraved crate on its own has nothing printed to carry the effects
+      const s = takesEffects(next) || !next.effects?.length ? next : { ...next, effects: undefined };
       setSpecState(s);
       if (!saveUrl) return;
       clearTimeout(saveTimer.current);
@@ -348,32 +356,9 @@ export function Studio({
 
   useEffect(() => orbit.onSpin(setSpinning), [orbit]);
 
-  // Listing test: copy the rendered view into a white main image and a search-size thumbnail.
   const engine = useRef<PackScene | null>(null);
-  const ltMain = useRef<HTMLCanvasElement>(null);
-  const ltSmall = useRef<HTMLCanvasElement>(null);
-  const lastSnap = useRef(0);
-  const trailing = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const snapshot = useCallback((src: HTMLCanvasElement) => {
-    const now = performance.now();
-    clearTimeout(trailing.current);
-    if (now - lastSnap.current < 120) {
-      // the drawing buffer is gone after this frame; ask for one more render to copy from
-      trailing.current = setTimeout(() => engine.current?.refresh(), 140);
-      return;
-    }
-    lastSnap.current = now;
-    const side = Math.min(src.width, src.height) * 0.86;
-    const sx = (src.width - side) / 2;
-    const sy = (src.height - side) / 2;
-    for (const c of [ltMain.current, ltSmall.current]) {
-      const ctx = c?.getContext("2d");
-      if (!c || !ctx) continue;
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, c.width, c.height);
-      ctx.drawImage(src, sx, sy, side, side, 0, 0, c.width, c.height);
-    }
-  }, []);
+  const [reference, setReference] = useState<Reference | null>(null);
+  const use = useMemo(() => materialUse(spec), [spec]);
   const [exporting, setExporting] = useState(false);
   const exportImage = async () => {
     const e = engine.current;
@@ -493,8 +478,6 @@ export function Studio({
   };
 
   const details = useMemo(() => detailsFor(spec.form), [spec.form]);
-  const brief = useMemo(() => renderBrief(d, spec, board.meta.product, brand), [d, spec, board.meta.product, brand]);
-  const briefText = lang === "zh" ? brief.zh : lang === "en" ? brief.en : `${brief.zh}\n\n${brief.en}`;
   const openLabel = openLabelFor(spec.form, open);
   const canOpen = CAN_OPEN.includes(spec.form);
   // when a product is packed, the size fields edit the product and the outer pack follows
@@ -553,7 +536,7 @@ export function Studio({
             category={board.meta.category}
             loader
             onEngine={(e) => (engine.current = e)}
-            afterRender={snapshot}
+            reference={reference}
             stage="sweep"
             photoreal
             backdrop={backdrop as Backdrop}
@@ -756,7 +739,6 @@ export function Studio({
               className={tab === t.id ? "st-tab is-active" : "st-tab"}
               onClick={() => {
                 setTab(t.id);
-                if (t.id === "check") setTimeout(() => engine.current?.refresh(), 0);
               }}
             >
               <L p={t.label} lang={lang} />
@@ -873,13 +855,32 @@ export function Studio({
           <div className="st-tabpanel" role="tabpanel">
             <section className="st-sec">
               <L p={S.finish} lang={lang} className="st-label" />
-              <div className="st-finishes">
+              <div className="st-finishes" role="radiogroup" aria-label={both(S.finish, lang)}>
                 {FINISHES.map((f) => (
-                  <button key={f} type="button" className={spec.finish === f ? `st-finish st-finish-${f} is-active` : `st-finish st-finish-${f}`} aria-pressed={spec.finish === f} onClick={() => setSpec({ ...spec, finish: f })}>
+                  <button key={f} type="button" role="radio" aria-checked={spec.finish === f} className={spec.finish === f ? `st-finish st-finish-${f} is-active` : `st-finish st-finish-${f}`} onClick={() => setSpec({ ...spec, finish: f })}>
                     <i aria-hidden="true" />
-                    {one(FINISH_LABELS[f], lang)}
+                    <span className="st-finish-t">
+                      {one(FINISH_LABELS[f], lang)}
+                      <small>{one(FINISH_HINTS[f], lang)}</small>
+                    </span>
                   </button>
                 ))}
+              </div>
+            </section>
+            <section className="st-sec">
+              <L p={S.effects} lang={lang} className="st-label" />
+              <L p={takesEffects(spec) ? S.effectsNote : S.effectsWood} lang={lang} className="st-small" />
+              <div className="st-finishes st-effects">
+                {EFFECTS.map((e) => {
+                  const on = !!spec.effects?.includes(e);
+                  return (
+                    <button key={e} type="button" aria-pressed={on} disabled={!takesEffects(spec)} className={on ? `st-finish st-fx-${e} is-active` : `st-finish st-fx-${e}`} onClick={() => setSpec(withEffect(spec, e, !on))}>
+                      <i aria-hidden="true" />
+                      <span className="st-finish-t">{one(EFFECT_LABELS[e], lang)}</span>
+                      <b className="st-check" aria-hidden="true" />
+                    </button>
+                  );
+                })}
               </div>
             </section>
             <section className="st-sec">
@@ -899,29 +900,46 @@ export function Studio({
         {tab === "check" ? (
           <div className="st-tabpanel" role="tabpanel">
             <section className="st-sec">
-              <L p={S.listing} lang={lang} className="st-label" />
-              <div className="st-listing-body">
-                <div className="lt-main">
-                  <canvas ref={ltMain} width={264} height={264} aria-label={both(S.listing, lang)} />
-                </div>
-                <div className="lt-grid" aria-hidden="true">
-                  <ListingTile />
-                  <ListingTile mine>
-                    <canvas ref={ltSmall} width={112} height={112} />
-                  </ListingTile>
-                  <ListingTile />
-                  <ListingTile />
-                </div>
+              <L p={S.refH} lang={lang} className="st-label" />
+              <L p={S.refNote} lang={lang} className="st-small" />
+              <div className="st-refs" role="radiogroup" aria-label={both(S.refH, lang)}>
+                <button type="button" role="radio" aria-checked={reference === null} className={reference === null ? "st-ref is-active" : "st-ref"} onClick={() => setReference(null)}>
+                  <span className="st-ref-t">{one(S.refNone, lang)}</span>
+                </button>
+                {REFERENCES.map((r) => (
+                  <button key={r} type="button" role="radio" aria-checked={reference === r} className={reference === r ? "st-ref is-active" : "st-ref"} onClick={() => setReference(r)}>
+                    <i className={`st-ref-i st-ref-${r}`} aria-hidden="true" />
+                    <span className="st-ref-t">
+                      {one(REFERENCE_INFO[r].label, lang)}
+                      <small>{one(REFERENCE_INFO[r].size, lang)}</small>
+                    </span>
+                  </button>
+                ))}
               </div>
-              <L p={S.listingNote} lang={lang} className="st-small" />
             </section>
             <section className="st-sec">
-              <div className="st-sec-row">
-                <L p={S.brief} lang={lang} className="st-label" />
-                <CopyButton text={briefText} label={one(S.copy, lang)} done={one(S.copied, lang)} />
-              </div>
-              <L p={S.briefNote} lang={lang} className="st-small" />
-              <pre className="st-brief">{lang === "en" ? brief.en : brief.zh}</pre>
+              <L p={S.measures} lang={lang} className="st-label" />
+              <dl className="st-measures">
+                <div>
+                  <dt>{one(S.outside, lang)}</dt>
+                  <dd>{formatSize(spec)}</dd>
+                </div>
+                <div>
+                  <dt>{one(S.volume, lang)}</dt>
+                  <dd>{(isRound(spec.form) ? (Math.PI * (spec.w / 2) ** 2 * spec.h) / 1e6 : (spec.w * spec.h * spec.d) / 1e6).toFixed(2)} L</dd>
+                </div>
+                <div>
+                  <dt>{one(S.printedMaterial, lang)}</dt>
+                  <dd>{use.m2.toFixed(3)} m²</dd>
+                </div>
+                <div>
+                  <dt>{one(S.largest, lang)}</dt>
+                  <dd>
+                    {use.largest.w} × {use.largest.h} mm <small>{one(use.largest.name, lang)}</small>
+                  </dd>
+                </div>
+              </dl>
+              <L p={S.materialNote} lang={lang} className="st-small" />
             </section>
           </div>
         ) : null}
