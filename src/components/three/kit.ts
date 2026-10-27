@@ -199,7 +199,12 @@ const noiseCanvas = once("noise", noiseCanvasRaw);
 const woodCanvas = once("wood", woodCanvasRaw);
 const fluteCanvas = once("flute", fluteCanvasRaw);
 
-export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: number, category = "other"): Kit {
+/**
+ * `defer`: when given, printed faces are drawn later rather than now. Each face's material is
+ * returned at once with a blank map, and the drawing is handed to `defer` as a job; the map
+ * fills in when the job runs (used by the homepage film to spread the work over frames).
+ */
+export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: number, category = "other", opts: { defer?: (job: () => void) => void } = {}): Kit {
   const disposables: { dispose: () => void }[] = [];
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   const fiber = new THREE.CanvasTexture(fiberNormal());
@@ -227,9 +232,20 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
     return t;
   };
 
+  const blank = () => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 2;
+    const x = c.getContext("2d")!;
+    x.fillStyle = roles.ground;
+    x.fillRect(0, 0, 2, 2);
+    return c;
+  };
+
   const tex = (kind: FaceKind, wMm: number, hMm: number, surface: Surface = "board") => {
     const ppm = Math.min(16, maxTex / Math.max(wMm, hMm));
-    const art = drawFace(kind, wMm, hMm, ppm, a);
+    // effects need the drawn masks now; plain print can wait
+    const lazy = !!opts.defer && !(a.effects ?? []).length;
+    const art = lazy ? null : drawFace(kind, wMm, hMm, ppm, a);
     const board = surface === "board";
     let fib: THREE.Texture | null = null;
     if (board) {
@@ -241,8 +257,15 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
     // printed tinplate is lacquered; film is laminated (gloss or matte by finish); moulded
     // plastic is printed directly, satin
     const rough = surface === "metal" ? 0.34 : surface === "film" ? f.film : surface === "plastic" ? 0.38 : surface === "glaze" ? 0.1 : f.rough;
+    const map = canvasTex(art ? art.color : blank(), true);
+    if (lazy)
+      opts.defer!(() => {
+        // the same texture object, so every clone of the material sees the print
+        map.image = drawFace(kind, wMm, hMm, ppm, a).color;
+        map.needsUpdate = true;
+      });
     const m = new THREE.MeshPhysicalMaterial({
-      map: canvasTex(art.color, true),
+      map,
       roughness: rough,
       metalness: surface === "metal" ? 0.18 : 0,
       normalMap: fib,
@@ -254,7 +277,7 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
       sheenColor: new THREE.Color(1, 1, 1),
     });
     const fx = a.effects ?? [];
-    if (art.foil) {
+    if (art?.foil) {
       const foil = fx.find((e) => e === "goldFoil" || e === "silverFoil" || e === "holo");
       if (foil) {
         // stamped foil: metal where the mask is white

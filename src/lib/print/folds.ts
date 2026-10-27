@@ -138,7 +138,7 @@ function mailer(w: number, h: number, d: number): FoldSet {
     { id: "sideLIn", poly: rect(cx - h - inH, y3, inH, d), parent: "sideL", hinge: seg(cx - h, y3, cx - h, y4), angle: 180, at: [0.4, 0.62] },
     { id: "sideR", poly: rect(cx + w, y3, h, d), parent: "base", hinge: seg(cx + w, y3, cx + w, y4), angle: 90, at: [0.15, 0.45], art: { kind: "bandPlain", rot: 90 } },
     { id: "sideRIn", poly: rect(cx + w + h, y3, inH, d), parent: "sideR", hinge: seg(cx + w + h, y3, cx + w + h, y4), angle: 180, at: [0.4, 0.62] },
-    { id: "lid", poly: rect(cx, y1, w, d), parent: "back", hinge: seg(cx, y2, cx + w, y2), angle: 90, at: [0.66, 0.92], art: { kind: "front", rot: 180 } },
+    { id: "lid", poly: rect(cx, y1, w, d), parent: "back", hinge: seg(cx, y2, cx + w, y2), angle: 90, at: [0.6, 0.94], art: { kind: "front", rot: 180 } },
     { id: "tuck", poly: [[cx + tin, y1], [cx + w - tin, y1], [cx + w - tin - 2, 4], [cx + w - tin - 8, 0], [cx + tin + 8, 0], [cx + tin + 2, 4]], parent: "lid", hinge: seg(cx + tin, y1, cx + w - tin, y1), angle: 102, at: [0.56, 0.8] },
     { id: "earL", poly: [[cx, e0], [cx, e0 + earD], [cx - earH, e0 + earD - 6], [cx - earH, e0 + 6]], parent: "lid", hinge: seg(cx, e0, cx, e0 + earD), angle: 102, at: [0.56, 0.8] },
     { id: "earR", poly: [[cx + w, e0], [cx + w + earH, e0 + 6], [cx + w + earH, e0 + earD - 6], [cx + w, e0 + earD]], parent: "lid", hinge: seg(cx + w, e0, cx + w, e0 + earD), angle: 102, at: [0.56, 0.8] },
@@ -248,7 +248,7 @@ function bookBox(w: number, h: number, d: number): FoldSet {
     { id: "lid", len: d, art: { kind: "front", rot: 0 } },
     { id: "flap", len: flapH, art: { kind: "band", rot: 0 } },
   ];
-  const win: Record<string, [number, number]> = { spine: [0.06, 0.3], lid: [0.7, 0.87], flap: [0.84, 1] };
+  const win: Record<string, [number, number]> = { spine: [0.06, 0.3], lid: [0.6, 0.86], flap: [0.8, 1] };
   const panels: FoldPanel[] = [];
   let y = t;
   rows.forEach((r, i) => {
@@ -270,7 +270,7 @@ function bookBox(w: number, h: number, d: number): FoldSet {
     material: "rigid",
     pieces: [
       { id: "cover", name: P("封套裱纸", "Case wrap"), panels, anchor: "bottom", final: { c: [0, 0, 1], n: [0, -1, 0], u: [0, 0, 1] }, move: [0.14, 0.48], base: "key", thick: 0.3 },
-      { id: "tray", name: P("内盒裱纸", "Tray wrap"), panels: tray, anchor: "trayC", final: { c: [0, 2, 0], n: [0, -1, 0], u: [0, 0, -1] }, move: [0.44, 0.7], base: "key", thick: 0.3 },
+      { id: "tray", name: P("内盒裱纸", "Tray wrap"), panels: tray, anchor: "trayC", final: { c: [0, 2, 0], n: [0, -1, 0], u: [0, 0, -1] }, move: [0.38, 0.6], base: "key", thick: 0.3 },
     ],
   };
 }
@@ -299,7 +299,7 @@ function drawer(w: number, h: number, d: number): FoldSet {
     material: "board",
     pieces: [
       { id: "sleeve", name: P("外套", "Sleeve"), panels: sleeve, anchor: "top", final: { c: [0, h, 0], n: [0, 1, 0], u: [0, 0, -1] }, move: [0.35, 0.72], base: "ground", thick: 0.45 },
-      { id: "tray", name: P("抽屉内盒", "Tray"), panels: tray, anchor: "trayC", final: { c: [0, 2.1, 0.75], n: [0, -1, 0], u: [0, 0, -1] }, move: [0.5, 0.8], slide: { from: [0, 0, d * 1.15], at: [0.8, 1] }, base: "key", thick: 0.45 },
+      { id: "tray", name: P("抽屉内盒", "Tray"), panels: tray, anchor: "trayC", final: { c: [0, 2.1, 0.75], n: [0, -1, 0], u: [0, 0, -1] }, move: [0.46, 0.72], slide: { from: [0, 0, d * 1.15], at: [0.72, 1] }, base: "key", thick: 0.45 },
     ],
   };
 }
@@ -387,7 +387,7 @@ function woodBox(w: number, h: number, d: number): FoldSet {
     material: "wood",
     pieces: [
       { id: "crate", name: P("箱体", "Crate"), panels, anchor: "base", final: { c: [0, 0, 0], n: [0, -1, 0], u: [0, 0, -1] }, move: [0.4, 0.8], base: "none", thick: T },
-      { id: "lid", name: P("抽拉盖", "Sliding lid"), panels: [{ id: "lid", poly: rect(0, 0, lw, ld), art: { kind: "front", rot: 0 } }], anchor: "lid", final: { c: [0, lidBottom + lidT, d / 2 - ld / 2], n: [0, 1, 0], u: [0, 0, -1] }, move: [0.6, 0.85], slide: { from: [0, 0, ld + 10], at: [0.85, 1] }, base: "none", thick: lidT },
+      { id: "lid", name: P("抽拉盖", "Sliding lid"), panels: [{ id: "lid", poly: rect(0, 0, lw, ld), art: { kind: "front", rot: 0 } }], anchor: "lid", final: { c: [0, lidBottom + lidT, d / 2 - ld / 2], n: [0, 1, 0], u: [0, 0, -1] }, move: [0.52, 0.82], slide: { from: [0, 0, ld + 10], at: [0.8, 1] }, base: "none", thick: lidT },
     ],
   };
 }

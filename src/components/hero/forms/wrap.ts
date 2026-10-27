@@ -127,14 +127,15 @@ export function buildWraps(model: THREE.Object3D, planes: Planes, zMid: number):
       const a1 = ((k + 1) / 48) * Math.PI * 2;
       lines.push({ a: new THREE.Vector3(from.x + Math.cos(a0) * r, from.y, from.z + Math.sin(a0) * r), b: new THREE.Vector3(from.x + Math.cos(a1) * r, from.y, from.z + Math.sin(a1) * r), kind: "cut" });
     }
-    return { mesh, from, to, at: [0.62 + i * 0.06, 0.92] as [number, number] };
+    // the lid sticker travels from the sheet to the lid: unhurried, it crosses half the frame
+    return { mesh, from, to, at: [0.42 + i * 0.06, 0.96] as [number, number] };
   });
 
   const tmp = new THREE.Vector3();
   const pose = (f: number) => {
     for (const lb of labels) {
-      const stand = ease(seg(f, [lb.at[0], lb.at[0] + (lb.at[1] - lb.at[0]) * 0.55]));
-      const bend = ease(seg(f, [lb.at[0] + (lb.at[1] - lb.at[0]) * 0.4, lb.at[1]]));
+      const stand = ease(seg(f, [lb.at[0], lb.at[0] + (lb.at[1] - lb.at[0]) * 0.62]));
+      const bend = ease(seg(f, [lb.at[0] + (lb.at[1] - lb.at[0]) * 0.38, lb.at[1]]));
       // where the label's frame is: polar round the body, from the flat spot to the tangent plane
       const rel0 = lb.flat.clone().sub(lb.axis);
       const a0 = Math.atan2(rel0.x, rel0.z);

@@ -143,7 +143,7 @@ export function ProofMatch({ art, spec, input, lang, setProof, uploadPhoto, phot
   const label = (k: "w" | "h" | "d") => (k === "w" ? (round ? "Ø" : lang === "en" ? "W" : "宽") : k === "h" ? (lang === "en" ? "H" : "高") : lang === "en" ? "D" : "深");
 
   return (
-    <div className="proof">
+    <div className="proof fade-in">
       <p className="proof-intro">{one(T.intro, lang)}</p>
       <div className="proof-stage">
         <canvas ref={cv} className={picking ? "proof-canvas is-picking" : "proof-canvas"} onClick={sample} role="img" aria-label={one(T.photo, lang)} />

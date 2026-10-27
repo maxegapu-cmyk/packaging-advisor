@@ -18,19 +18,25 @@ import { U } from "../../three/common";
 import { makeKit, type Kit } from "../../three/kit";
 import { studioEquirect } from "../../three/studio";
 import { clamp, ease, seg } from "../symbiosis";
-import { holographic, makePlanes, setScan, setWipe, type Holo, type Planes } from "./holo";
+import { holographicSteps, makePlanes, setScan, setWipe, type Holo, type Planes } from "./holo";
 import { FILM, ITEM_SECONDS as CH, phaseOf, type FilmItem } from "./items";
 import { buildPillow, morphBlister, morphPouch } from "./morph";
 import { buildNet, type Line3 } from "./net";
 import { kraftPlain, rscArt, tape } from "./rsc";
 import { buildWraps } from "./wrap";
 
-const BG = new THREE.Color("#07090C");
+/** The film's surroundings in the dark and light themes. */
+const TONES = {
+  dark: { bg: "#080A0C", floor: "#0D1013", grid: [0.5, 0.82, 0.8], gridA: 1, hemiSky: "#9fb4c8", hemiGround: "#0b0d10", hemi: 0.35, rim: "#9fe0da", rimI: 1.6, env: 0.62, exposure: 1.05 },
+  light: { bg: "#ECEAE3", floor: "#E6E3DB", grid: [0.16, 0.2, 0.19], gridA: 0.7, hemiSky: "#ffffff", hemiGround: "#d9d5ca", hemi: 0.75, rim: "#e8f1f0", rimI: 0.7, env: 0.7, exposure: 1.0 },
+} as const;
 const ROUND = new Set(["tin", "can", "bottle", "tube", "jar", "glassBottle", "ceramic", "paperTube"]);
 const FOLDED = new Set(["carton", "mailer", "rsc", "gift", "bookBox", "drawer", "bag", "aseptic", "woodBox"]);
 
 /** Timing within a pack's turn (seconds). */
-const T_ = { draw: [0, 0.6], wipe: [0.45, 1.1], ghost: [0.75, 1.3], form: [1.1, 2.7], scan: [2.7, 3.35], dims: [3.0, 4.3], turn: [2.9, 4.6] } as const;
+const T_ = { draw: [0, 0.6], wipe: [0.45, 1.15], ghost: [0.8, 1.4], form: [1.15, 3.1], scan: [3.1, 3.75], dims: [3.4, 4.85], turn: [3.2, 5.1] } as const;
+/** Camera keys within a turn: on the sheet, leaving it, arriving at the pack, settled. */
+const CAM_T = [0, 1.15, 2.2, 3.2, 5.1];
 
 type Pt2 = [number, number];
 export type HudLine = { a: Pt2; b: Pt2; kind: "cut" | "crease"; p: number; alpha: number };
@@ -47,7 +53,19 @@ type Act = {
   prod: { w: number; h: number; d: number };
   pose: (t: number) => void;
   posedAt: number | null;
+  holo: Holo | null;
+  /** How high the sheet is lifted to fold (scene units), for the camera to follow. */
+  rise: (t: number) => number;
   dispose: () => void;
+};
+
+/** A pack being built a little at a time while the one before it plays. */
+type Job = { ix: number; gen: Generator<void, Act, void>; act?: Act; warm?: THREE.Object3D[] };
+
+const finish = <T>(g: Generator<void, T, void>): T => {
+  let r = g.next();
+  while (!r.done) r = g.next();
+  return r.value;
 };
 
 /* ---------------------------------------------------------------- sizes, before building */
@@ -102,6 +120,9 @@ export class FormsScene {
   private env: THREE.Texture;
   private grid: THREE.Mesh;
   private gridMat: THREE.ShaderMaterial;
+  private floorMat: THREE.MeshStandardMaterial;
+  private hemi: THREE.HemisphereLight;
+  private dark = true;
   private acts = new Map<number, Act>();
   private w = 1;
   private h = 1;
@@ -111,7 +132,7 @@ export class FormsScene {
   private raf = 0;
   private running = false;
   private maxTex: number;
-  private pending = false;
+  private job: Job | null = null;
   onFrame?: (f: FormsFrame) => void;
 
   constructor(canvasEl: HTMLCanvasElement, opts: { maxTex?: number } = {}) {
@@ -131,19 +152,21 @@ export class FormsScene {
     eq.dispose();
     this.scene.environment = this.env;
     this.scene.environmentIntensity = 0.62;
-    this.scene.background = BG;
-    this.scene.fog = new THREE.Fog(BG, 10, 40);
-    this.scene.add(new THREE.HemisphereLight("#9fb4c8", "#0b0d10", 0.35));
+    this.scene.background = new THREE.Color(TONES.dark.bg);
+    this.scene.fog = new THREE.Fog(new THREE.Color(TONES.dark.bg), 10, 40);
+    this.hemi = new THREE.HemisphereLight("#9fb4c8", "#0b0d10", 0.35);
+    this.scene.add(this.hemi);
     this.key = new THREE.DirectionalLight("#fff6ec", 2.4);
     this.key.castShadow = true;
     this.key.shadow.mapSize.set(2048, 2048);
     this.key.shadow.bias = -0.0004;
     this.key.shadow.normalBias = 0.015;
     this.key.shadow.radius = 4;
-    this.rim = new THREE.DirectionalLight("#9fd8ff", 1.6);
+    this.rim = new THREE.DirectionalLight("#9fe0da", 1.6);
     this.scene.add(this.key, this.key.target, this.rim, this.rim.target);
     // floor: dark, slightly glossy, taking the shadows
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(4000, 400), new THREE.MeshStandardMaterial({ color: "#0C0F13", roughness: 0.62, metalness: 0.1, polygonOffset: true, polygonOffsetFactor: 4, polygonOffsetUnits: 8 }));
+    this.floorMat = new THREE.MeshStandardMaterial({ color: TONES.dark.floor, roughness: 0.62, metalness: 0.1, polygonOffset: true, polygonOffsetFactor: 4, polygonOffsetUnits: 8 });
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(4000, 400), this.floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     this.scene.add(floor);
@@ -155,18 +178,18 @@ export class FormsScene {
       polygonOffset: true,
       polygonOffsetFactor: 2,
       polygonOffsetUnits: 4,
-      uniforms: { uC: { value: new THREE.Vector2() }, uR: { value: 3 } },
+      uniforms: { uC: { value: new THREE.Vector2() }, uR: { value: 3 }, uCol: { value: new THREE.Vector3(...TONES.dark.grid) }, uA: { value: 1 } },
       vertexShader: `varying vec2 vP; void main(){ vec4 w = modelMatrix * vec4(position,1.); vP = w.xz; gl_Position = projectionMatrix * viewMatrix * w; }`,
       fragmentShader: `
-        uniform vec2 uC; uniform float uR; varying vec2 vP;
+        uniform vec2 uC; uniform float uR; uniform vec3 uCol; uniform float uA; varying vec2 vP;
         float gridLine(vec2 p, float s){ vec2 g = abs(fract(p / s - 0.5) - 0.5) / fwidth(p / s); return 1.0 - min(min(g.x, g.y), 1.0); }
         void main(){
           float d = length(vP - uC) / uR;
           float fade = smoothstep(1.0, 0.15, d);
           float minor = gridLine(vP, 0.1) * clamp(0.5 / (fwidth(vP.x) * 60.0), 0.0, 1.0);
           float major = gridLine(vP, 1.0);
-          float a = (minor * 0.07 + major * 0.16) * fade;
-          gl_FragColor = vec4(vec3(0.55, 0.8, 1.0), a);
+          float a = (minor * 0.07 + major * 0.16) * fade * uA;
+          gl_FragColor = vec4(uCol, a);
         }`,
     });
     this.grid = new THREE.Mesh(new THREE.PlaneGeometry(4000, 400), this.gridMat);
@@ -176,9 +199,35 @@ export class FormsScene {
     this.scene.add(this.grid);
   }
 
+  /** The dark film (the hologram glows) or the light one (paper, ink and celadon). */
+  setTone(dark: boolean) {
+    this.dark = dark;
+    const t = dark ? TONES.dark : TONES.light;
+    (this.scene.background as THREE.Color).set(t.bg);
+    (this.scene.fog as THREE.Fog).color.set(t.bg);
+    this.floorMat.color.set(t.floor);
+    this.floorMat.roughness = dark ? 0.62 : 0.9;
+    this.floorMat.metalness = dark ? 0.1 : 0;
+    this.gridMat.uniforms.uCol.value.set(...t.grid);
+    this.gridMat.uniforms.uA.value = t.gridA;
+    this.hemi.color.set(t.hemiSky);
+    this.hemi.groundColor.set(t.hemiGround);
+    this.hemi.intensity = t.hemi;
+    this.rim.color.set(t.rim);
+    this.rim.intensity = t.rimI;
+    this.scene.environmentIntensity = t.env;
+    this.renderer.toneMappingExposure = t.exposure;
+    for (const a of this.acts.values()) a.holo?.tone(dark);
+    if (!this.running && this.lastTime !== null) this.render(this.lastTime);
+  }
+
   /* ---------------------------------------------------------------- building a pack */
 
-  private build(ix: number): Act {
+  /**
+   * Builds pack `ix` in small steps (a generator: each `yield` is a place to pause), so that
+   * while the film plays the work is spread over many frames instead of one long stall.
+   */
+  private *build(ix: number): Generator<void, Act, void> {
     const item = FILM[ix];
     const sample = SAMPLES.find((s) => s.id === item.sample) ?? SAMPLES[0];
     const board = sample.board;
@@ -191,181 +240,236 @@ export class FormsScene {
     const x = TRACK[ix] * U;
     group.position.x = x;
     this.scene.add(group);
+    // hidden until it is whole
+    group.visible = false;
     const turn = new THREE.Group();
     group.add(turn);
-    const raw = makeKit(this.renderer, art, this.maxTex, board.meta.category);
+    // printed faces are drawn as separate steps, after the shapes exist
+    const faces: (() => void)[] = [];
+    const drawFaces = function* () {
+      while (faces.length) {
+        faces.shift()!();
+        yield;
+      }
+    };
+    const raw = makeKit(this.renderer, art, this.maxTex, board.meta.category, { defer: (j) => faces.push(j) });
     own.push(raw);
-    // one artwork per face and size, shared by the flat print and the 3D model
-    const texCache = new Map<string, THREE.MeshPhysicalMaterial>();
-    const kit: Kit = {
-      ...raw,
-      tex: (kind, w, h, surface) => {
-        const k = `${kind}|${Math.round(w * 10)}|${Math.round(h * 10)}|${surface ?? "board"}`;
-        let m = texCache.get(k);
-        if (!m) texCache.set(k, (m = raw.tex(kind, w, h, surface)));
-        return m;
-      },
-    };
-    const spec: PackSpec = { form: (item.form === "rsc" || item.form === "pillow" ? "carton" : item.form) as PackSpec["form"], w: item.w, h: item.h, d: item.d, finish };
-    const clipM = <T extends THREE.Material>(m: T): T => {
-      const c = m.clone() as T;
-      c.clippingPlanes = [planes.wipe, planes.above];
-      own.push(c);
-      return c;
-    };
-    let model: THREE.Object3D | null = null;
-    let holo: Holo | null = null;
-    const withModel = () => {
-      const b = buildForm({ spec, kit, art, maxTex: this.maxTex, own, category: board.meta.category });
-      b.apply(0);
-      b.explode(0);
-      b.root.traverse((o) => {
-        const m = o as THREE.Mesh;
-        if (m.isMesh) {
-          m.castShadow = true;
-          m.receiveShadow = true;
-        }
-      });
-      turn.add(b.root);
-      model = b.root;
-      holo = holographic(b.root, planes, 3 * U);
-      own.push(holo);
-    };
+    let built = false;
+    try {
+      yield;
+      // one artwork per face and size, shared by the flat print and the 3D model
+      const texCache = new Map<string, THREE.MeshPhysicalMaterial>();
+      const kit: Kit = {
+        ...raw,
+        tex: (kind, w, h, surface) => {
+          const k = `${kind}|${Math.round(w * 10)}|${Math.round(h * 10)}|${surface ?? "board"}`;
+          let m = texCache.get(k);
+          if (!m) texCache.set(k, (m = raw.tex(kind, w, h, surface)));
+          return m;
+        },
+      };
+      const spec: PackSpec = { form: (item.form === "rsc" || item.form === "pillow" ? "carton" : item.form) as PackSpec["form"], w: item.w, h: item.h, d: item.d, finish };
+      const clipM = <T extends THREE.Material>(m: T): T => {
+        const c = m.clone() as T;
+        c.clippingPlanes = [planes.wipe, planes.above];
+        own.push(c);
+        return c;
+      };
+      let model: THREE.Object3D | null = null;
+      let holo: Holo | null = null;
+      const withModel = function* (this: FormsScene) {
+        const b = buildForm({ spec, kit, art, maxTex: this.maxTex, own, category: board.meta.category });
+        b.apply(0);
+        b.explode(0);
+        b.root.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (m.isMesh) {
+            m.castShadow = true;
+            m.receiveShadow = true;
+          }
+        });
+        turn.add(b.root);
+        model = b.root;
+        yield;
+        holo = yield* holographicSteps(b.root, planes, 3 * U, this.dark);
+        own.push(holo);
+        yield;
+      };
 
-    let flat: { root: THREE.Group; lines: Line3[]; box: Act["box"]; pose: (f: number) => void; dispose: () => void };
-    let extra: ((t: number) => void) | null = null;
-    let hasScan = true;
-    if (FOLDED.has(item.form)) {
-      const set = foldsFor(item.form as "carton", item.w, item.h, item.d)!;
-      const netD = Math.max(...set.pieces.map((p) => flatOf(p).box.h));
-      const zMid = item.d / 2 + 50 + netD / 2;
-      const looks = new Map<string, THREE.Material>();
-      const cached = (key: string, make: () => THREE.Material) => {
-        let m = looks.get(key);
-        if (!m) looks.set(key, (m = make()));
-        return m;
-      };
-      const roles = { key: new THREE.Color(d.palette.find((p) => p.role === "brand")?.hex ?? d.palette[0].hex) };
-      const look = (piece: FoldPiece, p: FoldPanel) => {
-        const bb = flatOf({ ...piece, panels: [p] }).box;
-        const rot = p.art?.rot ?? 0;
-        const aw = rot === 90 || rot === 270 ? bb.h : bb.w;
-        const ah = rot === 90 || rot === 270 ? bb.w : bb.h;
-        let top: THREE.Material;
-        if (set.material === "wood") {
-          top = p.art ? cached(`eng|${aw}|${ah}`, () => clipM(raw.engraved("front", aw, ah))) : cached(`wood|${Math.round(bb.w)}|${Math.round(bb.h)}`, () => clipM(raw.wood(bb.w, bb.h)));
-          const under = cached(`woodU|${Math.round(bb.w)}`, () => clipM(raw.wood(bb.w, bb.h)));
-          return { top, under, edge: under };
+      let flat: { root: THREE.Group; lines: Line3[]; box: Act["box"]; pose: (f: number) => void; dispose: () => void };
+      let extra: ((t: number) => void) | null = null;
+      let rise: (f: number) => number = () => 0;
+      let hasScan = true;
+      if (FOLDED.has(item.form)) {
+        const set = foldsFor(item.form as "carton", item.w, item.h, item.d)!;
+        const netD = Math.max(...set.pieces.map((p) => flatOf(p).box.h));
+        const zMid = item.d / 2 + 50 + netD / 2;
+        const looks = new Map<string, THREE.Material>();
+        const cached = (key: string, make: () => THREE.Material) => {
+          let m = looks.get(key);
+          if (!m) looks.set(key, (m = make()));
+          return m;
+        };
+        const roles = { key: new THREE.Color(d.palette.find((p) => p.role === "brand")?.hex ?? d.palette[0].hex) };
+        const look = (piece: FoldPiece, p: FoldPanel) => {
+          const bb = flatOf({ ...piece, panels: [p] }).box;
+          const rot = p.art?.rot ?? 0;
+          const aw = rot === 90 || rot === 270 ? bb.h : bb.w;
+          const ah = rot === 90 || rot === 270 ? bb.w : bb.h;
+          let top: THREE.Material;
+          if (set.material === "wood") {
+            top = p.art ? cached(`eng|${aw}|${ah}`, () => clipM(raw.engraved("front", aw, ah))) : cached(`wood|${Math.round(bb.w)}|${Math.round(bb.h)}`, () => clipM(raw.wood(bb.w, bb.h)));
+            const under = cached(`woodU|${Math.round(bb.w)}`, () => clipM(raw.wood(bb.w, bb.h)));
+            return { top, under, edge: under };
+          }
+          if (p.art && (p.art.kind === "rscFront" || p.art.kind === "rscSide")) {
+            const kindR = p.art.kind;
+            const info = !!p.art.info;
+            top = cached(`rsc|${kindR}|${aw}|${ah}|${info}`, () => {
+              const t = new THREE.CanvasTexture(rscArt(kindR, aw, ah, art, item, info));
+              t.colorSpace = THREE.SRGBColorSpace;
+              t.anisotropy = 4;
+              own.push(t);
+              return clipM(new THREE.MeshStandardMaterial({ map: t, roughness: 0.92 }));
+            });
+          } else if (p.art) {
+            top = cached(`art|${p.art.kind}|${aw}|${ah}`, () => clipM(kit.tex(p.art!.kind as Parameters<Kit["tex"]>[0], aw, ah, set.material === "film" ? "film" : "board")));
+          } else if (p.glue) {
+            top = cached("glue", () => clipM(set.material === "corrugated" ? raw.kraft : raw.inside));
+          } else if (item.form === "rsc") {
+            top = cached("kraft", () => {
+              const t = new THREE.CanvasTexture(kraftPlain());
+              t.colorSpace = THREE.SRGBColorSpace;
+              t.wrapS = t.wrapT = THREE.RepeatWrapping;
+              own.push(t);
+              return clipM(new THREE.MeshStandardMaterial({ map: t, roughness: 0.93 }));
+            });
+          } else if (piece.base === "key") {
+            top = cached("key", () => clipM(new THREE.MeshPhysicalMaterial({ color: roles.key, roughness: 0.6 })));
+          } else top = cached("plain", () => clipM(raw.plain(set.material === "film" ? "film" : "board")));
+          const under = cached("under", () =>
+            set.material === "corrugated" ? clipM(raw.kraft) : set.material === "rigid" ? clipM(new THREE.MeshStandardMaterial({ color: "#8F8A80", roughness: 0.95 })) : set.material === "film" ? clipM(raw.bareMetal) : clipM(raw.inside),
+          );
+          const edge = cached("edge", () => (set.material === "corrugated" ? clipM(new THREE.MeshStandardMaterial({ color: "#A27A4E", roughness: 0.95 })) : clipM(raw.edge)));
+          return { top, under, edge };
+        };
+        // the panels' looks first, a few at a time; buildNet then finds them made
+        let t0 = performance.now();
+        for (const piece of set.pieces)
+          for (const p of piece.panels) {
+            look(piece, p);
+            if (performance.now() - t0 > 3) {
+              yield;
+              t0 = performance.now();
+            }
+          }
+        yield* drawFaces();
+        const net = buildNet(set, look, zMid);
+        flat = net;
+        rise = net.liftAt;
+        turn.add(net.root);
+        yield;
+        for (let k = 0; k < set.pieces.length; k++) {
+          net.prepare(k);
+          yield;
         }
-        if (p.art && (p.art.kind === "rscFront" || p.art.kind === "rscSide")) {
-          const kindR = p.art.kind;
-          const info = !!p.art.info;
-          top = cached(`rsc|${kindR}|${aw}|${ah}|${info}`, () => {
-            const t = new THREE.CanvasTexture(rscArt(kindR, aw, ah, art, item, info));
-            t.colorSpace = THREE.SRGBColorSpace;
-            t.anisotropy = 4;
-            own.push(t);
-            return clipM(new THREE.MeshStandardMaterial({ map: t, roughness: 0.92 }));
-          });
-        } else if (p.art) {
-          top = cached(`art|${p.art.kind}|${aw}|${ah}`, () => clipM(kit.tex(p.art!.kind as Parameters<Kit["tex"]>[0], aw, ah, set.material === "film" ? "film" : "board")));
-        } else if (p.glue) {
-          top = cached("glue", () => clipM(set.material === "corrugated" ? raw.kraft : raw.inside));
-        } else if (item.form === "rsc") {
-          top = cached("kraft", () => {
-            const t = new THREE.CanvasTexture(kraftPlain());
-            t.colorSpace = THREE.SRGBColorSpace;
-            t.wrapS = t.wrapT = THREE.RepeatWrapping;
-            own.push(t);
-            return clipM(new THREE.MeshStandardMaterial({ map: t, roughness: 0.93 }));
-          });
-        } else if (piece.base === "key") {
-          top = cached("key", () => clipM(new THREE.MeshPhysicalMaterial({ color: roles.key, roughness: 0.6 })));
-        } else top = cached("plain", () => clipM(raw.plain(set.material === "film" ? "film" : "board")));
-        const under = cached("under", () =>
-          set.material === "corrugated" ? clipM(raw.kraft) : set.material === "rigid" ? clipM(new THREE.MeshStandardMaterial({ color: "#8F8A80", roughness: 0.95 })) : set.material === "film" ? clipM(raw.bareMetal) : clipM(raw.inside),
-        );
-        const edge = cached("edge", () => (set.material === "corrugated" ? clipM(new THREE.MeshStandardMaterial({ color: "#A27A4E", roughness: 0.95 })) : clipM(raw.edge)));
-        return { top, under, edge };
-      };
-      const net = buildNet(set, look, zMid);
-      flat = net;
-      turn.add(net.root);
-      if (item.form === "rsc") {
+        if (item.form === "rsc") {
+          hasScan = false;
+          const tp = tape(item.w, item.h, 3);
+          own.push(tp);
+          turn.add(tp.mesh);
+          extra = (t) => tp.set(ease(seg(t, [3.15, 3.8])));
+        } else yield* withModel.call(this);
+      } else if (ROUND.has(item.form)) {
+        yield* withModel.call(this);
+        const wr = buildWraps(model!, planes, (Math.max(item.d, item.w) / 2 + 60) * U + 0.35 * item.h * U);
+        flat = wr;
+        turn.add(wr.root);
+      } else if (item.form === "pouch") {
+        yield* withModel.call(this);
+        const mp = morphPouch(item.w, item.h, item.d, kit, planes, (item.d / 2 + 60 + item.h / 2) * U);
+        flat = mp;
+        turn.add(mp.root);
+      } else if (item.form === "blister") {
+        yield* withModel.call(this);
+        const mp = morphBlister(item.w, item.h, item.d, kit, planes, (item.d / 2 + 50) * U);
+        flat = mp;
+        turn.add(mp.root);
+      } else {
         hasScan = false;
-        const tp = tape(item.w, item.h, 3);
-        own.push(tp);
-        turn.add(tp.mesh);
-        extra = (t) => tp.set(ease(seg(t, [2.75, 3.4])));
-      } else withModel();
-    } else if (ROUND.has(item.form)) {
-      withModel();
-      const wr = buildWraps(model!, planes, (Math.max(item.d, item.w) / 2 + 60) * U + 0.35 * item.h * U);
-      flat = wr;
-      turn.add(wr.root);
-    } else if (item.form === "pouch") {
-      withModel();
-      const mp = morphPouch(item.w, item.h, item.d, kit, planes, (item.d / 2 + 60 + item.h / 2) * U);
-      flat = mp;
-      turn.add(mp.root);
-    } else if (item.form === "blister") {
-      withModel();
-      const mp = morphBlister(item.w, item.h, item.d, kit, planes, (item.d / 2 + 50) * U);
-      flat = mp;
-      turn.add(mp.root);
-    } else {
-      hasScan = false;
-      const pl = buildPillow(item.w, item.d, item.h, art, this.renderer, planes, (item.d / 2 + 70 + item.d) * U);
-      flat = pl;
-      turn.add(pl.root);
-    }
-    own.push(flat);
-    // reveal order of the dieline: left to right across the sheet
-    const mids = flat.lines.map((l) => (l.a.x + l.b.x) / 2);
-    const lo = Math.min(...mids);
-    const hi = Math.max(...mids);
-    const ranks = mids.map((m) => (hi > lo ? (m - lo) / (hi - lo) : 0));
-    const box = flat.box;
-    const top = item.h * U * 1.06 + 0.01;
-    const pose = (t: number) => {
-      const f = ease(seg(t, T_.form));
-      flat.pose(f);
-      extra?.(t);
-      // the print: a laser line sweeps the sheet; before it, only the vector dieline exists
-      const wipeK = clamp((t - T_.wipe[0]) / (T_.wipe[1] - T_.wipe[0]));
-      setWipe(planes, x + box.x0 - 0.02 + (box.x1 - box.x0 + 0.04) * wipeK + (wipeK >= 1 ? 1e5 : 0));
-      const ghost = hasScan ? ease(seg(t, T_.ghost)) : 0;
-      const sk = seg(t, T_.scan);
-      const scanY = !hasScan ? -1e6 : sk <= 0 ? -1e6 : sk >= 1 ? 1e6 : -0.005 + (top + 0.01) * ease(sk);
-      setScan(planes, scanY);
-      (holo as Holo | null)?.set(ghost, scanY);
-      // after the scan, the flat print's job is done
-      flat.root.visible = !hasScan || sk < 1;
-      if (model) (model as THREE.Object3D).visible = t > T_.ghost[0];
-      turn.rotation.y = 0.38 * ease(seg(t, T_.turn));
-    };
-    pose(0);
-    return {
-      item,
-      x,
-      group,
-      lines: flat.lines,
-      ranks,
-      box,
-      prod: { w: item.w, h: item.h, d: item.d },
-      pose,
-      posedAt: null,
-      dispose: () => {
+        const pl = buildPillow(item.w, item.d, item.h, art, this.renderer, planes, (item.d / 2 + 70 + item.d) * U);
+        flat = pl;
+        turn.add(pl.root);
+      }
+      own.push(flat);
+      yield* drawFaces();
+      // reveal order of the dieline: left to right across the sheet
+      const mids = flat.lines.map((l) => (l.a.x + l.b.x) / 2);
+      const lo = Math.min(...mids);
+      const hi = Math.max(...mids);
+      const ranks = mids.map((m) => (hi > lo ? (m - lo) / (hi - lo) : 0));
+      const box = flat.box;
+      const top = item.h * U * 1.06 + 0.01;
+      const pose = (t: number) => {
+        // linear here: each fold, wrap and move eases on its own stretch of the form phase
+        const f = seg(t, T_.form);
+        flat.pose(f);
+        extra?.(t);
+        // the print: a laser line sweeps the sheet; before it, only the vector dieline exists
+        const wipeK = clamp((t - T_.wipe[0]) / (T_.wipe[1] - T_.wipe[0]));
+        setWipe(planes, x + box.x0 - 0.02 + (box.x1 - box.x0 + 0.04) * wipeK + (wipeK >= 1 ? 1e5 : 0));
+        // the hologram waits for the pack, and quietens as the folded sheet fills it
+        const ghost = hasScan ? ease(seg(t, T_.ghost)) * (1 - 0.6 * ease(seg(t, [T_.form[1] - 0.8, T_.form[1] - 0.1]))) : 0;
+        const sk = seg(t, T_.scan);
+        const scanY = !hasScan ? -1e6 : sk <= 0 ? -1e6 : sk >= 1 ? 1e6 : -0.005 + (top + 0.01) * ease(sk);
+        setScan(planes, scanY);
+        (holo as Holo | null)?.set(ghost, scanY);
+        // after the scan, the flat print's job is done
+        flat.root.visible = !hasScan || sk < 1;
+        if (model) (model as THREE.Object3D).visible = t > T_.ghost[0];
+        turn.rotation.y = 0.38 * ease(seg(t, T_.turn));
+      };
+      pose(0);
+      group.visible = true;
+      built = true;
+      return {
+        item,
+        x,
+        group,
+        lines: flat.lines,
+        ranks,
+        box,
+        prod: { w: item.w, h: item.h, d: item.d },
+        pose,
+        posedAt: null,
+        holo,
+        rise: (t) => rise(seg(t, T_.form)),
+        dispose: () => {
+          this.scene.remove(group);
+          own.forEach((o) => o.dispose());
+        },
+      };
+    } finally {
+      // abandoned half way (the viewer jumped elsewhere): let go of what was made
+      if (!built) {
         this.scene.remove(group);
         own.forEach((o) => o.dispose());
-      },
-    };
+      }
+    }
   }
 
   private act(ix: number): Act {
     let a = this.acts.get(ix);
     if (!a) {
-      a = this.build(ix);
+      const j = this.job;
+      if (j && j.ix === ix && !j.act) {
+        // needed now: finish the steps that are left
+        a = j.act = finish(j.gen);
+        // the theme may have changed while it was being built
+        a.holo?.tone(this.dark);
+        j.warm = [];
+        this.job = null;
+      } else a = finish(this.build(ix));
       this.acts.set(ix, a);
     }
     return a;
@@ -379,7 +483,71 @@ export class FormsScene {
         a.dispose();
         this.acts.delete(i);
       }
+    const j = this.job;
+    if (j && (!want.has(j.ix) && !(ahead === false && j.ix === ix + 1))) {
+      if (!j.act) j.gen.return(undefined as unknown as Act);
+      this.job = null;
+    }
     for (const i of want) this.act(i);
+  }
+
+  /**
+   * A few milliseconds of work on the next pack: its build steps, then a first draw of its
+   * meshes a couple at a time, into one pixel, so that their shaders compile and their
+   * textures upload now, not on the frame where the pack first comes into view.
+   */
+  private work(budget = 5) {
+    const j = this.job;
+    if (!j) return;
+    const t0 = performance.now();
+    if (!j.act) {
+      while (performance.now() - t0 < budget) {
+        const r = j.gen.next();
+        if (r.done) {
+          j.act = r.value;
+          r.value.holo?.tone(this.dark);
+          this.acts.set(j.ix, r.value);
+          j.warm = [];
+          r.value.group.traverse((o) => {
+            if ((o as THREE.Mesh).isMesh || (o as THREE.LineSegments).isLine) j.warm!.push(o);
+          });
+          break;
+        }
+      }
+      return;
+    }
+    if (this.acts.get(j.ix) !== j.act || !j.warm?.length) {
+      this.job = null;
+      return;
+    }
+    const a = j.act;
+    const hidden: THREE.Object3D[] = [];
+    for (const c of this.scene.children)
+      if (c !== a.group && c.visible && !(c as THREE.Light).isLight) {
+        c.visible = false;
+        hidden.push(c);
+      }
+    const inner: THREE.Object3D[] = [];
+    a.group.traverse((o) => o !== a.group && inner.push(o));
+    const saved = inner.map((o) => [o.visible, o.frustumCulled] as const);
+    const r = this.renderer;
+    r.setScissorTest(true);
+    r.setScissor(0, 0, 1, 1);
+    while (j.warm.length && performance.now() - t0 < budget) {
+      const now = new Set(j.warm.splice(0, 3));
+      for (const o of inner) {
+        const drawn = (o as THREE.Mesh).isMesh || (o as THREE.LineSegments).isLine;
+        o.visible = drawn ? now.has(o) : true;
+        if (now.has(o)) o.frustumCulled = false;
+      }
+      r.render(this.scene, this.camera);
+    }
+    r.setScissorTest(false);
+    inner.forEach((o, k) => {
+      o.visible = saved[k][0];
+      o.frustumCulled = saved[k][1];
+    });
+    for (const c of hidden) c.visible = true;
   }
 
   /* ---------------------------------------------------------------- camera */
@@ -405,7 +573,7 @@ export class FormsScene {
     const fitProd = this.fit(Math.max(W, D) * 1.25, H * 1.1 + D * 0.35);
     // the sheet while it is drawn, printed and folded; then the finished pack
     const mid = (p: number, q: number, k: number) => p + (q - p) * k;
-    const ts = [0, 1.1, 1.95, 2.75, 4.6];
+    const ts = CAM_T;
     const v: Record<(typeof KEYS)[number], number[]> = {
       tx: [ncx, ncx, mid(ncx, a.x, 0.4), a.x, a.x],
       ty: [0, 0, H * 0.3, H * 0.48, H * 0.5],
@@ -416,6 +584,8 @@ export class FormsScene {
     };
     const out = {} as Cam;
     for (const k of KEYS) out[k] = spline(ts, v[k], t);
+    // a sheet lifted to fold stays in frame: the camera rises with it (the lift is smooth)
+    out.ty += a.rise(t) * 0.6;
     return out;
   }
 
@@ -495,27 +665,17 @@ export class FormsScene {
     return [((p.x + 1) / 2) * this.w, ((1 - p.y) / 2) * this.h];
   }
 
+  private lastTime: number | null = null;
+
   private render(time: number) {
+    this.lastTime = time;
     const total = FILM.length * CH;
     time = ((time % total) + total) % total;
     const ix = Math.min(FILM.length - 1, Math.floor(time / CH));
     const t = time - ix * CH;
     this.keep(ix, !this.running || t > CH - 1 || this.acts.has(ix + 1));
-    // build the next pack while this one holds still, not in the middle of its motion
-    if (this.running && t > 1.5 && ix + 1 < FILM.length && !this.acts.has(ix + 1) && !this.pending) {
-      this.pending = true;
-      const w = window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => void };
-      (w.requestIdleCallback ?? ((f: () => void) => setTimeout(f, 0)))(
-        () => {
-          this.pending = false;
-          if (!this.running) return;
-          this.act(Math.min(FILM.length - 1, Math.floor((((performance.now() / 1000 - this.t0) % (FILM.length * CH)) + FILM.length * CH) % (FILM.length * CH) / CH) + 1));
-          // compile its shaders now, while nothing moves, rather than on its first frame
-          this.renderer.compile(this.scene, this.camera);
-        },
-        { timeout: 1500 },
-      );
-    }
+    // the next pack is built a step at a time from early in this one's turn (see work())
+    if (this.running && t > 0.3 && ix + 1 < FILM.length && !this.acts.has(ix + 1) && !this.job) this.job = { ix: ix + 1, gen: this.build(ix + 1) };
     for (const [i, a] of this.acts) {
       // packs waiting flat, or finished and still, need no posing
       const lt = clamp(time - i * CH, -1, CH + 2);
@@ -535,7 +695,7 @@ export class FormsScene {
       const b = this.acts.get(j);
       if (!b) continue;
       const lt = time - j * CH;
-      const drawAlpha = 1 - clamp((lt - 1.15) / 0.35);
+      const drawAlpha = 1 - clamp((lt - 1.2) / 0.35);
       if (lt < -0.5 || drawAlpha <= 0) continue;
       b.lines.forEach((l, k) => {
         const start = -0.4 + b.ranks[k] * 0.36 + (l.kind === "crease" ? 0.2 : 0);
@@ -602,6 +762,7 @@ export class FormsScene {
     if (!this.t0) this.t0 = performance.now() / 1000;
     const loop = () => {
       if (!this.running) return;
+      this.work();
       this.render(performance.now() / 1000 - this.t0);
       this.raf = requestAnimationFrame(loop);
     };
@@ -620,6 +781,8 @@ export class FormsScene {
 
   dispose() {
     this.stop();
+    if (this.job && !this.job.act) this.job.gen.return(undefined as unknown as Act);
+    this.job = null;
     for (const a of this.acts.values()) a.dispose();
     this.acts.clear();
     this.env.dispose();

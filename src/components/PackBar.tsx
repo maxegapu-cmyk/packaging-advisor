@@ -12,7 +12,7 @@ const T = {
   saved: { zh: "已保存", en: "Saved" },
 };
 const one = (p: { zh: string; en: string }, lang: Lang) => (lang === "en" ? p.en : p.zh);
-const both = (p: { zh: string; en: string }, lang: Lang) => (lang === "bi" ? `${p.zh} ${p.en}` : one(p, lang));
+const both = one;
 
 /** Package structure for all three directions on a board: form and finish here; size and combinations in the 3D space. */
 export function PackBar({ lang }: { lang: Lang }) {

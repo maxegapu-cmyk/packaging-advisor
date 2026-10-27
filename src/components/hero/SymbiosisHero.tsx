@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Lang, Pair } from "@/lib/i18n";
 import type { Sample } from "@/lib/samples";
 import { reducedMotion } from "../pack/orbit";
+import { useTheme } from "@/lib/theme";
 import { Bi } from "../Bi";
+import { SegPill } from "../SegPill";
 import type { FrameInfo, HeroItem, OverlayFrame, SymbiosisScene } from "./symbiosis";
 import type { FormsFrame, FormsScene } from "./forms/film";
 import { FILM, ITEM_SECONDS, PHASES, phaseOf, sizeText } from "./forms/items";
@@ -38,23 +40,25 @@ export function heroItems(samples: Sample[]): HeroItem[] {
   return out;
 }
 
+const f1 = (n: number) => n.toFixed(1);
 const pts = (a: [number, number][]) => a.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
 
 /** Draws the 2D layer into the SVG (imperatively, every frame). */
 function drawOverlay(svg: SVGSVGElement, o: OverlayFrame) {
   svg.setAttribute("viewBox", `0 0 ${o.w} ${o.h}`);
   const out: string[] = [];
+  // colours come from the theme (globals.css: .sy-*)
   if (o.head) {
-    const cols = ["#00A0E9", "#E4007F", "#E6D200", "#111111"];
-    cols.forEach((c, i) => out.push(`<line x1="${o.head!.a[0] + i * 3}" y1="${o.head!.a[1]}" x2="${o.head!.b[0] + i * 3}" y2="${o.head!.b[1]}" stroke="${c}" stroke-width="1.2" opacity="0.85"/>`));
+    const { a, b } = o.head;
+    out.push(`<line x1="${f1(a[0])}" y1="${f1(a[1])}" x2="${f1(b[0])}" y2="${f1(b[1])}" class="sy-head-glow"/><line x1="${f1(a[0])}" y1="${f1(a[1])}" x2="${f1(b[0])}" y2="${f1(b[1])}" class="sy-head"/>`);
   }
-  for (const g of o.ghosts) out.push(`<polygon points="${pts(g)}" fill="none" stroke="#00A0E9" stroke-width="0.9" stroke-dasharray="4 3" opacity="0.75"/>`);
-  if (o.circle) out.push(`<polyline points="${pts(o.circle)}" fill="none" stroke="#E4007F" stroke-width="1.2" stroke-dasharray="5 4"/>`);
+  for (const g of o.ghosts) out.push(`<polygon points="${pts(g)}" class="sy-ghost"/>`);
+  if (o.circle) out.push(`<polyline points="${pts(o.circle)}" class="sy-circle"/>`);
   if (o.cut) {
     let len = 0;
     for (let i = 1; i < o.cut.pts.length; i++) len += Math.hypot(o.cut.pts[i][0] - o.cut.pts[i - 1][0], o.cut.pts[i][1] - o.cut.pts[i - 1][1]);
     const done = len * o.cut.p;
-    out.push(`<polyline points="${pts(o.cut.pts)}" fill="none" stroke="#E4007F" stroke-width="1.6" stroke-linejoin="round" stroke-dasharray="${len.toFixed(1)}" stroke-dashoffset="${(len - done).toFixed(1)}"/>`);
+    out.push(`<polyline points="${pts(o.cut.pts)}" class="sy-cut" stroke-dasharray="${len.toFixed(1)}" stroke-dashoffset="${(len - done).toFixed(1)}"/>`);
     // the knife
     let acc = 0;
     for (let i = 1; i < o.cut.pts.length; i++) {
@@ -63,15 +67,15 @@ function drawOverlay(svg: SVGSVGElement, o: OverlayFrame) {
       const l = Math.hypot(x1 - x0, y1 - y0);
       if (acc + l >= done && o.cut.p < 1) {
         const k = l ? (done - acc) / l : 0;
-        out.push(`<circle cx="${(x0 + (x1 - x0) * k).toFixed(1)}" cy="${(y0 + (y1 - y0) * k).toFixed(1)}" r="3.2" fill="#E4007F"/>`);
+        out.push(`<circle cx="${(x0 + (x1 - x0) * k).toFixed(1)}" cy="${(y0 + (y1 - y0) * k).toFixed(1)}" r="3.2" class="sy-knife"/>`);
         break;
       }
       acc += l;
     }
   }
   for (const t of o.threads) {
-    out.push(`<line x1="${t.a[0].toFixed(1)}" y1="${t.a[1].toFixed(1)}" x2="${t.b[0].toFixed(1)}" y2="${t.b[1].toFixed(1)}" stroke="#00A0E9" stroke-width="0.8" opacity="0.8"/>`);
-    out.push(`<circle cx="${t.b[0].toFixed(1)}" cy="${t.b[1].toFixed(1)}" r="2.2" fill="#00A0E9"/><circle cx="${t.a[0].toFixed(1)}" cy="${t.a[1].toFixed(1)}" r="2.2" fill="#fff" stroke="#00A0E9" stroke-width="1"/>`);
+    out.push(`<line x1="${t.a[0].toFixed(1)}" y1="${t.a[1].toFixed(1)}" x2="${t.b[0].toFixed(1)}" y2="${t.b[1].toFixed(1)}" class="sy-thread"/>`);
+    out.push(`<circle cx="${t.b[0].toFixed(1)}" cy="${t.b[1].toFixed(1)}" r="2.2" class="sy-dot"/><circle cx="${t.a[0].toFixed(1)}" cy="${t.a[1].toFixed(1)}" r="2.2" class="sy-dot-o"/>`);
   }
   for (const d of o.dims) {
     const [ax, ay] = d.a;
@@ -80,16 +84,13 @@ function drawOverlay(svg: SVGSVGElement, o: OverlayFrame) {
     const nx = -(by - ay) / len;
     const ny = (bx - ax) / len;
     const tk = 5;
-    out.push(`<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="#111" stroke-width="1"/>`);
-    out.push(`<line x1="${ax - nx * tk}" y1="${ay - ny * tk}" x2="${ax + nx * tk}" y2="${ay + ny * tk}" stroke="#111" stroke-width="1"/><line x1="${bx - nx * tk}" y1="${by - ny * tk}" x2="${bx + nx * tk}" y2="${by + ny * tk}" stroke="#111" stroke-width="1"/>`);
+    out.push(`<g class="sy-dimg"><line x1="${f1(ax)}" y1="${f1(ay)}" x2="${f1(bx)}" y2="${f1(by)}"/><line x1="${f1(ax - nx * tk)}" y1="${f1(ay - ny * tk)}" x2="${f1(ax + nx * tk)}" y2="${f1(ay + ny * tk)}"/><line x1="${f1(bx - nx * tk)}" y1="${f1(by - ny * tk)}" x2="${f1(bx + nx * tk)}" y2="${f1(by + ny * tk)}"/></g>`);
     const mx = (ax + bx) / 2 + nx * 14;
     const my = (ay + by) / 2 + ny * 14;
     out.push(`<text x="${mx.toFixed(1)}" y="${my.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" class="sym-dim">${d.text}</text>`);
   }
   svg.innerHTML = `<g opacity="${o.alpha2d.toFixed(3)}">${out.join("")}</g>`;
 }
-
-const f1 = (n: number) => n.toFixed(1);
 
 /** Draws the forms film's 2D layer: the dieline, the print laser, the scan contour, the dimensions. */
 function drawFormsOverlay(svg: SVGSVGElement, f: FormsFrame) {
@@ -128,7 +129,7 @@ const FILMS: { id: Film; label: Pair }[] = [
 ];
 const FILM_KEY = "pa.heroFilm";
 /** Reduced motion: the gift box, finished. */
-const FORMS_STILL: [number, number] = [5, 3.8];
+const FORMS_STILL: [number, number] = [5, 4.2];
 
 /** Starts work once the page has loaded and gone idle, so copy and layout come first. */
 function whenIdle(): Promise<void> {
@@ -153,6 +154,8 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
   const svg = useRef<SVGSVGElement>(null);
   const veil = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
+  // where the pre-rendered film was, so a change of theme picks up at the same moment
+  const videoAt = useRef<{ film: string; t: number }>({ film: "", t: 0 });
   const scene = useRef<SymbiosisScene | null>(null);
   const forms = useRef<FormsScene | null>(null);
   const [film, setFilm] = useState<Film>("symbiosis");
@@ -162,6 +165,16 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
   // the remembered film is read first, so a returning visitor's other film is never built
   const [ready, setReady] = useState(false);
   const one = (p: Pair) => (lang === "en" ? p.en : p.zh);
+  const theme = useTheme();
+  const dark = theme === "dark";
+  // read when a film is made, so it starts in the right tone
+  const darkRef = useRef(dark);
+  darkRef.current = dark;
+
+  useEffect(() => {
+    scene.current?.setTone(dark);
+    forms.current?.setTone(dark);
+  }, [dark]);
 
   useEffect(() => {
     try {
@@ -235,6 +248,7 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
           mount(
             (c) => {
               const sc = new SymbiosisScene(c, items);
+              sc.setTone(darkRef.current);
               scene.current = sc;
               sc.onFrame = (f: FrameInfo, o: OverlayFrame) => {
                 if (svg.current) drawOverlay(svg.current, o);
@@ -257,6 +271,7 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
           mount(
             (c) => {
               const sc = new FormsScene(c);
+              sc.setTone(darkRef.current);
               forms.current = sc;
               sc.onFrame = (f: FormsFrame) => {
                 if (svg.current) drawFormsOverlay(svg.current, f);
@@ -291,25 +306,29 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
   const isForms = film === "forms";
   const fp = FILM[pack.item];
   return (
-    <section className={`sym${isForms ? " is-forms is-dark" : ""}`} data-film={film} aria-label={lang === "en" ? "Packaging Advisor" : "包装视觉顾问"}>
+    <section className={`sym${isForms ? " is-forms" : ""}${dark ? " is-dark" : ""}`} data-film={film} aria-label={lang === "en" ? "Packaging Advisor" : "包装视觉顾问"}>
       <div className="sym-stage" ref={host}>
         <svg ref={svg} className="sym-2d" aria-hidden="true" />
         <div ref={veil} className="sym-veil" aria-hidden="true" />
         {!ok[film] ? (
           // no WebGL: the same film, pre-rendered
           <video
-            key={film}
+            key={`${film}-${theme}`}
             ref={video}
             className="sym-video"
-            src={`/hero/${film}.mp4`}
-            poster={`/hero/${film}-poster.jpg`}
+            src={`/hero/${film}-${theme}.mp4`}
+            poster={`/hero/${film}-${theme}.jpg`}
             autoPlay
             muted
             loop
             playsInline
             aria-hidden="true"
+            onLoadedMetadata={(e) => {
+              if (videoAt.current.film === film) e.currentTarget.currentTime = videoAt.current.t;
+            }}
             // the pre-rendered film still drives the caption and the strip
             onTimeUpdate={(e) => {
+              videoAt.current = { film, t: e.currentTarget.currentTime };
               if (!isForms) return;
               const t = e.currentTarget.currentTime;
               const item = Math.min(FILM.length - 1, Math.floor(t / ITEM_SECONDS));
@@ -319,7 +338,8 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
           />
         ) : null}
       </div>
-      <div className="sym-films" role="tablist" aria-label={lang === "en" ? "Films" : "影片"}>
+      <div className="sym-films seg" role="tablist" aria-label={lang === "en" ? "Films" : "影片"}>
+        <SegPill />
         {FILMS.map((f) => (
           <button key={f.id} type="button" role="tab" aria-selected={film === f.id} className={film === f.id ? "is-on" : undefined} onClick={() => choose(f.id)}>
             <Bi p={f.label} lang={lang} />
@@ -356,7 +376,7 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
                 title={`${x.name.zh} ${x.name.en}`}
                 onClick={() => {
                   setPack({ item: i, phase: 0 });
-                  forms.current?.show(i, reducedMotion() ? 3.8 : 0.05);
+                  forms.current?.show(i, reducedMotion() ? FORMS_STILL[1] : 0.05);
                   if (video.current) video.current.currentTime = i * ITEM_SECONDS + 0.05;
                 }}
               >
@@ -374,7 +394,8 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
               </li>
             ))}
           </ol>
-          <div className="sym-products" role="group" aria-label={lang === "en" ? "Products in the film" : "影片中的产品"}>
+          <div className="sym-products seg" role="group" aria-label={lang === "en" ? "Products in the film" : "影片中的产品"}>
+            <SegPill />
             {items.map((x, i) => (
               <button
                 key={x.id}

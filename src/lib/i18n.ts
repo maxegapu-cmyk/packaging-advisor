@@ -1,19 +1,20 @@
 /**
- * Display languages. Default "bi": Chinese first with English beneath. Testers can switch to
- * Chinese only or English only; the choice is a cookie, so it works without JavaScript.
+ * Display languages: Chinese (the default) or English. The choice is a cookie, so it works
+ * without JavaScript. An older "bi" (both at once) choice reads as Chinese.
  */
 export const LANG_COOKIE = "pa_lang";
-export const LANGS = ["bi", "zh", "en"] as const;
+export const LANGS = ["zh", "en"] as const;
 export type Lang = (typeof LANGS)[number];
+export const DEFAULT_LANG: Lang = "zh";
 export const isLang = (v: unknown): v is Lang => typeof v === "string" && (LANGS as readonly string[]).includes(v);
+/** A stored choice as a language (anything unknown, including the retired "bi", is Chinese). */
+export const toLang = (v: unknown): Lang => (isLang(v) ? v : DEFAULT_LANG);
 
 export type Pair = { zh: string; en: string };
 
 /** Plain-text rendering (for attributes, titles, alt text). */
 export function plain(p: Pair, lang: Lang): string {
-  if (lang === "zh") return p.zh;
-  if (lang === "en") return p.en || p.zh;
-  return p.en && p.en !== p.zh ? `${p.zh} ${p.en}` : p.zh;
+  return lang === "en" ? p.en || p.zh : p.zh;
 }
 
 export const UI = {
@@ -29,7 +30,6 @@ export const UI = {
   noProducts: { zh: "还没有产品。上传一两张产品照片，几分钟内得到三个包装方向。", en: "No products yet. Upload one or two product photos and get three packaging directions in minutes." },
   admin: { zh: "管理", en: "Admin" },
   language: { zh: "语言", en: "Language" },
-  langBi: { zh: "中英", en: "中英" },
   langZh: { zh: "中文", en: "中文" },
   langEn: { zh: "English", en: "English" },
 

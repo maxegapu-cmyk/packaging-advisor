@@ -139,7 +139,7 @@ export const EFFECT_LABELS: Record<Effect, Pair> = {
 };
 
 /** Short wording of a finish with its effects, e.g. "哑膜 + 烫金 + 击凸". */
-export function finishText(spec: { finish: Finish; effects?: Effect[] }, lang: "zh" | "en" | "bi"): string {
+export function finishText(spec: { finish: Finish; effects?: Effect[] }, lang: "zh" | "en"): string {
   const one = (p: Pair) => (lang === "en" ? p.en : p.zh);
   return [one(FINISH_LABELS[spec.finish]), ...(spec.effects ?? []).map((e) => one(EFFECT_LABELS[e]))].join(" + ");
 }

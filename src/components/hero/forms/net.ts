@@ -20,6 +20,8 @@ type PieceState = {
   qFinal: THREE.Quaternion;
   anchor: THREE.Vector3; // anchor printed-face centre, sheet coordinates
   arc: number;
+  /** How far the piece is lifted over the folding (mm, sampled on f), smoothed; see prepare. */
+  lift: number[] | null;
 };
 
 export type NetBuild = {
@@ -28,11 +30,18 @@ export type NetBuild = {
   /** Flat footprint in item-local scene units. */
   box: { x0: number; x1: number; z0: number; z1: number };
   pose: (f: number) => void;
+  /** Works out piece `k`'s lift over the fold ahead of time (otherwise it is found frame by frame). */
+  prepare: (k: number) => void;
+  /** How high (scene units) the highest-lifted piece floats at `f`, from the prepared curves. */
+  liftAt: (f: number) => number;
   materials: THREE.Material[];
   dispose: () => void;
 };
 
 const m4 = new THREE.Matrix4();
+/** Shares of the form phase for lifting the sheet before the folds, and setting the pack down after. */
+const LEAD = 0.14;
+const TAIL = 0.1;
 /** Caps of the extruded edge geometry: drawn as separate faces instead. */
 const HIDDEN = new THREE.MeshBasicMaterial({ visible: false });
 const toM = (a: M4) => new THREE.Matrix4().fromArray(a);
@@ -144,48 +153,83 @@ export function buildNet(set: FoldSet, look: (piece: FoldPiece, p: FoldPanel) =>
     const qFinal = new THREE.Quaternion().setFromRotationMatrix(pm);
     const anc = piece.panels.find((p) => p.id === piece.anchor)!;
     const ab = bboxOf(anc.poly);
-    states.push({ piece, holder, panels: groups, origin, qFinal, anchor: new THREE.Vector3(ab.x + ab.w / 2, anc.thick ?? piece.thick, ab.y + ab.h / 2), arc: 0.16 * Math.max(f.box.w, f.box.h) });
+    states.push({ piece, holder, panels: groups, origin, qFinal, anchor: new THREE.Vector3(ab.x + ab.w / 2, anc.thick ?? piece.thick, ab.y + ab.h / 2), arc: 0.16 * Math.max(f.box.w, f.box.h), lift: null });
   });
 
   const tmpBox = new THREE.Box3();
   const q = new THREE.Quaternion();
   const P = new THREE.Vector3();
+  const place = (st: PieceState, lift: number) => {
+    m4.compose(new THREE.Vector3(P.x, P.y + lift, P.z), q, new THREE.Vector3(1, 1, 1));
+    st.holder.matrix.copy(m4).multiply(new THREE.Matrix4().makeTranslation(-st.anchor.x, -st.anchor.y, -st.anchor.z));
+    st.holder.matrixWorldNeedsUpdate = true;
+  };
+  /**
+   * Folds piece `st` to `f` and places it unlifted; returns how far it then hangs below the
+   * floor (mm). The folding itself runs between LEAD and 1 − TAIL: the first stretch lifts the
+   * sheet off the table, the last one sets the finished pack down.
+   */
+  const fold = (st: PieceState, f: number) => {
+    f = seg(f, [LEAD, 1 - TAIL]);
+    const frames = foldFrames(st.piece, (p) => (p.at ? ease(seg(f, p.at)) : 1));
+    for (const [id, g] of st.panels) {
+      g.matrix.fromArray(frames.get(id)!);
+      g.matrixWorldNeedsUpdate = true;
+    }
+    const e = ease(seg(f, st.piece.move));
+    const start = st.anchor.clone().add(st.origin);
+    const end = new THREE.Vector3(...st.piece.final.c);
+    if (st.piece.slide) {
+      const s = 1 - ease(seg(f, st.piece.slide.at));
+      end.add(new THREE.Vector3(...st.piece.slide.from).multiplyScalar(s));
+    }
+    q.identity().slerp(st.qFinal, e);
+    P.copy(start).lerp(end, e);
+    // a little arc, so a piece travels over rather than through what is already there
+    P.y += Math.sin(Math.PI * e) * st.arc;
+    place(st, 0);
+    st.holder.updateMatrixWorld(true);
+    tmpBox.makeEmpty();
+    const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+    st.holder.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+      tmpBox.union(m.geometry.boundingBox!.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)));
+    });
+    return Math.max(0, -tmpBox.min.y / U);
+  };
+  const N = 80;
+  const smooth = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+  const prepare = (k: number) => {
+    const st = states[k];
+    if (!st || st.lift) return;
+    const need: number[] = [];
+    for (let i = 0; i <= N; i++) need.push(fold(st, i / N));
+    // the most that will be needed a little ahead (and just behind), so the piece rises before
+    // a panel swings down and stays up while it folds; then smoothed, so it floats up and down
+    // instead of being pushed frame by frame
+    const ahead = Math.round(0.22 * N);
+    const behind = Math.round(0.06 * N);
+    let v = need.map((_, i) => Math.max(...need.slice(Math.max(0, i - behind), i + ahead + 1)));
+    for (let pass = 0; pass < 6; pass++) v = v.map((_, i) => (v[Math.max(0, i - 2)] + v[Math.max(0, i - 1)] + v[i] + v[Math.min(N, i + 1)] + v[Math.min(N, i + 2)]) / 5);
+    // on the table at the start and at the end, never lower than needed in between
+    st.lift = v.map((x, i) => Math.max(x * smooth(Math.min(i / (LEAD * N), (N - i) / (TAIL * N))), need[i]));
+    fold(st, 0);
+  };
+  const curveAt = (c: number[], f: number) => {
+    const x = clamp(f) * N;
+    const i = Math.min(N - 1, Math.floor(x));
+    return c[i] + (c[i + 1] - c[i]) * (x - i);
+  };
+  const liftAt = (f: number) => Math.max(0, ...states.map((st) => (st.lift ? curveAt(st.lift, f) : 0))) * U;
   const pose = (f: number) => {
     for (const st of states) {
-      const frames = foldFrames(st.piece, (p) => (p.at ? ease(seg(f, p.at)) : 1));
-      for (const [id, g] of st.panels) {
-        g.matrix.fromArray(frames.get(id)!);
-        g.matrixWorldNeedsUpdate = true;
-      }
-      const e = ease(seg(f, st.piece.move));
-      const start = st.anchor.clone().add(st.origin);
-      const end = new THREE.Vector3(...st.piece.final.c);
-      if (st.piece.slide) {
-        const s = 1 - ease(seg(f, st.piece.slide.at));
-        end.add(new THREE.Vector3(...st.piece.slide.from).multiplyScalar(s));
-      }
-      q.identity().slerp(st.qFinal, e);
-      P.copy(start).lerp(end, e);
-      // a little arc, so a piece travels over rather than through what is already there
-      P.y += Math.sin(Math.PI * e) * st.arc;
-      const place = (lift: number) => {
-        m4.compose(new THREE.Vector3(P.x, P.y + lift, P.z), q, new THREE.Vector3(1, 1, 1));
-        st.holder.matrix.copy(m4).multiply(new THREE.Matrix4().makeTranslation(-st.anchor.x, -st.anchor.y, -st.anchor.z));
-        st.holder.matrixWorldNeedsUpdate = true;
-      };
-      place(0);
-      // never through the floor: lift by whatever hangs below it
-      st.holder.updateMatrixWorld(true);
-      tmpBox.makeEmpty();
-      const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
-      st.holder.traverse((o) => {
-        const m = o as THREE.Mesh;
-        if (!m.isMesh) return;
-        if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
-        tmpBox.union(m.geometry.boundingBox!.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)));
-      });
-      const low = tmpBox.min.y / U;
-      if (low < 0) place(-low + 0.05);
+      const low = fold(st, f);
+      let lift = low;
+      if (st.lift) lift = Math.max(low, curveAt(st.lift, f));
+      // never through the floor
+      if (lift > 0) place(st, lift + 0.05);
     }
     root.updateMatrixWorld(true);
   };
@@ -197,6 +241,8 @@ export function buildNet(set: FoldSet, look: (piece: FoldPiece, p: FoldPanel) =>
     lines,
     box: { x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs) },
     pose,
+    prepare,
+    liftAt,
     materials: [...mats],
     dispose: () => own.forEach((o) => o.dispose()),
   };

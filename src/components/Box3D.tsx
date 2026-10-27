@@ -91,7 +91,7 @@ export function SpaceIcon() {
 }
 
 /** A package on a board sheet or the landing page: drag to turn, shares the camera when synced. */
-export function Box3D({ d, brand, label, fit = 200, spaceLabel = SPACE_LABEL, lang = "bi" }: { d: Direction; brand: string; label: string; fit?: number; spaceLabel?: Pair; lang?: "bi" | "zh" | "en" }) {
+export function Box3D({ d, brand, label, fit = 200, spaceLabel = SPACE_LABEL, lang = "zh" }: { d: Direction; brand: string; label: string; fit?: number; spaceLabel?: Pair; lang?: "zh" | "en" }) {
   const sync = useContext(SyncCtx);
   const { spec, studioHref, category } = usePack();
   const [own] = useState(() => new Orbit(undefined, 1, { free: true }));
@@ -111,7 +111,6 @@ export function Box3D({ d, brand, label, fit = 200, spaceLabel = SPACE_LABEL, la
         <a className="space-btn" href={href}>
           <SpaceIcon />
           {lang === "en" ? spaceLabel.en : spaceLabel.zh}
-          {lang === "bi" ? <span className="bi-en">{spaceLabel.en}</span> : null}
         </a>
       ) : null}
     </div>

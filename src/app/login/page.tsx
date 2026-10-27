@@ -3,6 +3,7 @@ import { Bi, T } from "@/components/Bi";
 import { Box3D } from "@/components/Box3D";
 import { Brandmark } from "@/components/Brandmark";
 import { LangSwitch } from "@/components/LangSwitch";
+import { ThemeSwitch } from "@/components/ThemeSwitch";
 import { plain, UI } from "@/lib/i18n";
 import { DEMO_BOARD } from "@/lib/llm/demo";
 import { currentInvite, getLang } from "../_server/session";
@@ -27,7 +28,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               <Brandmark />
               <Bi p={UI.appName} lang={lang} as="strong" />
             </a>
-            <LangSwitch lang={lang} back="/login" />
+            <div className="topbar-right">
+              <LangSwitch lang={lang} back="/login" />
+              <ThemeSwitch lang={lang} />
+            </div>
           </div>
           <T k="signIn" lang={lang} as="h1" />
           <T k="tagline" lang={lang} as="p" className="muted" />

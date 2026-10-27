@@ -8,6 +8,7 @@ import { FORM_LABELS, FORM_PRESET, type Form, type PackSpec } from "@/lib/pack";
 /** One form per material family, to show the range on the landing page. */
 const SHOW: Form[] = ["gift", "carton", "pouch", "jar", "tin"];
 import { SpaceIcon } from "./Box3D";
+import { SegPill } from "./SegPill";
 import { FormGlyph } from "./pack/FormGlyph";
 import { Orbit, REST_ANGLE } from "./pack/orbit";
 import { Package3D } from "./pack/Package3D";
@@ -56,7 +57,8 @@ export function SpaceShowcase({ d, brand, lang, href }: { d: Direction; brand: s
         {!touched ? <span className="showcase-drag">{one(C.drag)}</span> : null}
       </div>
       <div className="showcase-controls">
-        <div className="showcase-forms" role="radiogroup" aria-label={lang === "en" ? "Structure" : "盒型"}>
+        <div className="showcase-forms seg" role="radiogroup" aria-label={lang === "en" ? "Structure" : "盒型"}>
+          <SegPill />
           {SHOW.map((f) => (
             <button
               key={f}
@@ -93,7 +95,6 @@ export function SpaceShowcase({ d, brand, lang, href }: { d: Direction; brand: s
         <a className="btn btn-sheet btn-large showcase-enter" href={href}>
           <SpaceIcon />
           {one(C.enter)}
-          {lang === "bi" ? <span className="bi-en">{C.enter.en}</span> : null}
         </a>
       </div>
     </div>

@@ -92,42 +92,90 @@ export function prefetchArt(it: HeroItem) {
   }
 }
 
-/** The press sheet: paper with registration marks, a color bar and a slug line. */
-function sheetCanvas(it: HeroItem, W: number, H: number): HTMLCanvasElement {
-  const k = 3;
+/**
+ * The press sheet: uncoated paper with hairline crop marks at the trim corners and a fine
+ * registration target on each long edge. Quiet on purpose: the print is the subject.
+ * `W`, `H` in scene units (1 = 100 mm on the sheet).
+ */
+function sheetCanvas(W: number, H: number): HTMLCanvasElement {
+  const k = 300; // px per unit
   const c = document.createElement("canvas");
-  c.width = W * k;
-  c.height = H * k;
+  c.width = Math.round(W * k);
+  c.height = Math.round(H * k);
   const g = c.getContext("2d")!;
-  g.fillStyle = "#FBFBF9";
+  g.fillStyle = "#F8F6F0";
   g.fillRect(0, 0, c.width, c.height);
-  const reg = (x: number, y: number) => {
-    g.strokeStyle = "#111";
-    g.lineWidth = 1.2;
+  // a faint tooth to the paper
+  const img = g.getImageData(0, 0, c.width, c.height);
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (rnd() - 0.5) * 5;
+    img.data[i] += n;
+    img.data[i + 1] += n;
+    img.data[i + 2] += n;
+  }
+  g.putImageData(img, 0, 0);
+  g.strokeStyle = "rgba(40, 38, 34, 0.55)";
+  g.lineWidth = 1.4;
+  // crop marks: short hairlines out from each trim corner, clear of the corner itself
+  const m = 0.34 * k;
+  const gap = 0.05 * k;
+  const len = 0.17 * k;
+  const corners: [number, number, number, number][] = [
+    [m, m, -1, -1],
+    [c.width - m, m, 1, -1],
+    [m, c.height - m, -1, 1],
+    [c.width - m, c.height - m, 1, 1],
+  ];
+  g.beginPath();
+  for (const [x, y, sx, sy] of corners) {
+    g.moveTo(x + sx * gap, y);
+    g.lineTo(x + sx * (gap + len), y);
+    g.moveTo(x, y + sy * gap);
+    g.lineTo(x, y + sy * (gap + len));
+  }
+  g.stroke();
+  // registration targets, centred in the side margins (the slug line has the top one)
+  const target = (x: number, y: number) => {
+    const r = 0.045 * k;
     g.beginPath();
-    g.arc(x, y, 9, 0, Math.PI * 2);
-    g.moveTo(x - 15, y);
-    g.lineTo(x + 15, y);
-    g.moveTo(x, y - 15);
-    g.lineTo(x, y + 15);
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.moveTo(x - r * 1.7, y);
+    g.lineTo(x + r * 1.7, y);
+    g.moveTo(x, y - r * 1.7);
+    g.lineTo(x, y + r * 1.7);
+    g.stroke();
+    g.beginPath();
+    g.arc(x, y, r * 0.42, 0, Math.PI * 2);
     g.stroke();
   };
-  const m = 26;
-  reg(m, m);
-  reg(c.width - m, m);
-  reg(m, c.height - m);
-  reg(c.width - m, c.height - m);
-  // color bar: process inks, then this product's palette, repeated
-  const r = rolesOf(it.d);
-  const bar = ["#00A0E9", "#E4007F", "#FFF100", "#000000", r.ground, r.ink, r.key, r.accent];
-  const sw = 22;
-  for (let x = m + 40, i = 0; x < c.width - m - 40 - sw; x += sw, i++) {
-    g.fillStyle = bar[i % bar.length];
-    g.fillRect(x, c.height - m - 8, sw - 2, 16);
-  }
-  g.fillStyle = "#777";
-  g.font = `500 13px "Helvetica Neue", Arial, "PingFang SC", sans-serif`;
-  g.fillText(`${it.brand}  ·  ${it.name.zh}  ·  ${it.w}×${it.h}${it.kind === "carton" ? `×${it.dep}` : ""} mm  ·  1:1  ·  bleed 3 mm`, m + 40, m + 5);
+  target(m / 2, c.height / 2);
+  target(c.width - m / 2, c.height / 2);
+  return c;
+}
+
+/** The slug line printed in the sheet's margin: brand, product, size, scale. */
+function slugCanvas(it: HeroItem): HTMLCanvasElement {
+  const px = 44;
+  const c = document.createElement("canvas");
+  const g = c.getContext("2d")!;
+  const font = `500 ${px}px "Helvetica Neue", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif`;
+  const size = `${it.w} × ${it.h}${it.kind === "carton" ? ` × ${it.dep}` : ""} mm`;
+  const brand = it.brand.startsWith("[") || it.name.zh.startsWith(it.brand) ? "" : it.brand;
+  const parts = [brand, it.name.zh, size, "1 : 1"].filter(Boolean);
+  const text = parts.join("   ·   ");
+  g.font = font;
+  const seal = px * 0.62;
+  c.width = Math.ceil(seal + px * 0.7 + g.measureText(text).width + 8);
+  c.height = Math.ceil(px * 1.5);
+  g.font = font;
+  // a small vermilion seal before the line, as on a proof signed off
+  g.fillStyle = "#B4483A";
+  g.fillRect(0, (c.height - seal) / 2, seal, seal);
+  g.fillStyle = "#77736A";
+  g.textBaseline = "middle";
+  g.fillText(text, seal + px * 0.7, c.height / 2 + 1);
   return c;
 }
 
@@ -435,6 +483,15 @@ export type OverlayFrame = {
 };
 
 export type CartonBuild = ReturnType<typeof buildCarton>;
+type RoundBuild = ReturnType<typeof buildRound>;
+type Place = { sw: number; sh: number; z: number };
+type Prepared = { i: number; own: { dispose(): void }[]; carton: CartonBuild | null; round: RoundBuild | null; node: THREE.Object3D; s: number; slug: THREE.CanvasTexture; place: Place };
+
+/** The surroundings in the light and dark themes. */
+const TONES = {
+  light: { bg: "#EAE7DF", table: "#E0DCD2", hemi: 0.9, ground: "#c9c6bc", env: 0.55 },
+  dark: { bg: "#151614", table: "#1D1E1B", hemi: 0.45, ground: "#2a2a26", env: 0.42 },
+} as const;
 
 /**
  * Poses a carton net: `lift` raises it off the sheet, `fold` (0–1) folds the panels in order,
@@ -471,6 +528,17 @@ export class SymbiosisScene {
   private stageRoot = new THREE.Group();
   private sheet: THREE.Mesh;
   private sheetMat: THREE.MeshStandardMaterial;
+  private sheetKey = "";
+  private slug: THREE.Mesh;
+  private slugMat: THREE.MeshBasicMaterial;
+  private table: THREE.Mesh;
+  private hemi: THREE.HemisphereLight;
+  /** The next product, built ahead while this one holds still. */
+  private next: Prepared | null = null;
+  private preparing = false;
+  /** Sheet size and stage offset: where they were and where they go, eased at a cycle's start. */
+  private from: Place | null = null;
+  private to: Place = { sw: 5.5, sh: 4.6, z: 0 };
   private carton: ReturnType<typeof buildCarton> | null = null;
   private round: ReturnType<typeof buildRound> | null = null;
   private turn = new THREE.Group();
@@ -495,9 +563,9 @@ export class SymbiosisScene {
     r.toneMappingExposure = 1.05;
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
-    const bg = new THREE.Color("#E6E7E3");
+    const bg = new THREE.Color(TONES.light.bg);
     this.scene.background = bg;
-    this.scene.fog = new THREE.Fog(bg, 16, 34);
+    this.scene.fog = new THREE.Fog(bg.clone(), 16, 34);
     const pm = new THREE.PMREMGenerator(r);
     const eq = studioEquirect(512);
     this.env = pm.fromEquirectangular(eq).texture;
@@ -505,7 +573,7 @@ export class SymbiosisScene {
     eq.dispose();
     this.scene.environment = this.env;
     this.scene.environmentIntensity = 0.55;
-    const hemi = new THREE.HemisphereLight("#ffffff", "#c9c8c2", 0.9);
+    const hemi = (this.hemi = new THREE.HemisphereLight("#ffffff", "#c9c8c2", 0.9));
     const key = new THREE.DirectionalLight("#fffaf2", 2.1);
     key.position.set(-5, 11, 6);
     key.castShadow = true;
@@ -520,7 +588,7 @@ export class SymbiosisScene {
     const fill = new THREE.DirectionalLight("#eef3ff", 0.55);
     fill.position.set(7, 5, -3);
     this.scene.add(hemi, key, fill);
-    const table = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshStandardMaterial({ color: "#DADBD6", roughness: 0.95 }));
+    const table = (this.table = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshStandardMaterial({ color: TONES.light.table, roughness: 0.95 })));
     table.rotation.x = -Math.PI / 2;
     table.position.y = -0.004;
     table.receiveShadow = true;
@@ -528,50 +596,104 @@ export class SymbiosisScene {
     this.sheet = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.sheetMat);
     this.sheet.rotation.x = -Math.PI / 2;
     this.sheet.receiveShadow = true;
-    this.scene.add(table, this.stageRoot);
-    this.stageRoot.add(this.sheet, this.turn);
-    this.load(0);
+    // the slug line, a separate strip so it can fade with the print while the paper stays
+    this.slugMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false });
+    this.slug = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.slugMat);
+    this.slug.rotation.x = -Math.PI / 2;
+    this.slug.renderOrder = 1;
+    // the sheet stays put on the table; the product's stage moves over it
+    this.scene.add(table, this.sheet, this.slug, this.stageRoot);
+    this.stageRoot.add(this.turn);
+    this.load(0, false);
   }
 
-  /** Builds the current product. */
-  private load(i: number) {
-    this.ix = i;
-    for (const o of this.own) o.dispose();
-    this.own = [];
-    this.turn.clear();
-    this.carton = null;
-    this.round = null;
+  /** Light or dark surroundings; the press sheet stays paper either way. */
+  setTone(dark: boolean) {
+    const t = dark ? TONES.dark : TONES.light;
+    (this.scene.background as THREE.Color).set(t.bg);
+    (this.scene.fog as THREE.Fog).color.set(t.bg);
+    (this.table.material as THREE.MeshStandardMaterial).color.set(t.table);
+    this.hemi.intensity = t.hemi;
+    this.hemi.groundColor.set(t.ground);
+    this.scene.environmentIntensity = t.env;
+    if (!this.running && this.lastNow >= 0) this.frame(this.lastNow);
+  }
+
+  /** Builds product `i`, not yet on stage. */
+  private prepare(i: number): Prepared {
     const it = this.items[i];
     const r = this.renderer;
+    const own: { dispose(): void }[] = [];
     let SW: number;
     let SH: number;
+    let carton: CartonBuild | null = null;
+    let round: RoundBuild | null = null;
+    let node: THREE.Object3D;
+    let s: number;
     if (it.kind === "carton") {
       const netW = 2 * it.w + 2 * it.dep;
-      const s = Math.min(4.3 / netW, 3.6 / (it.h + 2 * it.dep + 2 * Math.max(10, Math.min(it.dep * 0.55, 34))));
-      this.carton = buildCarton(it, r, s, this.own);
-      this.turn.add(this.carton.holder);
-      SW = this.carton.netW * s + 1.2;
-      SH = this.carton.netH * s + 1.0;
-      this.turn.userData.s = s;
+      s = Math.min(4.3 / netW, 3.6 / (it.h + 2 * it.dep + 2 * Math.max(10, Math.min(it.dep * 0.55, 34))));
+      carton = buildCarton(it, r, s, own);
+      node = carton.holder;
+      SW = carton.netW * s + 1.2;
+      SH = carton.netH * s + 1.0;
     } else {
       const area = roundAreas(it.kind === "tin" ? "tin" : "bottle", it.w, it.h);
-      const s = Math.min(3.4 / (area.wrap!.w + it.w + 30), 2.4 / it.h);
-      this.round = buildRound(it, r, s, this.own);
-      this.turn.add(this.round.root);
-      SW = this.round.lw + this.round.R * 2 + 1.6;
-      SH = this.round.lh + this.round.R * 2 + 1.6;
-      this.turn.userData.s = s;
+      s = Math.min(3.4 / (area.wrap!.w + it.w + 30), 2.4 / it.h);
+      round = buildRound(it, r, s, own);
+      node = round.root;
+      SW = round.lw + round.R * 2 + 1.6;
+      SH = round.lh + round.R * 2 + 1.6;
     }
-    SW = Math.max(SW, 5.2);
-    SH = Math.max(SH, 3.9);
-    const sc = sheetCanvas(it, Math.round(SW * 100), Math.round(SH * 100));
-    this.sheetMat.map?.dispose();
-    this.sheetMat.map = tex(sc, r);
-    this.sheetMat.needsUpdate = true;
-    this.sheet.scale.set(SW, SH, 1);
-    // round forms: body at the turntable's centre, label in front; centre the pair on the sheet
-    this.stageRoot.position.set(0, 0, this.round ? -this.round.labelZ / 2 : 0);
-    this.sheet.position.set(0, 0, 0);
+    const slug = tex(slugCanvas(it), r);
+    own.push(slug);
+    // one sheet size for every product (the largest any of them needs), so the paper never jumps
+    return { i, own, carton, round, node, s, slug, place: { sw: Math.max(SW, 5.5), sh: Math.max(SH, 4.6), z: round ? -round.labelZ / 2 : 0 } };
+  }
+
+  /** Puts product `i` on stage; `glide` eases the sheet and stage from where they were. */
+  private load(i: number, glide: boolean) {
+    const p = this.next && this.next.i === i ? this.next : this.prepare(i);
+    // built ahead for a product we are not going to after all
+    if (this.next && this.next !== p) for (const o of this.next.own) o.dispose();
+    this.next = null;
+    this.ix = i;
+    for (const o of this.own) o.dispose();
+    this.own = p.own;
+    this.turn.clear();
+    this.turn.add(p.node);
+    this.carton = p.carton;
+    this.round = p.round;
+    this.turn.userData.s = p.s;
+    this.slugMat.map = p.slug;
+    this.slugMat.needsUpdate = true;
+    const img = p.slug.image as HTMLCanvasElement;
+    const sh = 0.11;
+    this.slug.scale.set((sh * img.width) / img.height, sh, 1);
+    this.from = glide ? { sw: this.sheet.scale.x, sh: this.sheet.scale.y, z: this.stageRoot.position.z } : null;
+    this.to = p.place;
+    this.place(glide ? 0 : 1);
+  }
+
+  /** Sheet size, its art and the stage offset, `k` of the way from `from` to `to`. */
+  private place(k: number) {
+    const a = this.from ?? this.to;
+    const b = this.to;
+    const e = ease(k);
+    const sw = a.sw + (b.sw - a.sw) * e;
+    const sh = a.sh + (b.sh - a.sh) * e;
+    this.sheet.scale.set(sw, sh, 1);
+    this.stageRoot.position.set(0, 0, a.z + (b.z - a.z) * e);
+    const key = `${b.sw.toFixed(2)}|${b.sh.toFixed(2)}`;
+    if (key !== this.sheetKey) {
+      this.sheetKey = key;
+      this.sheetMat.map?.dispose();
+      this.sheetMat.map = tex(sheetCanvas(b.sw, b.sh), this.renderer);
+      this.sheetMat.needsUpdate = true;
+    }
+    // the slug sits in the top margin, from the left crop mark
+    const img = this.slug.scale;
+    this.slug.position.set(-sw / 2 + 0.34 + img.x / 2, 0.0015, -sh / 2 + 0.17);
   }
 
   resize(w: number, h: number) {
@@ -599,6 +721,7 @@ export class SymbiosisScene {
   /** Poses everything for time t within the current product's cycle. */
   pose(t: number): OverlayFrame {
     const it = this.items[this.ix];
+    this.place(this.from ? seg(t, [0, 0.9]) : 1);
     const of: OverlayFrame = { w: this.w, h: this.h, stage: stageAt(t), cut: null, ghosts: [], threads: [], dims: [], circle: null, head: null, alpha2d: 1 };
     const print = seg(t, T.print);
     const back = ease(seg(t, T.back));
@@ -606,12 +729,15 @@ export class SymbiosisScene {
     const turnT = seg(t, [T.stand[0], T.back[1]]);
     this.turn.rotation.y = Math.sin(turnT * Math.PI) * -0.55 * (1 - back);
     of.alpha2d = 1 - unprint;
+    this.slugMat.opacity = clamp(print * 2.5) * (1 - unprint);
     // print head: a CMYK line sweeping the sheet
     if (print > 0 && print < 1) {
       const sw = this.sheet.scale.x;
       const shh = this.sheet.scale.y;
       const x = -sw / 2 + print * sw;
-      of.head = { a: this.project(new THREE.Vector3(x, 0, this.sheet.position.z - shh / 2)), b: this.project(new THREE.Vector3(x, 0, this.sheet.position.z + shh / 2)) };
+      // the sheet lies in the table's frame; the stage (and so `project`) is offset by stageRoot
+      const z0 = -this.stageRoot.position.z;
+      of.head = { a: this.project(new THREE.Vector3(x, 0, z0 - shh / 2)), b: this.project(new THREE.Vector3(x, 0, z0 + shh / 2)) };
     }
     const sx = this.sheet.scale.x;
     const fadeIn = (xw: number) => clamp((print * 1.15 - ((xw + sx / 2) / sx)) * 6) * (1 - unprint);
@@ -732,24 +858,62 @@ export class SymbiosisScene {
   }
 
   private prefetched = -1;
+  private lastNow = -1;
 
   /** Renders one frame at absolute time `now` (seconds since start). */
   frame(now: number) {
+    this.lastNow = now;
     const cycle = Math.floor(now / DUR) % this.items.length;
-    if (cycle !== this.ix) this.load(cycle);
+    if (cycle !== this.ix) this.load(cycle, (this.running || this.playing) && cycle === (this.ix + 1) % this.items.length);
     const t = now % DUR;
-    // while this product holds still, draw the next one's artwork in idle time
+    // while this product holds still: draw the next one's artwork, then build it and upload
+    // its textures, each in idle time, so the change of product never stalls a frame
     const next = (cycle + 1) % this.items.length;
+    const idle = (f: () => void) => {
+      const w = window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => void };
+      if (w.requestIdleCallback) w.requestIdleCallback(f, { timeout: 900 });
+      else setTimeout(f, 0);
+    };
     if (t > T.hold[0] && this.prefetched !== next) {
       this.prefetched = next;
-      const run = () => prefetchArt(this.items[next]);
-      const w = window as Window & { requestIdleCallback?: (f: () => void) => void };
-      if (w.requestIdleCallback) w.requestIdleCallback(run);
-      else setTimeout(run, 0);
+      idle(() => prefetchArt(this.items[next]));
+    }
+    if (this.running && t > T.hold[0] + 0.6 && t < T.back[1] && !this.next && !this.preparing && next !== this.ix) {
+      this.preparing = true;
+      idle(() => {
+        this.preparing = false;
+        if (!this.running || this.next) return;
+        const p = this.prepare(next);
+        this.next = p;
+        idle(() => {
+          if (this.next !== p) return;
+          p.node.traverse((o) => {
+            const m = (o as THREE.Mesh).material;
+            for (const x of Array.isArray(m) ? m : m ? [m] : []) {
+              const mm = x as THREE.MeshStandardMaterial;
+              for (const t of [mm.map, mm.normalMap, mm.roughnessMap]) if (t) this.renderer.initTexture(t);
+            }
+          });
+          this.renderer.initTexture(p.slug);
+        });
+      });
     }
     const of = this.pose(t);
     this.renderer.render(this.scene, this.camera);
     this.onFrame?.({ item: this.ix, stage: of.stage, t }, of);
+  }
+
+  private playing = false;
+
+  /** Renders absolute time `now` as part of continuous playback, as the live loop would (for recording the film). */
+  play(now: number) {
+    this.stop();
+    this.playing = true;
+    try {
+      this.frame(now);
+    } finally {
+      this.playing = false;
+    }
   }
 
   /** Frame the scene in the middle (e.g. for a video without the page copy). */
@@ -786,7 +950,8 @@ export class SymbiosisScene {
   /** For stills and tests: render exactly this product at this time. */
   still(i: number, t: number) {
     this.stop();
-    if (i !== this.ix) this.load(i);
+    this.lastNow = i * DUR + t;
+    if (i !== this.ix) this.load(i, false);
     const of = this.pose(t);
     this.renderer.render(this.scene, this.camera);
     this.onFrame?.({ item: i, stage: of.stage, t }, of);
@@ -795,6 +960,9 @@ export class SymbiosisScene {
   dispose() {
     this.stop();
     for (const o of this.own) o.dispose();
+    if (this.next) for (const o of this.next.own) o.dispose();
+    this.slug.geometry.dispose();
+    this.slugMat.dispose();
     this.sheetMat.map?.dispose();
     this.env.dispose();
     this.renderer.dispose();

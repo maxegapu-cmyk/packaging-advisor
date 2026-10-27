@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { Bi, T } from "@/components/Bi";
 import { Brandmark } from "@/components/Brandmark";
 import { LangSwitch } from "@/components/LangSwitch";
+import { ThemeSwitch } from "@/components/ThemeSwitch";
 import { UI } from "@/lib/i18n";
 import { signOutAction } from "../actions";
 import { getLang, requireInvite } from "../_server/session";
@@ -36,6 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </nav>
         <div className="topbar-right">
           <LangSwitch lang={lang} back={back} />
+          <ThemeSwitch lang={lang} />
           <form action={signOutAction}>
             <button type="submit" className="btn btn-small btn-quiet">
               <T k="signOut" lang={lang} />

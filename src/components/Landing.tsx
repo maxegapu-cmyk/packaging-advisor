@@ -10,6 +10,8 @@ import { Bi } from "./Bi";
 import { Box3D, BoxSync, PackProvider, SpaceIcon } from "./Box3D";
 import { paletteVars } from "./BoxFaces";
 import { Brandmark } from "./Brandmark";
+import { ThemeSwitch } from "./ThemeSwitch";
+import { SegPill } from "./SegPill";
 import { ColorBar } from "./ColorBar";
 import { SymbiosisHero } from "./hero/SymbiosisHero";
 import { FaceLayout } from "./FaceLayout";
@@ -116,6 +118,7 @@ function Topbar({ lang, langSwitch }: { lang: Lang; langSwitch: React.ReactNode 
       </nav>
       <div className="topbar-right">
         {langSwitch}
+        <ThemeSwitch lang={lang} />
         <a className="btn btn-quiet btn-small" href="/login">
           <Bi p={UI.signIn} lang={lang} />
         </a>
@@ -145,11 +148,6 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
         <h1 className="hero-h">
           <span className="hero-line">{one(C.heroA)}</span>
           <span className="hero-line">{one(C.heroB)}</span>
-          {lang === "bi" ? (
-            <span className="hero-en">
-              {C.heroA.en} {C.heroB.en}
-            </span>
-          ) : null}
         </h1>
         <Bi p={C.heroSub} lang={lang} as="p" className="hero-sub" />
         <div className="hero-ctas">
@@ -216,7 +214,8 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
           <Bi p={C.samplesH} lang={lang} as="h2" className="band-h" />
           <Bi p={C.samplesSub} lang={lang} as="p" className="band-sub" />
         </div>
-        <div className="sample-tabs" role="tablist" aria-label={one(C.samplesH)}>
+        <div className="sample-tabs seg" role="tablist" aria-label={one(C.samplesH)}>
+          <SegPill />
           {SAMPLES.map((s, i) => (
             <button key={s.id} type="button" role="tab" aria-selected={i === si} className={i === si ? "sample-tab is-active" : "sample-tab"} onClick={() => setSi(i)}>
               <FormGlyph form={s.pack.form} />
@@ -227,7 +226,7 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
             </button>
           ))}
         </div>
-        <Bi p={board.reading.product} lang={lang} as="p" className="sample-reading" />
+        <Bi key={sample.id} p={board.reading.product} lang={lang} as="p" className="sample-reading fade-in" />
         <PackProvider key={sample.id} initial={sample.pack} studioBase={`/space/demo?s=${sample.id}`} category={board.meta.category}>
           <BoxSync label={one(UI.rotateTogether)} hint={one(UI.dragHint)} toolbar={<PackBar lang={lang} />}>
             <div className="sample-grid">
@@ -288,7 +287,7 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
             <div className="specimen-body">
               <FaceLayout d={teaRec} lang={lang} title="" />
               <div className="specimen-side">
-                <ColorBar palette={teaRec.palette} lang={lang === "bi" ? "zh" : lang} label="" />
+                <ColorBar palette={teaRec.palette} lang={lang} label="" />
                 <div className="specimen-claim">
                   <span className="tag">{one(UI.levelHigh)}</span>
                   <q>{tea.claimCheck[1]?.text}</q>

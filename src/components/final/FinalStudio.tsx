@@ -10,6 +10,7 @@ import { checkEan13 } from "@/lib/print/ean13";
 import { infoPanels, printLayout } from "@/lib/print/layout";
 import { blocking, preflight, type Check } from "@/lib/print/preflight";
 import { Bi } from "../Bi";
+import { SegPill } from "../SegPill";
 import { Package3D } from "../pack/Package3D";
 import { Orbit, REST_ANGLE } from "../pack/orbit";
 import { Stage3D } from "../pack/Stage3D";
@@ -463,7 +464,8 @@ export function FinalStudio({
 
         <aside className="final-side">
           <div className="final-preview">
-            <div className="final-tabs" role="tablist">
+            <div className="final-tabs seg" role="tablist">
+              <SegPill />
               <button type="button" role="tab" aria-selected={tab === "3d"} className={tab === "3d" ? "is-on" : ""} onClick={() => setTab("3d")}>
                 {one(T.tab3d, lang)}
               </button>
@@ -479,7 +481,7 @@ export function FinalStudio({
               </span>
             </div>
             {tab === "3d" ? (
-              <div className="final-stage">
+              <div className="final-stage fade-in" key="3d">
                 <Stage3D orbit={orbit} label={`${art.brand} ${art.headline}`} className="final-stage-3d" inPage>
                   <Package3D d={view3d.d} brand={view3d.brand} spec={pack} fit={400} open={open} orbit={orbit} category={board.meta.category} info={view3d.info} quality="high" />
                 </Stage3D>
@@ -501,11 +503,12 @@ export function FinalStudio({
                 </div>
               </div>
             ) : tab === "proof" ? (
-              <ProofMatch art={art} spec={pack} input={view} lang={lang} setProof={(proof) => set({ proof })} uploadPhoto={uploadProof} photoSrc={proofSrc} />
+              <ProofMatch key="proof" art={art} spec={pack} input={view} lang={lang} setProof={(proof) => set({ proof })} uploadPhoto={uploadProof} photoSrc={proofSrc} />
             ) : (
-              <div className="final-sheet">
+              <div className="final-sheet fade-in" key="sheet">
                 {layout.sheets.length > 1 ? (
-                  <div className="final-sheet-tabs">
+                  <div className="final-sheet-tabs seg">
+                    <SegPill />
                     {layout.sheets.map((s, i) => (
                       <button key={s.id} type="button" className={i === sheetIx ? "is-on" : ""} onClick={() => setSheetIx(i)}>
                         {one(s.name, lang)}

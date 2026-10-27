@@ -7,7 +7,7 @@ import type { Direction } from "@/lib/board/schema";
  */
 export function Mockup({ d, brand }: { d: Direction; brand: string }) {
   const [ground, ink, key, accent] = [d.palette[0]?.hex, d.palette[1]?.hex, d.palette[2]?.hex, d.palette[3]?.hex ?? d.palette[2]?.hex];
-  const style = { "--ground": ground, "--ink": ink, "--key": key, "--accent": accent } as CSSProperties;
+  const style = { "--ground": ground, "--p-ink": ink, "--key": key, "--p-accent": accent } as CSSProperties;
   const m = d.mockup;
   return (
     <div className={`mk mk-${d.layout}`} style={style} role="img" aria-label={`${d.name.zh} ${d.name.en}: outer box, inner pack and manual mockup`}>

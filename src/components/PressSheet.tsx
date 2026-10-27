@@ -28,7 +28,6 @@ export function RegMarks() {
   );
 }
 
-/** Press color-control strip: the direction's palette next to process C, M, Y, K. */
 /**
  * A hairline band of the direction's colors, each as wide as its share of the surface: the
  * color card drawn as an edge. Quiet enough to sit under a header.

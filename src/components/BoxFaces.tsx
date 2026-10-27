@@ -11,9 +11,10 @@ export function paletteVars(d: Direction): CSSProperties {
   const p = d.palette;
   return {
     "--ground": p[0]?.hex,
-    "--ink": p[1]?.hex,
+    // the product's own ink and accent, named apart from the site's --ink and --accent
+    "--p-ink": p[1]?.hex,
     "--key": p[2]?.hex,
-    "--accent": p[3]?.hex ?? p[2]?.hex,
+    "--p-accent": p[3]?.hex ?? p[2]?.hex,
   } as CSSProperties;
 }
 

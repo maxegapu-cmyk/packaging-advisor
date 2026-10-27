@@ -314,8 +314,8 @@ export function buildPillow(len: number, wid: number, th: number, a: ArtInput, r
   own.push(map);
   const mat = clip(new THREE.MeshPhysicalMaterial({ map, roughness: a.finish === "gloss" ? 0.22 : 0.5, clearcoat: a.finish === "gloss" ? 1 : 0.3, clearcoatRoughness: 0.08, side: THREE.DoubleSide }), planes);
   own.push(mat);
-  const NU = 160;
-  const NV = 80;
+  const NU = 128;
+  const NV = 64;
   const geo = new THREE.PlaneGeometry(1, 1, NV, NU);
   own.push(geo);
   const mesh = new THREE.Mesh(geo, mat);

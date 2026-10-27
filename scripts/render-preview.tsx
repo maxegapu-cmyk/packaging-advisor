@@ -11,10 +11,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { BoardView } from "../src/components/BoardView";
 import { validateBoard } from "../src/lib/board/schema";
 import { DEMO_BOARD } from "../src/lib/llm/demo";
-import { isLang, type Lang } from "../src/lib/i18n";
+import { toLang, type Lang } from "../src/lib/i18n";
 
-const [input, output = "board-preview.html", langArg = "bi"] = process.argv.slice(2);
-const lang: Lang = isLang(langArg) ? langArg : "bi";
+const [input, output = "board-preview.html", langArg = "zh"] = process.argv.slice(2);
+const lang: Lang = toLang(langArg);
 const raw = input ? JSON.parse(fs.readFileSync(input, "utf8")) : DEMO_BOARD;
 const v = validateBoard(raw);
 if (!v.ok) {

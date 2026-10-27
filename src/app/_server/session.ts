@@ -2,11 +2,11 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { sessionInvite, SESSION_COOKIE, type Invite } from "@/lib/auth";
 import { initApp } from "@/lib/init";
-import { isLang, LANG_COOKIE, type Lang } from "@/lib/i18n";
+import { LANG_COOKIE, toLang, type Lang } from "@/lib/i18n";
 
 export async function getLang(): Promise<Lang> {
   const v = (await cookies()).get(LANG_COOKIE)?.value;
-  return isLang(v) ? v : "bi";
+  return toLang(v);
 }
 
 export async function currentInvite(): Promise<Invite | null> {

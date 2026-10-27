@@ -31,6 +31,7 @@ import {
   type PackSpec,
 } from "@/lib/pack";
 import { materialUse } from "@/lib/print/layout";
+import { SegPill } from "../SegPill";
 import { REFERENCE_INFO, REFERENCES, type Reference } from "@/lib/reference";
 import { paletteVars } from "../BoxFaces";
 import { Package3D } from "./Package3D";
@@ -195,14 +196,7 @@ function openLabelFor(form: Form, open: boolean): Pair {
 /* ---------------------------------------------------------------- Small pieces */
 
 function L({ p, lang, className }: { p: Pair; lang: Lang; className?: string }) {
-  if (lang === "zh") return <span className={className}>{p.zh}</span>;
-  if (lang === "en") return <span className={className}>{p.en}</span>;
-  return (
-    <span className={`bi ${className ?? ""}`}>
-      <span>{p.zh}</span>
-      <span className="bi-en">{p.en}</span>
-    </span>
-  );
+  return <span className={className}>{lang === "en" ? p.en : p.zh}</span>;
 }
 /** Mixes two hex colors (t = share of b). */
 function mix(a: string, b: string, t: number): string {
@@ -211,7 +205,7 @@ function mix(a: string, b: string, t: number): string {
   return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(",")})`;
 }
 const one = (p: Pair, lang: Lang) => (lang === "en" ? p.en : p.zh);
-const both = (p: Pair, lang: Lang) => (lang === "bi" ? `${p.zh} ${p.en}` : one(p, lang));
+const both = one;
 
 function Icon({ name }: { name: string }) {
   const paths: Record<string, ReactNode> = {
@@ -729,7 +723,8 @@ export function Studio({
           </div>
         </section>
 
-        <div className="st-tabs" role="tablist" aria-label={both(S.adjust, lang)}>
+        <div className="st-tabs seg" role="tablist" aria-label={both(S.adjust, lang)}>
+          <SegPill className="seg-line" />
           {panelTabs.map((t) => (
             <button
               key={t.id}
@@ -750,7 +745,8 @@ export function Studio({
           <div className="st-tabpanel" role="tabpanel">
             <section className="st-sec">
               <L p={S.structure} lang={lang} className="st-label" />
-              <div className="st-mats" role="tablist" aria-label={both(S.material, lang)}>
+              <div className="st-mats seg" role="tablist" aria-label={both(S.material, lang)}>
+                <SegPill />
                 {MATERIAL_GROUPS.map((g) => (
                   <button key={g.id} type="button" role="tab" aria-selected={matGroup === g.id} className={matGroup === g.id ? "st-mat is-active" : "st-mat"} onClick={() => setMatGroup(g.id)}>
                     {one(g.label, lang)}
@@ -792,7 +788,8 @@ export function Studio({
                   <div className="st-combo-opts">
                     <div className="st-opt">
                       <span className="st-small">{one(S.count, lang)}</span>
-                      <div className="st-seg">
+                      <div className="st-seg seg">
+                        <SegPill />
                         {([1, 2] as const).map((n) => (
                           <button key={n} type="button" aria-pressed={spec.inner?.count === n} className={spec.inner?.count === n ? "is-active" : ""} onClick={() => spec.inner && setSpec({ ...spec, inner: { ...spec.inner, count: n } })}>
                             × {n}
@@ -803,7 +800,8 @@ export function Studio({
                     {spec.form !== "carton" && spec.form !== "bag" ? (
                       <div className="st-opt">
                         <span className="st-small">{one(S.insert, lang)}</span>
-                        <div className="st-seg st-seg-wrap">
+                        <div className="st-seg st-seg-wrap seg">
+                          <SegPill />
                           {INSERTS.map((x) => {
                             const on = (spec.inner?.insert ?? (spec.form === "mailer" ? "pulp" : "velvet")) === x;
                             return (
