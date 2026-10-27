@@ -20,8 +20,8 @@ const SANS = '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans C
 
 export const rolesOf = (d: Direction): Roles => libRolesOf(d);
 
-/** Paints a role. In mask mode everything is black except foil-stamped elements. */
-type Paint = (role: Role, foil?: boolean) => string;
+/** Paints a role. In mask mode everything is black except foil-stamped elements. Carries the palette. */
+type Paint = ((role: Role, foil?: boolean) => string) & { roles: Roles };
 
 type Ctx = CanvasRenderingContext2D;
 /**
@@ -65,10 +65,39 @@ function canvas(w: number, h: number): [HTMLCanvasElement, Ctx] {
  */
 function painter(roles: Roles, a: ArtInput, mask: boolean): Paint {
   const fc = foilColor(a);
-  return (role, foil = false) => {
+  const paint = (role: Role, foil = false) => {
     if (mask) return foil ? "#ffffff" : "#000000";
     return fc && foil ? fc : roles[role];
   };
+  return Object.assign(paint, { roles });
+}
+
+/* ---------------------------------------------------------------- Legibility */
+
+const channel = (v: number) => {
+  const c = v / 255;
+  return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+};
+function luminance(hex: string): number {
+  const h = hex.replace("#", "");
+  const n = h.length === 3 ? h.split("").map((x) => x + x).join("") : h.padEnd(6, "0").slice(0, 6);
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(n.slice(i, i + 2), 16) || 0);
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+/** WCAG contrast ratio between two hex colours. */
+export function contrastOf(a: string, b: string): number {
+  const x = luminance(a);
+  const y = luminance(b);
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+/**
+ * The role to set text in over `bg`: `prefer` when it reads (3:1, the large-text bar), else
+ * whichever of `prefer` and `alt` contrasts more. A pale key with a pale ground keeps its words.
+ */
+function textOn(P: Paint, bg: Role, prefer: Role, alt: Role): Role {
+  const r = P.roles;
+  const cp = contrastOf(r[prefer], r[bg]);
+  return cp >= 3 || cp >= contrastOf(r[alt], r[bg]) ? prefer : alt;
 }
 
 function setFont(ctx: Ctx, weight: number, size: number, family: string) {
@@ -80,16 +109,24 @@ function spacing(ctx: Ctx, em: number, size: number) {
   (ctx as Ctx & { letterSpacing?: string }).letterSpacing = `${(em * size).toFixed(1)}px`;
 }
 
-/** Shrinks the font until `text` fits `maxW`. Returns the size used. */
-function fit(ctx: Ctx, text: string, weight: number, size: number, family: string, maxW: number): number {
+/**
+ * Shrinks the font until `text` fits `maxW` (with `track` em of letter spacing, which stays set
+ * on return). Returns the size used.
+ */
+function fit(ctx: Ctx, text: string, weight: number, size: number, family: string, maxW: number, track = 0): number {
   let s = size;
   setFont(ctx, weight, s, family);
+  spacing(ctx, track, s);
   while (s > 6 && ctx.measureText(text).width > maxW) {
     s *= 0.94;
     setFont(ctx, weight, s, family);
+    spacing(ctx, track, s);
   }
   return s;
 }
+
+/** How far the inked part of `text` reaches below its baseline (descenders), at the current font. */
+const descentOf = (ctx: Ctx, text: string) => Math.max(0, ctx.measureText(text).actualBoundingBoxDescent);
 
 /** Wraps CJK or Latin text into at most `lines` lines within `maxW`. */
 function wrap(ctx: Ctx, text: string, maxW: number, lines: number): string[] {
@@ -109,17 +146,64 @@ function wrap(ctx: Ctx, text: string, maxW: number, lines: number): string[] {
   return out.filter(Boolean).slice(0, lines);
 }
 
-/** Vertical CJK text, one character per line, centred on x. */
-function vertical(ctx: Ctx, text: string, x: number, yMid: number, size: number, gap = 0.28) {
-  const chars = Array.from(text).filter((c) => c.trim());
-  const step = size * (1 + gap);
-  let y = yMid - (chars.length * step) / 2 + size * 0.88;
-  ctx.textAlign = "center";
-  for (const c of chars) {
-    ctx.fillText(c, x, y);
-    y += step;
+const CJK = /[⺀-鿿豈-﫿＀-￯　-〿]/;
+type VToken = { t: string; kind: "cjk" | "latin" | "space" };
+/** Splits text for vertical setting: each CJK character alone, Latin words and numbers kept whole. */
+function vTokens(text: string): VToken[] {
+  const out: VToken[] = [];
+  for (const ch of Array.from(text)) {
+    if (!ch.trim()) {
+      if (out.length && out[out.length - 1].kind !== "space") out.push({ t: " ", kind: "space" });
+      continue;
+    }
+    const latin = !CJK.test(ch);
+    const last = out[out.length - 1];
+    if (latin && last?.kind === "latin") last.t += ch;
+    else out.push({ t: ch, kind: latin ? "latin" : "cjk" });
   }
-  ctx.textAlign = "left";
+  while (out.length && out[out.length - 1].kind === "space") out.pop();
+  return out;
+}
+/** Length of vertical text along the column, at the current font. */
+function verticalLength(ctx: Ctx, text: string, size: number, gap = 0.28): number {
+  return vTokens(text).reduce((n, k) => n + (k.kind === "cjk" ? size * (1 + gap) : k.kind === "space" ? size * 0.45 : upright(k.t) ? size * (1 + gap) : ctx.measureText(k.t).width + size * gap), 0);
+}
+/** One or two digits sit upright side by side in a single cell (纵中横); longer runs turn. */
+const upright = (t: string) => /^[0-9]{1,2}$/.test(t);
+/**
+ * Vertical text, top to bottom, centred on x and on yMid, the way Chinese is set in columns:
+ * each CJK character upright in its own cell; a number of one or two digits upright in one cell;
+ * longer Latin words and numbers ("500ml") turned 90° clockwise and kept whole, never stacked
+ * a letter at a time.
+ */
+function vertical(ctx: Ctx, text: string, x: number, yMid: number, size: number, gap = 0.28) {
+  const toks = vTokens(text);
+  const step = size * (1 + gap);
+  let y = yMid - verticalLength(ctx, text, size, gap) / 2;
+  const align = ctx.textAlign;
+  const base = ctx.textBaseline;
+  for (const k of toks) {
+    if (k.kind === "space") {
+      y += size * 0.45;
+    } else if (k.kind === "cjk" || upright(k.t)) {
+      ctx.textAlign = "center";
+      ctx.textBaseline = "alphabetic";
+      ctx.fillText(k.t, x, y + size * 0.88, size * 1.02);
+      y += step;
+    } else {
+      const w = ctx.measureText(k.t).width;
+      ctx.save();
+      ctx.translate(x, y + size * gap * 0.5);
+      ctx.rotate(Math.PI / 2);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(k.t, 0, 0);
+      ctx.restore();
+      y += w + size * gap;
+    }
+  }
+  ctx.textAlign = align;
+  ctx.textBaseline = base;
 }
 
 /* ---------------------------------------------------------------- Front panels */
@@ -150,8 +234,27 @@ function drawNet(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, ppm: num
   ctx.fillText(net, x, y);
 }
 
-/** The main face. Works for portrait and landscape panels. */
-function drawFront(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, ppm = 0) {
+/**
+ * The main face. Works for portrait and landscape panels. `safe` is the share of the width that
+ * faces the viewer: a label wrapped far round a jar keeps its words in the middle `safe` part
+ * (colour fields still run to the label's edges), so nothing important turns away round the curve.
+ */
+function drawFront(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, ppm = 0, safe = 1) {
+  if (safe < 0.999) {
+    const cw = W * safe;
+    const x0 = (W - cw) / 2;
+    ctx.fillStyle = P("ground");
+    ctx.fillRect(0, 0, W, H);
+    ctx.save();
+    ctx.translate(x0, 0);
+    drawFront(ctx, cw, H, a, P, ppm, 1);
+    ctx.restore();
+    // the layout's colour fields carry on to the edges of the label
+    ctx.fillStyle = P("key");
+    if (a.d.layout === "stripe") ctx.fillRect(0, 0, x0 + 0.5, H);
+    if (a.d.layout === "split") ctx.fillRect(x0 + cw - 0.5, 0, W - x0 - cw + 0.5, H);
+    return;
+  }
   const { d, brand } = a;
   const m = Math.min(W, H);
   const head = d.mockup.headline;
@@ -179,24 +282,27 @@ function drawFront(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, ppm = 
     }
     ctx.globalAlpha = 1;
     const x = bw + m * 0.075;
+    const room = W - x - m * 0.07;
     if (showBrand) {
-      if (logo) drawLogo(ctx, logo, x, m * 0.07, W - x - m * 0.07, m * 0.11);
+      if (logo) drawLogo(ctx, logo, x, m * 0.07, room, m * 0.11);
       else {
         ctx.fillStyle = P("ink", true);
-        setFont(ctx, 700, m * 0.058, SANS);
-        spacing(ctx, 0.12, m * 0.058);
+        // the net content sits top right: keep the brand clear of it
+        const net = a.info?.net.trim() ? m * 0.3 : 0;
+        fit(ctx, brand, 700, m * 0.058, SANS, room - net, 0.12);
         ctx.fillText(brand, x, m * 0.13);
         spacing(ctx, 0, 0);
       }
     }
     drawNet(ctx, W, H, a, P, pxmm, "tr");
-    const s = fit(ctx, head, 800, m * 0.205, SANS, W - x - m * 0.07);
+    const s = fit(ctx, head, 800, m * 0.205, SANS, room);
+    const hy = H - m * 0.2;
+    const hd = descentOf(ctx, head);
     ctx.fillStyle = P("ink", true);
-    ctx.fillText(head, x, H - m * 0.2);
+    ctx.fillText(head, x, hy);
     ctx.fillStyle = P("ink");
-    setFont(ctx, 600, m * 0.064, SANS);
-    spacing(ctx, 0.06, m * 0.064);
-    ctx.fillText(detail, x, H - m * 0.2 + s * 0.2 + m * 0.085);
+    const ds = fit(ctx, detail, 600, m * 0.064, SANS, room, 0.06);
+    ctx.fillText(detail, x, Math.min(H - m * 0.04, hy + Math.max(hd, s * 0.2) + ds * 1.3));
     spacing(ctx, 0, 0);
     return;
   }
@@ -226,23 +332,26 @@ function drawFront(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, ppm = 
     ctx.lineTo(0, lh * 0.85);
     ctx.stroke();
     ctx.restore();
+    const room = kx - m * 0.12;
     if (showBrand) {
       if (logo) drawLogo(ctx, logo, m * 0.07, m * 0.06, kx - m * 0.14, m * 0.1);
       else {
         ctx.fillStyle = P("ink", true);
-        setFont(ctx, 700, m * 0.055, SANS);
-        spacing(ctx, 0.14, m * 0.055);
+        fit(ctx, brand, 700, m * 0.055, SANS, room, 0.14);
         ctx.fillText(brand, m * 0.07, m * 0.12);
         spacing(ctx, 0, 0);
       }
     }
     drawNet(ctx, kx, H, a, P, pxmm, "bl");
-    const s = fit(ctx, head, 700, m * 0.33, SERIF, kx - m * 0.12);
+    const s = fit(ctx, head, 700, m * 0.33, SERIF, room);
+    const hy = H * 0.5 + s * 0.3;
+    const hd = descentOf(ctx, head);
     ctx.fillStyle = P("ink", true);
-    ctx.fillText(head, m * 0.07, H * 0.5 + s * 0.3);
+    ctx.fillText(head, m * 0.07, hy);
     ctx.fillStyle = P("ink");
-    const ds = fit(ctx, detail, 600, m * 0.06, SANS, kx - m * 0.12);
-    ctx.fillText(detail, m * 0.07, H * 0.5 + s * 0.3 + ds * 1.9);
+    const ds = fit(ctx, detail, 600, m * 0.06, SANS, room);
+    // below the headline's descenders (a Latin "p" or "g"), not into them
+    ctx.fillText(detail, m * 0.07, hy + Math.max(hd + ds * 1.15, ds * 1.9));
     return;
   }
 
@@ -273,8 +382,7 @@ function drawFront(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, ppm = 
     if (logo) y = m * 0.07 + drawLogo(ctx, logo, x, m * 0.07, W * 0.5, m * 0.1) + m * 0.03;
     else {
       ctx.fillStyle = P("ink", true);
-      setFont(ctx, 700, m * 0.056, SANS);
-      spacing(ctx, 0.16, m * 0.056);
+      fit(ctx, brand, 700, m * 0.056, SANS, W - x * 2, 0.16);
       ctx.fillText(brand, x, y);
       spacing(ctx, 0, 0);
       y += m * 0.06;
@@ -285,14 +393,15 @@ function drawFront(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, ppm = 
   const lines = wrap(ctx, head, W - x * 2, 2);
   const s = fit(ctx, lines.reduce((a1, b) => (a1.length > b.length ? a1 : b), ""), 700, m * 0.215, SERIF, W - x * 2);
   ctx.fillStyle = P("ink", true);
+  let hd = 0;
   for (const l of lines) {
     y += s * 1.02;
     ctx.fillText(l, x, y);
+    hd = descentOf(ctx, l);
   }
   ctx.fillStyle = P("ink");
-  setFont(ctx, 600, m * 0.064, SANS);
-  spacing(ctx, 0.06, m * 0.064);
-  ctx.fillText(detail, x, y + m * 0.1);
+  const ds = fit(ctx, detail, 600, m * 0.064, SANS, W - x * 2, 0.06);
+  ctx.fillText(detail, x, y + Math.max(m * 0.1, hd + ds * 1.2));
   spacing(ctx, 0, 0);
 }
 
@@ -357,8 +466,7 @@ function drawBack(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, ppm = 0
   ctx.fillStyle = P("ground");
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = P("ink");
-  setFont(ctx, 700, m * 0.06, SANS);
-  spacing(ctx, 0.12, m * 0.06);
+  fit(ctx, a.brand || a.d.mockup.headline, 700, m * 0.06, SANS, W - pad * 2, 0.12);
   ctx.fillText(a.brand || a.d.mockup.headline, pad, pad + m * 0.05);
   spacing(ctx, 0, 0);
   // text lines
@@ -422,9 +530,15 @@ function drawSide(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, variant
     ctx.fillRect(0, 0, W, H * 0.16);
   }
   const text = variant === "left" ? brand || d.mockup.headline : d.mockup.detail;
-  const size = Math.min(W * 0.2, (H * 0.6) / Math.max(2, Array.from(text).length * 1.3));
-  ctx.fillStyle = keyed ? P("ground", true) : P("ink", true);
+  // a column no wider than a fifth of the panel and no longer than 62% of its height
+  let size = Math.min(W * 0.2, (H * 0.6) / Math.max(2, Array.from(text).length * 1.3));
   setFont(ctx, 700, size, SANS);
+  const len = verticalLength(ctx, text, size);
+  if (len > H * 0.62) {
+    size *= (H * 0.62) / len;
+    setFont(ctx, 700, size, SANS);
+  }
+  ctx.fillStyle = keyed ? P(textOn(P, "key", "ground", "ink"), true) : P("ink", true);
   vertical(ctx, text, W / 2, H * 0.52, size);
 }
 
@@ -436,8 +550,7 @@ function drawTop(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint) {
   ctx.fillRect(0, H - m * 0.06, W, m * 0.06);
   ctx.fillStyle = P("ink", true);
   const t = a.brand || a.d.mockup.headline;
-  const s = fit(ctx, t, 700, m * 0.3, SANS, W * 0.6);
-  spacing(ctx, 0.2, s);
+  const s = fit(ctx, t, 700, m * 0.3, SANS, W * 0.6, 0.2);
   ctx.textAlign = "center";
   ctx.fillText(t, W / 2, H / 2 + s * 0.35);
   ctx.textAlign = "left";
@@ -449,18 +562,77 @@ function drawPlain(ctx: Ctx, W: number, H: number, role: Role, P: Paint) {
   ctx.fillRect(0, 0, W, H);
 }
 
-/** Lid band of a gift box: brand on the left, detail on the right. */
-function drawBand(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, withText: boolean) {
+/**
+ * A printed band in the key colour: a gift box's lid wall, a book box's flap, a drawer's front, a
+ * paper tube's lid. On a thin band the brand sits left and the detail right, on one line, when
+ * both fit; otherwise, and on a tall panel, they stack centred. `arc` (degrees) is how far the
+ * band wraps: a band all the way round a lid keeps its words on the part facing the viewer.
+ */
+function drawBand(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, withText: boolean, arc = 0) {
   ctx.fillStyle = P("key");
   ctx.fillRect(0, 0, W, H);
   if (!withText) return;
-  const s = Math.min(H * 0.3, W * 0.05);
-  ctx.fillStyle = P("ground", true);
-  setFont(ctx, 700, s, SANS);
-  spacing(ctx, 0.22, s);
-  ctx.fillText(a.brand || a.d.mockup.headline, H * 0.45, H / 2 + s * 0.36);
-  ctx.textAlign = "right";
-  ctx.fillText(a.d.mockup.detail, W - H * 0.45, H / 2 + s * 0.36);
+  const brand = a.brand || a.d.mockup.headline;
+  const detail = a.d.mockup.detail.trim() === brand.trim() ? "" : a.d.mockup.detail;
+  const span = arc > 100 ? W * Math.min(1, 100 / arc) : W;
+  const x0 = (W - span) / 2;
+  const cx = W / 2;
+  const pad = Math.min(H * 0.45, span * 0.06);
+  const room = span - 2 * pad;
+  ctx.fillStyle = P(textOn(P, "key", "ground", "ink"), true);
+  const tall = H > span * 0.28;
+  if (!tall) {
+    const s = Math.min(H * 0.3, span * 0.05);
+    const by = H / 2 + s * 0.36;
+    setFont(ctx, 700, s, SANS);
+    spacing(ctx, 0.22, s);
+    const bw = ctx.measureText(brand).width;
+    const dw = detail ? ctx.measureText(detail).width : 0;
+    const gap = s * 2;
+    if (bw + (detail ? gap + dw : 0) <= room) {
+      if (arc > 100) {
+        // centred as one line on the front of a round lid
+        const x = cx - (bw + (detail ? gap + dw : 0)) / 2;
+        ctx.fillText(brand, x, by);
+        if (detail) ctx.fillText(detail, x + bw + gap, by);
+      } else {
+        ctx.fillText(brand, x0 + pad, by);
+        if (detail) {
+          ctx.textAlign = "right";
+          ctx.fillText(detail, x0 + span - pad, by);
+          ctx.textAlign = "left";
+        }
+      }
+      spacing(ctx, 0, 0);
+      return;
+    }
+    if (H < s * 3.4) {
+      // no room for two lines: the brand alone, centred
+      ctx.textAlign = "center";
+      fit(ctx, brand, 700, s, SANS, room, 0.22);
+      ctx.fillText(brand, cx, by);
+      ctx.textAlign = "left";
+      spacing(ctx, 0, 0);
+      return;
+    }
+  }
+  // stacked and centred: brand, then the detail smaller beneath
+  ctx.textAlign = "center";
+  const bs = fit(ctx, brand, 700, Math.min(H * (tall ? 0.16 : 0.3), span * (tall ? 0.1 : 0.05)), SANS, room, 0.22);
+  const bd = descentOf(ctx, brand);
+  let ds = 0;
+  const total = () => bs + (detail ? Math.max(bd, bs * 0.1) + ds * 1.6 : 0);
+  if (detail) {
+    fit(ctx, detail, 600, bs * 0.46, SANS, room, 0.12);
+    ds = parseFloat(ctx.font.match(/([\d.]+)px/)?.[1] ?? "0");
+  }
+  const by = H / 2 - total() / 2 + bs * 0.86;
+  fit(ctx, brand, 700, bs, SANS, room, 0.22);
+  ctx.fillText(brand, cx, by);
+  if (detail) {
+    fit(ctx, detail, 600, ds, SANS, room, 0.12);
+    ctx.fillText(detail, cx, by + Math.max(bd, bs * 0.1) + ds * 1.25);
+  }
   ctx.textAlign = "left";
   spacing(ctx, 0, 0);
 }
@@ -504,13 +676,13 @@ function drawTinCap(ctx: Ctx, S: number, a: ArtInput, P: Paint) {
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
-  ctx.fillStyle = P("ground", true);
+  ctx.fillStyle = P(textOn(P, "key", "ground", "ink"), true);
   const t = a.brand || a.d.mockup.headline;
   const s = fit(ctx, t, 700, S * 0.17, SERIF, S * 0.6);
   ctx.textAlign = "center";
   ctx.fillText(t, c, c + s * 0.3);
-  setFont(ctx, 600, S * 0.042, SANS);
-  spacing(ctx, 0.3, S * 0.042);
+  // inside the inner ring at that height
+  fit(ctx, a.d.mockup.detail, 600, S * 0.042, SANS, S * 0.62, 0.3);
   ctx.fillText(a.d.mockup.detail, c, c + s * 0.3 + S * 0.09);
   spacing(ctx, 0, 0);
   ctx.textAlign = "left";
@@ -545,11 +717,13 @@ function drawInnerCard(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint) {
     ctx.lineTo(W * 0.5, H);
     ctx.fill();
   }
-  const x = a.d.layout === "stripe" ? W * 0.2 : m * 0.12;
+  const stripe = a.d.layout === "stripe";
+  const x = stripe ? W * 0.2 : m * 0.12;
   ctx.fillStyle = P("ink", true);
-  setFont(ctx, 700, m * 0.13, SANS);
+  // clear of the key corner: it starts at 62% of the width at the top, 50% at the bottom
+  fit(ctx, a.brand || a.d.mockup.headline, 700, m * 0.13, SANS, (stripe ? W - m * 0.08 : W * 0.6 - m * 0.04) - x);
   ctx.fillText(a.brand || a.d.mockup.headline, x, m * 0.26);
-  fit(ctx, a.d.mockup.innerLabel, 700, m * 0.16, SANS, W * 0.45);
+  fit(ctx, a.d.mockup.innerLabel, 700, m * 0.16, SANS, Math.min(W * 0.45, (stripe ? W - m * 0.08 : W * 0.5 - m * 0.04) - x));
   ctx.fillText(a.d.mockup.innerLabel, x, H - m * 0.16);
 }
 
@@ -562,7 +736,7 @@ function drawManual(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint) {
     ctx.fillRect(0, 0, W * 0.09, H);
   }
   const x = m * 0.16;
-  ctx.fillStyle = P("key", true);
+  ctx.fillStyle = P(textOn(P, "ground", "key", "ink"), true);
   setFont(ctx, 700, m * 0.36, SERIF);
   ctx.fillText("1", x, H * 0.62);
   ctx.fillStyle = P("ink");
@@ -579,8 +753,14 @@ function drawManual(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint) {
 
 export type Art = { color: HTMLCanvasElement; foil: HTMLCanvasElement | null };
 
+/** How a face sits on the package. `arc`: degrees a label or band wraps round a curved body. */
+export type FaceOpts = { arc?: number };
+
+/** The share of a wrapped front label that faces the viewer: about 100° of the curve. */
+const safeOf = (arc?: number) => (arc && arc > 100 ? Math.min(1, 100 / arc) : 1);
+
 /** Draws one face at `wMm` × `hMm`, `ppm` pixels per millimetre. */
-export function drawFace(kind: FaceKind, wMm: number, hMm: number, ppm: number, a: ArtInput): Art {
+export function drawFace(kind: FaceKind, wMm: number, hMm: number, ppm: number, a: ArtInput, opts: FaceOpts = {}): Art {
   const W = Math.max(8, Math.round(wMm * ppm));
   const H = Math.max(8, Math.round(hMm * ppm));
   const roles = rolesOf(a.d);
@@ -590,7 +770,7 @@ export function drawFace(kind: FaceKind, wMm: number, hMm: number, ppm: number, 
     const P = painter(roles, a, mask);
     switch (kind) {
       case "front":
-        drawFront(ctx, W, H, a, P, ppm);
+        drawFront(ctx, W, H, a, P, ppm, safeOf(opts.arc));
         break;
       case "back":
         drawBack(ctx, W, H, a, P, ppm);
@@ -611,7 +791,7 @@ export function drawFace(kind: FaceKind, wMm: number, hMm: number, ppm: number, 
         drawPlain(ctx, W, H, "ground", P);
         break;
       case "band":
-        drawBand(ctx, W, H, a, P, true);
+        drawBand(ctx, W, H, a, P, true, opts.arc ?? 0);
         break;
       case "bandPlain":
         drawBand(ctx, W, H, a, P, false);

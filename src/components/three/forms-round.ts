@@ -6,6 +6,7 @@
  */
 import * as THREE from "three";
 import type { PackSpec } from "@/lib/pack";
+import { LABEL_ARC } from "@/lib/print/layout";
 import { rolesOf, type ArtInput } from "./art";
 import { band, box, disc, lathe, liftOff, mmOf, pin, RAD, ribbed, smooth, springAt, surface, U, V, type Built } from "./common";
 import type { Kit } from "./kit";
@@ -337,13 +338,13 @@ export function buildJar(spec: PackSpec, k: Kit, a: ArtInput, category: string):
     k.fill(fillKind(category, false)),
   );
   root.add(fill);
-  const arc = 150 * RAD;
+  const arc = LABEL_ARC.jar * RAD;
   const ly0 = Math.max(8 * mm, H * 0.12);
   const ly1 = yS - 6 * mm;
-  const label = band(R + 0.25 * mm, ly0, ly1, k.tex("front", ((R * arc) / U) | 0, (ly1 - ly0) / U), arc);
+  const label = band(R + 0.25 * mm, ly0, ly1, k.tex("front", ((R * arc) / U) | 0, (ly1 - ly0) / U, "board", arc / RAD), arc);
   root.add(label);
-  const backArc = 100 * RAD;
-  const backLabel = band(R + 0.25 * mm, ly0, ly1, k.tex("back", ((R * backArc) / U) | 0, (ly1 - ly0) / U), backArc);
+  const backArc = LABEL_ARC.back * RAD;
+  const backLabel = band(R + 0.25 * mm, ly0, ly1, k.tex("back", ((R * backArc) / U) | 0, (ly1 - ly0) / U, "board", backArc / RAD), backArc);
   backLabel.rotation.y = Math.PI;
   root.add(backLabel);
 
@@ -458,13 +459,13 @@ export function buildGlassBottle(spec: PackSpec, k: Kit, a: ArtInput, category: 
     k.fill(fillKind(category, true)),
   );
   root.add(fill);
-  const arc = 130 * RAD;
+  const arc = LABEL_ARC.glassBottle * RAD;
   const ly0 = H * 0.1;
   const ly1 = y0 - H * 0.06;
-  const label = band(R + 0.25 * mm, ly0, ly1, k.tex("front", ((R * arc) / U) | 0, (ly1 - ly0) / U), arc);
+  const label = band(R + 0.25 * mm, ly0, ly1, k.tex("front", ((R * arc) / U) | 0, (ly1 - ly0) / U, "board", arc / RAD), arc);
   root.add(label);
-  const backArc = 100 * RAD;
-  const backLabel = band(R + 0.25 * mm, ly0, ly1, k.tex("back", ((R * backArc) / U) | 0, (ly1 - ly0) / U), backArc);
+  const backArc = LABEL_ARC.back * RAD;
+  const backLabel = band(R + 0.25 * mm, ly0, ly1, k.tex("back", ((R * backArc) / U) | 0, (ly1 - ly0) / U, "board", backArc / RAD), backArc);
   backLabel.rotation.y = Math.PI;
   root.add(backLabel);
   const nb0 = yN + 4 * mm;

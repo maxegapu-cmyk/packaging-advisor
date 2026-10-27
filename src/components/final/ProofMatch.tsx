@@ -71,7 +71,7 @@ export function ProofMatch({ art, spec, input, lang, setProof, uploadPhoto, phot
     if (!p) return null;
     const s = artSize(p);
     const ppm = Math.min(6, 900 / Math.max(s.w, s.h));
-    const c = drawFace(p.kind, s.w, s.h, ppm, input).color;
+    const c = drawFace(p.kind, s.w, s.h, ppm, input, { arc: p.arc }).color;
     if (p.kind !== "tinWrap") return { c, w: s.w, h: s.h };
     const fw = c.width * WRAP_FRONT;
     const out = document.createElement("canvas");

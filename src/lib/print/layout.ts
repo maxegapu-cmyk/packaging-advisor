@@ -14,8 +14,11 @@ import { flatOf, foldsFor, type FoldPiece } from "./folds";
 
 export type FaceKind = "front" | "back" | "left" | "right" | "top" | "bottom" | "flap" | "band" | "bandPlain" | "baseSide" | "tinWrap" | "tinCap" | "inner" | "manual";
 
-/** rot: clockwise quarter turns applied to the upright artwork. */
-export type Panel = { kind: FaceKind; x: number; y: number; w: number; h: number; rot: 0 | 90 | 180 | 270; info?: boolean };
+/** rot: clockwise quarter turns applied to the upright artwork. arc: degrees the panel wraps round a curved body. */
+export type Panel = { kind: FaceKind; x: number; y: number; w: number; h: number; rot: 0 | 90 | 180 | 270; info?: boolean; arc?: number };
+
+/** How far the labels of a jar and a glass bottle wrap round the body, in degrees (3D and print). */
+export const LABEL_ARC = { jar: 150, glassBottle: 130, back: 100 } as const;
 export type Line = [number, number, number, number];
 export type Piece = {
   id: string;
@@ -165,7 +168,7 @@ export function roundAreas(form: Form, w: number, h: number) {
       const yN = h - capH - 1;
       const yS = yN - Math.min(h * 0.1, (R - rnO) * 1.6);
       const lh = yS - 6 - Math.max(8, h * 0.12);
-      return { front: { w: R * ((150 * Math.PI) / 180), h: lh }, back: { w: R * ((100 * Math.PI) / 180), h: lh }, cap: 2 * (rnO + 2.4) };
+      return { front: { w: R * ((LABEL_ARC.jar * Math.PI) / 180), h: lh, arc: LABEL_ARC.jar }, back: { w: R * ((LABEL_ARC.back * Math.PI) / 180), h: lh, arc: LABEL_ARC.back }, cap: 2 * (rnO + 2.4) };
     }
     case "glassBottle": {
       const y0 = h * 0.56;
@@ -176,7 +179,7 @@ export function roundAreas(form: Form, w: number, h: number) {
       const yN = y0 + Math.min(h * 0.2, (R - rn) * 2.2);
       const nb0 = yN + 4;
       const nb1 = Math.min(Hg - 9, nb0 + 18);
-      return { front: { w: R * ((130 * Math.PI) / 180), h: lh }, back: { w: R * ((100 * Math.PI) / 180), h: lh }, neck: nb1 - nb0 > 5 ? { w: 2 * Math.PI * rn, h: nb1 - nb0 } : undefined };
+      return { front: { w: R * ((LABEL_ARC.glassBottle * Math.PI) / 180), h: lh, arc: LABEL_ARC.glassBottle }, back: { w: R * ((LABEL_ARC.back * Math.PI) / 180), h: lh, arc: LABEL_ARC.back }, neck: nb1 - nb0 > 5 ? { w: 2 * Math.PI * rn, h: nb1 - nb0 } : undefined };
     }
     default:
       return {};
@@ -301,7 +304,7 @@ function sheetsFor(form: Form, w: number, h: number, d: number, finish: Finish, 
       return [sheet(id("parts"), nm(P("抽屉盒刀模", "Drawer box die")), nets("drawer", w, h, d), mat, [...notes, DIE], qty)];
     case "paperTube": {
       const ov = 8;
-      const parts = [wrapLabel("body", P("罐身裱纸", "Body wrap"), ra.wrap!.w, ra.wrap!.h, ov), rectPiece("lidband", P("盖身裱纸", "Lid wrap"), ra.lidBand!.w + ov, ra.lidBand!.h, [{ kind: "band", x: 0, y: 0, w: ra.lidBand!.w, h: ra.lidBand!.h, rot: 0 }], [{ x: ra.lidBand!.w, y: 0, w: ov, h: ra.lidBand!.h }]), disc("cap", P("盖顶贴纸", "Lid top"), ra.cap!, "tinCap")];
+      const parts = [wrapLabel("body", P("罐身裱纸", "Body wrap"), ra.wrap!.w, ra.wrap!.h, ov), rectPiece("lidband", P("盖身裱纸", "Lid wrap"), ra.lidBand!.w + ov, ra.lidBand!.h, [{ kind: "band", x: 0, y: 0, w: ra.lidBand!.w, h: ra.lidBand!.h, rot: 0, arc: 360 }], [{ x: ra.lidBand!.w, y: 0, w: ov, h: ra.lidBand!.h }]), disc("cap", P("盖顶贴纸", "Lid top"), ra.cap!, "tinCap")];
       return [sheet(id("wraps"), nm(P("纸罐裱纸", "Paper tube wraps")), parts, mat, [...notes, P("接缝处预留 8 mm 搭接。", "8 mm overlap at the seam.")], qty)];
     }
     case "bag":
@@ -334,7 +337,7 @@ function sheetsFor(form: Form, w: number, h: number, d: number, finish: Finish, 
     }
     case "jar":
     case "glassBottle": {
-      const parts: Local[] = [rectPiece("front", P("正标", "Front label"), ra.front!.w, ra.front!.h, [{ kind: "front", x: 0, y: 0, w: ra.front!.w, h: ra.front!.h, rot: 0 }]), rectPiece("back", P("背标", "Back label"), ra.back!.w, ra.back!.h, [{ kind: "back", x: 0, y: 0, w: ra.back!.w, h: ra.back!.h, rot: 0, info: true }])];
+      const parts: Local[] = [rectPiece("front", P("正标", "Front label"), ra.front!.w, ra.front!.h, [{ kind: "front", x: 0, y: 0, w: ra.front!.w, h: ra.front!.h, rot: 0, arc: ra.front!.arc }]), rectPiece("back", P("背标", "Back label"), ra.back!.w, ra.back!.h, [{ kind: "back", x: 0, y: 0, w: ra.back!.w, h: ra.back!.h, rot: 0, info: true, arc: ra.back!.arc }])];
       if ("neck" in ra && ra.neck) parts.push(rectPiece("neck", P("颈标", "Neck band"), ra.neck.w, ra.neck.h, [{ kind: "bandPlain", x: 0, y: 0, w: ra.neck.w, h: ra.neck.h, rot: 0 }]));
       if ("cap" in ra && ra.cap) parts.push(disc("cap", P("盖顶贴纸", "Lid sticker"), ra.cap, "tinCap"));
       return [sheet(id("labels"), nm(P("瓶罐标签", "Labels")), parts, mat, notes, qty)];

@@ -39,7 +39,7 @@ export type PanelArt = { color: HTMLCanvasElement; foil: HTMLCanvasElement | nul
  */
 export function panelArt(p: Panel, a: ArtInput, ppm: number, bleed = BLEED): PanelArt {
   const s = artSize(p);
-  const art = drawFace(p.kind, s.w, s.h, ppm, a);
+  const art = drawFace(p.kind, s.w, s.h, ppm, a, { arc: p.arc });
   const fix = (c: HTMLCanvasElement) => (p.kind === "tinWrap" ? unwrapSeam(c) : c);
   const extend = (src: HTMLCanvasElement) => {
     const b = Math.round(bleed * ppm);

@@ -13,7 +13,8 @@ export type Surface = "board" | "film" | "metal" | "plastic" | "glaze";
 export type InsertKind = "velvet" | "pulp" | "foam" | "card";
 
 export type Kit = {
-  tex: (kind: FaceKind, wMm: number, hMm: number, surface?: Surface) => THREE.MeshPhysicalMaterial;
+  /** A printed face. `arc`: degrees it wraps round a curved body (a jar's label, a tube's lid band). */
+  tex: (kind: FaceKind, wMm: number, hMm: number, surface?: Surface, arc?: number) => THREE.MeshPhysicalMaterial;
   edge: THREE.MeshStandardMaterial;
   inside: THREE.MeshStandardMaterial;
   lining: THREE.MeshPhysicalMaterial;
@@ -241,11 +242,11 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
     return c;
   };
 
-  const tex = (kind: FaceKind, wMm: number, hMm: number, surface: Surface = "board") => {
+  const tex = (kind: FaceKind, wMm: number, hMm: number, surface: Surface = "board", arc?: number) => {
     const ppm = Math.min(16, maxTex / Math.max(wMm, hMm));
     // effects need the drawn masks now; plain print can wait
     const lazy = !!opts.defer && !(a.effects ?? []).length;
-    const art = lazy ? null : drawFace(kind, wMm, hMm, ppm, a);
+    const art = lazy ? null : drawFace(kind, wMm, hMm, ppm, a, { arc });
     const board = surface === "board";
     let fib: THREE.Texture | null = null;
     if (board) {
@@ -261,7 +262,7 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
     if (lazy)
       opts.defer!(() => {
         // the same texture object, so every clone of the material sees the print
-        map.image = drawFace(kind, wMm, hMm, ppm, a).color;
+        map.image = drawFace(kind, wMm, hMm, ppm, a, { arc }).color;
         map.needsUpdate = true;
       });
     const m = new THREE.MeshPhysicalMaterial({
