@@ -141,13 +141,14 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
   const sampleIds = new Set(SAMPLES.map((s) => s.id));
 
   return (
-    <div className="landing">
+    <div className={lang === "en" ? "landing is-en" : "landing is-zh"}>
       <Topbar lang={lang} langSwitch={langSwitch} />
 
       <SymbiosisHero samples={SAMPLES} lang={lang}>
-        <h1 className="hero-h">
-          <span className="hero-line">{one(C.heroA)}</span>
-          <span className="hero-line">{one(C.heroB)}</span>
+        {/* In Chinese the headline is an inscription: two columns written top to bottom, without punctuation, sealed below. */}
+        <h1 className={lang === "en" ? "hero-h" : "hero-h hero-v"}>
+          <span className="hero-line">{lang === "en" ? C.heroA.en : C.heroA.zh.replace(/[，。]/g, "")}</span>
+          <span className="hero-line">{lang === "en" ? C.heroB.en : C.heroB.zh.replace(/[，。]/g, "")}</span>
         </h1>
         <Bi p={C.heroSub} lang={lang} as="p" className="hero-sub" />
         <div className="hero-ctas">
@@ -164,95 +165,99 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
 
       <section id="how" className="band band-how">
         <Bi p={C.howH} lang={lang} as="h2" className="band-h" />
-        <ol className="how">
-          {C.steps.map((s, i) => (
-            <li key={i}>
-              <HowVignette n={i} sample={SAMPLES[0]} lang={lang} />
-              <span className="how-n">{i + 1}</span>
-              <Bi p={s.t} lang={lang} as="h3" />
-              <Bi p={s.d} lang={lang} as="p" />
-            </li>
-          ))}
-        </ol>
+        <div className="band-body">
+          <ol className="how">
+            {C.steps.map((s, i) => (
+              <li key={i}>
+                <HowVignette n={i} sample={SAMPLES[0]} lang={lang} />
+                <span className="how-n" aria-hidden="true">
+                  {lang === "en" ? i + 1 : "壹贰叁肆"[i]}
+                </span>
+                <Bi p={s.t} lang={lang} as="h3" />
+                <Bi p={s.d} lang={lang} as="p" />
+              </li>
+            ))}
+          </ol>
+        </div>
       </section>
 
       <section id="any" className="band band-wash">
-        <div className="band-headrow any-head">
-          <div>
-            <Bi p={C.anyH} lang={lang} as="h2" className="band-h" />
+        <Bi p={C.anyH} lang={lang} as="h2" className="band-h band-h-lead" />
+        <div className="band-body">
+          <div className="band-headrow any-head">
             <Bi p={C.anySub} lang={lang} as="p" className="any-sub" />
-          </div>
-          <div className="any-counts">
-            <span>{one(C.catsCount)}</span>
-            <span>{one(C.formsCount)}</span>
-          </div>
-        </div>
-        <div className="families">
-          {CATEGORY_FAMILIES.map((f) => (
-            <div key={f.id} className="family">
-              <h3 className="family-h">{one(f.label)}</h3>
-              <ul>
-                {f.cats.map((c) => (
-                  <li key={c}>
-                    <FormGlyph form={CATEGORY_PACK[c].form} />
-                    <span>{one(CATEGORIES[c])}</span>
-                    {sampleIds.has(c) ? (
-                      <button type="button" className="family-sample" onClick={() => (setSi(SAMPLES.findIndex((s) => s.id === c)), document.getElementById("samples")?.scrollIntoView({ behavior: "smooth" }))}>
-                        {one(C.hasSample)}
-                      </button>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
+            <div className="any-counts">
+              <span>{one(C.catsCount)}</span>
+              <span>{one(C.formsCount)}</span>
             </div>
-          ))}
+          </div>
+          <div className="families">
+            {CATEGORY_FAMILIES.map((f) => (
+              <div key={f.id} className="family">
+                <h3 className="family-h">{one(f.label)}</h3>
+                <ul>
+                  {f.cats.map((c) => (
+                    <li key={c}>
+                      <FormGlyph form={CATEGORY_PACK[c].form} />
+                      <span>{one(CATEGORIES[c])}</span>
+                      {sampleIds.has(c) ? (
+                        <button type="button" className="family-sample" onClick={() => (setSi(SAMPLES.findIndex((s) => s.id === c)), document.getElementById("samples")?.scrollIntoView({ behavior: "smooth" }))}>
+                          {one(C.hasSample)}
+                        </button>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       <section id="samples" className="band">
-        <div className="band-headrow">
-          <Bi p={C.samplesH} lang={lang} as="h2" className="band-h" />
-          <Bi p={C.samplesSub} lang={lang} as="p" className="band-sub" />
-        </div>
-        <div className="sample-tabs seg" role="tablist" aria-label={one(C.samplesH)}>
-          <SegPill />
-          {SAMPLES.map((s, i) => (
-            <button key={s.id} type="button" role="tab" aria-selected={i === si} className={i === si ? "sample-tab is-active" : "sample-tab"} onClick={() => setSi(i)}>
-              <FormGlyph form={s.pack.form} />
-              <span className="sample-tab-text">
-                <strong>{one(s.label)}</strong>
-                <small>{one(s.board.meta.product)}</small>
-              </span>
-            </button>
-          ))}
-        </div>
-        <Bi key={sample.id} p={board.reading.product} lang={lang} as="p" className="sample-reading fade-in" />
-        <PackProvider key={sample.id} initial={sample.pack} studioBase={`/space/demo?s=${sample.id}`} category={board.meta.category}>
-          <BoxSync label={one(UI.rotateTogether)} hint={one(UI.dragHint)} toolbar={<PackBar lang={lang} />}>
-            <div className="sample-grid">
-              {board.directions.map((d) => (
-                <div className={d.id === board.recommendation.pick ? "sample is-recommended" : "sample"} key={`${sample.id}-${d.id}`}>
-                  <div className="sample-stage" style={paletteVars(d)}>
-                    <Box3D d={d} brand={board.meta.brand} lang={lang} label={`${d.id} ${one(d.name)}`} />
+        <Bi p={C.samplesH} lang={lang} as="h2" className="band-h band-h-lead" />
+        <div className="band-body">
+          <Bi p={C.samplesSub} lang={lang} as="p" className="band-sub band-lead" />
+          <div className="sample-tabs seg" role="tablist" aria-label={one(C.samplesH)}>
+            <SegPill />
+            {SAMPLES.map((s, i) => (
+              <button key={s.id} type="button" role="tab" aria-selected={i === si} className={i === si ? "sample-tab is-active" : "sample-tab"} onClick={() => setSi(i)}>
+                <FormGlyph form={s.pack.form} />
+                <span className="sample-tab-text">
+                  <strong>{one(s.label)}</strong>
+                  <small>{one(s.board.meta.product)}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+          <Bi key={sample.id} p={board.reading.product} lang={lang} as="p" className="sample-reading fade-in" />
+          <PackProvider key={sample.id} initial={sample.pack} studioBase={`/space/demo?s=${sample.id}`} category={board.meta.category}>
+            <BoxSync label={one(UI.rotateTogether)} hint={one(UI.dragHint)} toolbar={<PackBar lang={lang} />}>
+              <div className="sample-grid">
+                {board.directions.map((d) => (
+                  <div className={d.id === board.recommendation.pick ? "sample is-recommended" : "sample"} key={`${sample.id}-${d.id}`}>
+                    <div className="sample-stage" style={paletteVars(d)}>
+                      <Box3D d={d} brand={board.meta.brand} lang={lang} label={`${d.id} ${one(d.name)}`} />
+                    </div>
+                    <div className="sample-name">
+                      <span className="dir-id">{d.id}</span>
+                      <Bi p={d.name} lang={lang} as="h3" />
+                      {d.id === board.recommendation.pick ? <Bi p={UI.recommended} lang={lang} className="tag tag-accent" /> : null}
+                    </div>
+                    <ColorBar palette={d.palette} lang={lang} label={one(UI.colorCard)} />
                   </div>
-                  <div className="sample-name">
-                    <span className="dir-id">{d.id}</span>
-                    <Bi p={d.name} lang={lang} as="h3" />
-                    {d.id === board.recommendation.pick ? <Bi p={UI.recommended} lang={lang} className="tag tag-accent" /> : null}
-                  </div>
-                  <ColorBar palette={d.palette} lang={lang} label={one(UI.colorCard)} />
-                </div>
-              ))}
-            </div>
-          </BoxSync>
-        </PackProvider>
-        <div className="sample-quote">
-          <Bi p={UI.forDesigner} lang={lang} as="p" className="label" />
-          <Bi p={board.recommendation.designerInstruction} lang={lang} as="p" className="quote" />
-          <a className="btn btn-icon" href={`/space/demo?s=${sample.id}&d=${rec.id}`}>
-            <SpaceIcon />
-            <Bi p={C.openSample} lang={lang} />
-          </a>
+                ))}
+              </div>
+            </BoxSync>
+          </PackProvider>
+          <div className="sample-quote">
+            <Bi p={UI.forDesigner} lang={lang} as="p" className="label" />
+            <Bi p={board.recommendation.designerInstruction} lang={lang} as="p" className="quote" />
+            <a className="btn btn-icon" href={`/space/demo?s=${sample.id}&d=${rec.id}`}>
+              <SpaceIcon />
+              <Bi p={C.openSample} lang={lang} />
+            </a>
+          </div>
         </div>
       </section>
 
@@ -277,44 +282,48 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
 
       <section id="board" className="band">
         <Bi p={C.boardH} lang={lang} as="h2" className="band-h" />
-        <div className="board-intro">
-          <figure className="specimen" aria-hidden="true">
-            <div className="specimen-top">
-              <span className="dir-id">{tea.recommendation.pick}</span>
-              <strong>{one(teaRec.name)}</strong>
-              <span className="tag tag-accent">{one(UI.recommended)}</span>
-            </div>
-            <div className="specimen-body">
-              <FaceLayout d={teaRec} lang={lang} title="" />
-              <div className="specimen-side">
-                <ColorBar palette={teaRec.palette} lang={lang} label="" />
-                <div className="specimen-claim">
-                  <span className="tag">{one(UI.levelHigh)}</span>
-                  <q>{tea.claimCheck[1]?.text}</q>
-                  <span className="specimen-arrow">{one(UI.saferWording)}</span>
-                  <span>{one(tea.claimCheck[1]?.safer ?? { zh: "", en: "" })}</span>
+        <div className="band-body">
+          <div className="board-intro">
+            <figure className="specimen" aria-hidden="true">
+              <div className="specimen-top">
+                <span className="dir-id">{tea.recommendation.pick}</span>
+                <strong>{one(teaRec.name)}</strong>
+                <span className="tag tag-accent">{one(UI.recommended)}</span>
+              </div>
+              <div className="specimen-body">
+                <FaceLayout d={teaRec} lang={lang} title="" />
+                <div className="specimen-side">
+                  <ColorBar palette={teaRec.palette} lang={lang} label="" />
+                  <div className="specimen-claim">
+                    <span className="tag">{one(UI.levelHigh)}</span>
+                    <q>{tea.claimCheck[1]?.text}</q>
+                    <span className="specimen-arrow">{one(UI.saferWording)}</span>
+                    <span>{one(tea.claimCheck[1]?.safer ?? { zh: "", en: "" })}</span>
+                  </div>
                 </div>
               </div>
+            </figure>
+            <div className="items">
+              {C.items.map((it, i) => (
+                <div className="item" key={i}>
+                  <Bi p={it.t} lang={lang} as="h3" />
+                  <Bi p={it.d} lang={lang} as="p" />
+                </div>
+              ))}
             </div>
-          </figure>
-          <div className="items">
-            {C.items.map((it, i) => (
-              <div className="item" key={i}>
-                <Bi p={it.t} lang={lang} as="h3" />
-                <Bi p={it.d} lang={lang} as="p" />
-              </div>
-            ))}
           </div>
         </div>
       </section>
 
       <section className="band band-nots">
         <Bi p={C.notH} lang={lang} as="h2" className="band-h" />
-        <ul className="nots">
-          {C.nots.map((n, i) => (
-            <Bi key={i} p={n} lang={lang} as="li" />
-          ))}
-        </ul>
+        <div className="band-body">
+          <ul className="nots">
+            {C.nots.map((n, i) => (
+              <Bi key={i} p={n} lang={lang} as="li" />
+            ))}
+          </ul>
+        </div>
       </section>
 
       <section className="end">
@@ -325,12 +334,15 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
         </a>
       </section>
 
+      {/* a colophon (牌记), framed with a thick and a thin line as in a Song-printed book */}
       <footer className="footer">
-        <span className="brandmark">
-          <Brandmark size={22} />
-          <Bi p={UI.appName} lang={lang} />
-        </span>
-        <Bi p={C.footer} lang={lang} />
+        <div className="colophon">
+          <span className="brandmark">
+            <Brandmark size={30} />
+            <Bi p={UI.appName} lang={lang} />
+          </span>
+          <Bi p={C.footer} lang={lang} />
+        </div>
       </footer>
     </div>
   );

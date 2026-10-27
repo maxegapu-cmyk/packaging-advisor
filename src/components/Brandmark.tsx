@@ -1,10 +1,17 @@
-/** A folded box drawn in ink, its creases in celadon, with a small vermilion seal: the product's mark. */
+/**
+ * The product's mark: a square cinnabar seal cut in 白文 (characters left in the paper colour),
+ * reading 包装顾问 the traditional way, right column first: 包装 on the right, 顾问 on the left.
+ */
 export function Brandmark({ size = 28 }: { size?: number }) {
   return (
     <svg className="bm" width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
-      <path className="bm-box" d="M4 10 16 4l12 6v12l-12 6-12-6z" strokeWidth="1.4" strokeLinejoin="round" />
-      <path className="bm-crease" d="M4 10l12 6 12-6M16 16v12" fill="none" strokeWidth="1.4" strokeDasharray="2.5 2" />
-      <rect className="bm-seal" x="24.5" y="24.5" width="6" height="6" rx="0.6" />
+      <rect className="bm-seal" x="0.5" y="0.5" width="31" height="31" rx="1.6" />
+      <g className="bm-chars">
+        <text x="23.2" y="14.2">包</text>
+        <text x="23.2" y="28.2">装</text>
+        <text x="8.8" y="14.2">顾</text>
+        <text x="8.8" y="28.2">问</text>
+      </g>
     </svg>
   );
 }
