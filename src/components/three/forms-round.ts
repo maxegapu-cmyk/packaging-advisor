@@ -261,6 +261,7 @@ export function buildTube(spec: PackSpec, k: Kit, a: ArtInput): Built {
     ),
     bodyMat,
   );
+  body.userData.wrap = { r: R, arc: Math.PI * 2 };
   tube.add(body);
   const crimp = box(2 * flat, crimpH, 0.7 * mm, [plainM, plainM, plainM, plainM, plainM, plainM]);
   crimp.position.y = y1 + crimpH / 2;
@@ -369,7 +370,9 @@ export function buildJar(spec: PackSpec, k: Kit, a: ArtInput, category: string):
   );
   const top = k.tex("tinCap", (2 * Rc) / U, (2 * Rc) / U, "metal");
   top.clearcoat = 1;
-  lid.add(disc(Rc - 1.3 * mm, capH + 0.06 * mm, top));
+  const sticker = disc(Rc - 1.3 * mm, capH + 0.06 * mm, top);
+  sticker.userData.decal = { r: Rc - 1.3 * mm };
+  lid.add(sticker);
   const closedY = H - capH;
   lid.position.y = closedY;
 

@@ -350,6 +350,7 @@ export function buildTin(spec: PackSpec, k: Kit, a: ArtInput, maxTex: number, ow
   const wrap = new THREE.Mesh(new THREE.CylinderGeometry(R + 0.12 * mm, R + 0.12 * mm, labelH, SEG, 1, true, Math.PI, Math.PI * 2), k.tex("tinWrap", circ / U, labelH / U, "metal"));
   wrap.position.y = labelY0 + labelH / 2;
   wrap.castShadow = true;
+  wrap.userData.wrap = { r: R + 0.12 * mm, arc: Math.PI * 2 };
   root.add(wrap);
 
   // foil seal at the top of the body
@@ -400,6 +401,7 @@ export function buildTin(spec: PackSpec, k: Kit, a: ArtInput, maxTex: number, ow
   const cap = new THREE.Mesh(new THREE.CircleGeometry(LR - 2.5 * mm, SEG), capMat);
   cap.rotation.x = -Math.PI / 2;
   cap.position.y = lidH - 0.15 * mm;
+  cap.userData.decal = { r: LR - 2.5 * mm };
   lid.add(cap);
 
   // Opened, the lid leans upright beside the tin, its printed top toward the camera.

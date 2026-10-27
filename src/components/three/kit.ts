@@ -104,7 +104,7 @@ const CONTENTS: Record<string, { dry: string; liquid: string; cream: string }> =
   other: { dry: "#8F8A7E", liquid: "#D8C6A0", cream: "#F2EEE6" },
 };
 
-function noiseCanvas(base: string, spread: number, size = 256, flecks = 2400): HTMLCanvasElement {
+function noiseCanvasRaw(base: string, spread: number, size = 256, flecks = 2400): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = c.height = size;
   const ctx = c.getContext("2d")!;
@@ -125,7 +125,7 @@ function noiseCanvas(base: string, spread: number, size = 256, flecks = 2400): H
 }
 
 /** Flat-sawn pine: fine growth rings of uneven spacing along the length, pores, a soft knot. */
-function woodCanvas(W = 1024, H = 512, seed0 = 7): HTMLCanvasElement {
+function woodCanvasRaw(W = 1024, H = 512, seed0 = 7): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = W;
   c.height = H;
@@ -162,7 +162,7 @@ function woodCanvas(W = 1024, H = 512, seed0 = 7): HTMLCanvasElement {
   return c;
 }
 
-function fluteCanvas(): HTMLCanvasElement {
+function fluteCanvasRaw(): HTMLCanvasElement {
   // one flute period (about 3.5 mm for E/B flute) across a 3 mm board
   const W = 128;
   const H = 96;
@@ -186,6 +186,18 @@ function fluteCanvas(): HTMLCanvasElement {
   ctx.stroke();
   return c;
 }
+
+/** The surface images are the same for every package: draw each once. */
+const surfaceCache = new Map<string, HTMLCanvasElement>();
+const once = <A extends unknown[]>(name: string, f: (...a: A) => HTMLCanvasElement) => (...a: A) => {
+  const k = name + JSON.stringify(a);
+  let c = surfaceCache.get(k);
+  if (!c) surfaceCache.set(k, (c = f(...a)));
+  return c;
+};
+const noiseCanvas = once("noise", noiseCanvasRaw);
+const woodCanvas = once("wood", woodCanvasRaw);
+const fluteCanvas = once("flute", fluteCanvasRaw);
 
 export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: number, category = "other"): Kit {
   const disposables: { dispose: () => void }[] = [];

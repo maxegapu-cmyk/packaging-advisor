@@ -6,8 +6,8 @@ import type { Sample } from "@/lib/samples";
 import { reducedMotion } from "../pack/orbit";
 import { Bi } from "../Bi";
 import type { FrameInfo, HeroItem, OverlayFrame, SymbiosisScene } from "./symbiosis";
-import type { CivFrame, CivilizationScene } from "./civilization";
-import { CHAPTER_SECONDS, CHAPTERS } from "./chapters";
+import type { FormsFrame, FormsScene } from "./forms/film";
+import { FILM, ITEM_SECONDS, PHASES, phaseOf, sizeText } from "./forms/items";
 
 const STAGES: Pair[] = [
   { zh: "印刷", en: "Print" },
@@ -89,47 +89,46 @@ function drawOverlay(svg: SVGSVGElement, o: OverlayFrame) {
   svg.innerHTML = `<g opacity="${o.alpha2d.toFixed(3)}">${out.join("")}</g>`;
 }
 
-/** Draws the civilization film's 2D construction lines, each revealed up to its `p`. */
-function drawCivOverlay(svg: SVGSVGElement, f: CivFrame) {
+const f1 = (n: number) => n.toFixed(1);
+
+/** Draws the forms film's 2D layer: the dieline, the print laser, the scan contour, the dimensions. */
+function drawFormsOverlay(svg: SVGSVGElement, f: FormsFrame) {
   svg.setAttribute("viewBox", `0 0 ${f.w} ${f.h}`);
   const out: string[] = [];
   for (const l of f.lines) {
-    const p = l.p ?? 1;
-    if (p <= 0 || l.pts.length < 2) continue;
-    let len = 0;
-    for (let i = 1; i < l.pts.length; i++) len += Math.hypot(l.pts[i][0] - l.pts[i - 1][0], l.pts[i][1] - l.pts[i - 1][1]);
-    // cut the polyline at p of its length, so dashed lines reveal cleanly too
-    const keep: [number, number][] = [l.pts[0]];
-    let acc = 0;
-    for (let i = 1; i < l.pts.length; i++) {
-      const [x0, y0] = l.pts[i - 1];
-      const [x1, y1] = l.pts[i];
-      const s = Math.hypot(x1 - x0, y1 - y0);
-      if (acc + s >= len * p) {
-        const k = s ? (len * p - acc) / s : 0;
-        keep.push([x0 + (x1 - x0) * k, y0 + (y1 - y0) * k]);
-        break;
-      }
-      keep.push([x1, y1]);
-      acc += s;
-    }
-    out.push(`<polyline points="${pts(keep)}" fill="none" stroke="${l.color}" stroke-width="${l.width}"${l.dash ? ` stroke-dasharray="${l.dash}"` : ""} stroke-linecap="round" stroke-linejoin="round"/>`);
-    // the knife, where the cut has got to
-    if (l.head && p < 1) {
-      const [hx, hy] = keep[keep.length - 1];
-      out.push(`<circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="3.4" fill="${l.color}"/>`);
-    }
+    const bx = l.a[0] + (l.b[0] - l.a[0]) * l.p;
+    const by = l.a[1] + (l.b[1] - l.a[1]) * l.p;
+    const crease = l.kind === "crease";
+    out.push(`<line x1="${f1(l.a[0])}" y1="${f1(l.a[1])}" x2="${f1(bx)}" y2="${f1(by)}" class="${crease ? "fx-crease" : "fx-cut"}" opacity="${l.alpha.toFixed(3)}"/>`);
+  }
+  if (f.laser) {
+    const [[x0, y0], [x1, y1]] = f.laser;
+    out.push(`<line x1="${f1(x0)}" y1="${f1(y0)}" x2="${f1(x1)}" y2="${f1(y1)}" class="fx-laser-glow"/><line x1="${f1(x0)}" y1="${f1(y0)}" x2="${f1(x1)}" y2="${f1(y1)}" class="fx-laser"/>`);
+  }
+  if (f.scan) out.push(`<polygon points="${pts(f.scan)}" class="fx-scan"/>`);
+  for (const d of f.dims) {
+    const [ax, ay] = d.a;
+    const [bx, by] = d.b;
+    const len = Math.hypot(bx - ax, by - ay) || 1;
+    const nx = -(by - ay) / len;
+    const ny = (bx - ax) / len;
+    const tk = 5;
+    out.push(`<g opacity="${d.alpha.toFixed(3)}" class="fx-dimg"><line x1="${f1(ax)}" y1="${f1(ay)}" x2="${f1(bx)}" y2="${f1(by)}"/><line x1="${f1(ax - nx * tk)}" y1="${f1(ay - ny * tk)}" x2="${f1(ax + nx * tk)}" y2="${f1(ay + ny * tk)}"/><line x1="${f1(bx - nx * tk)}" y1="${f1(by - ny * tk)}" x2="${f1(bx + nx * tk)}" y2="${f1(by + ny * tk)}"/>`);
+    const mx = (ax + bx) / 2 + nx * 15;
+    const my = (ay + by) / 2 + ny * 15;
+    out.push(`<text x="${f1(mx)}" y="${f1(my)}" text-anchor="middle" dominant-baseline="middle" class="fx-dim">${d.text}</text></g>`);
   }
   svg.innerHTML = out.join("");
 }
 
-export type Film = "symbiosis" | "civilization";
+export type Film = "symbiosis" | "forms";
 const FILMS: { id: Film; label: Pair }[] = [
   { id: "symbiosis", label: { zh: "共生", en: "Symbiosis" } },
-  { id: "civilization", label: { zh: "文明：从平面到立体", en: "Civilization: flat to form" } },
+  { id: "forms", label: { zh: "平面到立体", en: "Flat to form" } },
 ];
 const FILM_KEY = "pa.heroFilm";
-const CIV_STILL: [number, number] = [6, 7.2];
+/** Reduced motion: the gift box, finished. */
+const FORMS_STILL: [number, number] = [5, 3.8];
 
 /** Starts work once the page has loaded and gone idle, so copy and layout come first. */
 function whenIdle(): Promise<void> {
@@ -144,8 +143,9 @@ function whenIdle(): Promise<void> {
  * The homepage hero, with two code-driven films under tabs:
  * - 共生 Symbiosis: a press sheet prints, cuts and folds into the package (or wraps a label
  *   round a tin or bottle) and back again, for one product after another.
- * - 文明 Civilization: seven moments in how people went from flat marks to solid forms.
- * Copy sits over the left; the strip below jumps to any product or chapter.
+ * - 平面到立体 Flat to form: twenty packs in everyday use, each from its dieline and flat
+ *   print to its finished form.
+ * Copy sits over the left; the strip below jumps to any product or pack.
  */
 export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; lang: Lang; children: ReactNode }) {
   const items = useMemo(() => heroItems(samples), [samples]);
@@ -154,20 +154,24 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
   const veil = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const scene = useRef<SymbiosisScene | null>(null);
-  const civ = useRef<CivilizationScene | null>(null);
+  const forms = useRef<FormsScene | null>(null);
   const [film, setFilm] = useState<Film>("symbiosis");
   const [info, setInfo] = useState<{ item: number; stage: number }>({ item: 0, stage: 3 });
-  const [chapter, setChapter] = useState(0);
-  const [ok, setOk] = useState<Record<Film, boolean>>({ symbiosis: true, civilization: true });
+  const [pack, setPack] = useState<{ item: number; phase: number }>({ item: 0, phase: 0 });
+  const [ok, setOk] = useState<Record<Film, boolean>>({ symbiosis: true, forms: true });
+  // the remembered film is read first, so a returning visitor's other film is never built
+  const [ready, setReady] = useState(false);
   const one = (p: Pair) => (lang === "en" ? p.en : p.zh);
 
   useEffect(() => {
     try {
       const v = localStorage.getItem(FILM_KEY);
-      if (v === "civilization") setFilm(v);
+      // the second film used to be called "civilization"
+      if (v === "forms" || v === "civilization") setFilm("forms");
     } catch {
       /* storage blocked: start on the first film */
     }
+    setReady(true);
   }, []);
 
   const choose = (f: Film) => {
@@ -180,6 +184,7 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
   };
 
   useEffect(() => {
+    if (!ready) return;
     let alive = true;
     let ro: ResizeObserver | undefined;
     let io: IntersectionObserver | undefined;
@@ -191,6 +196,8 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
     const mount = (make: (c: HTMLCanvasElement) => { start(): void; stop(): void; dispose(): void; resize(w: number, h: number): void }, still: () => void) => {
       const el = host.current;
       if (!alive || !el) return;
+      // exactly one film canvas, whatever order things finished in
+      el.querySelectorAll(".sym-canvas").forEach((c) => c.remove());
       canvas = document.createElement("canvas");
       canvas.className = "sym-canvas";
       el.prepend(canvas);
@@ -243,28 +250,28 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
         )
         .catch(() => setOk((o) => ({ ...o, symbiosis: false })));
     } else {
-      let last = -1;
+      let last = { item: -1, phase: -1 };
       whenIdle()
-        .then(() => import("./civilization"))
-        .then(({ CivilizationScene }) =>
+        .then(() => import("./forms/film"))
+        .then(({ FormsScene }) =>
           mount(
             (c) => {
-              const sc = new CivilizationScene(c);
-              civ.current = sc;
-              sc.onFrame = (f: CivFrame) => {
-                if (svg.current) drawCivOverlay(svg.current, f);
+              const sc = new FormsScene(c);
+              forms.current = sc;
+              sc.onFrame = (f: FormsFrame) => {
+                if (svg.current) drawFormsOverlay(svg.current, f);
                 if (veil.current) veil.current.style.opacity = f.fade.toFixed(3);
-                if (f.chapter !== last) {
-                  last = f.chapter;
-                  setChapter(last);
+                if (f.item !== last.item || f.phase !== last.phase) {
+                  last = { item: f.item, phase: f.phase };
+                  setPack(last);
                 }
               };
               return sc;
             },
-            () => civ.current?.still(...CIV_STILL),
+            () => forms.current?.still(...FORMS_STILL),
           ),
         )
-        .catch(() => setOk((o) => ({ ...o, civilization: false })));
+        .catch(() => setOk((o) => ({ ...o, forms: false })));
     }
     return () => {
       alive = false;
@@ -273,17 +280,18 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
       document.removeEventListener("visibilitychange", onVis);
       run?.dispose();
       scene.current = null;
-      civ.current = null;
+      forms.current = null;
       canvas?.remove();
+      const w = window as unknown as { __hero?: unknown };
+      if (run && w.__hero === run) w.__hero = undefined;
     };
-  }, [items, film]);
+  }, [items, film, ready]);
 
   const cur = items[info.item];
-  const ch = CHAPTERS[chapter];
-  const isCiv = film === "civilization";
-  const dark = isCiv && ch.dark;
+  const isForms = film === "forms";
+  const fp = FILM[pack.item];
   return (
-    <section className={`sym${isCiv ? " is-civ" : ""}${dark ? " is-dark" : ""}`} data-film={film} aria-label={lang === "en" ? "Packaging Advisor" : "包装视觉顾问"}>
+    <section className={`sym${isForms ? " is-forms is-dark" : ""}`} data-film={film} aria-label={lang === "en" ? "Packaging Advisor" : "包装视觉顾问"}>
       <div className="sym-stage" ref={host}>
         <svg ref={svg} className="sym-2d" aria-hidden="true" />
         <div ref={veil} className="sym-veil" aria-hidden="true" />
@@ -300,8 +308,14 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
             loop
             playsInline
             aria-hidden="true"
-            // the pre-rendered civilization film still drives the captions and chapter strip
-            onTimeUpdate={(e) => isCiv && setChapter(Math.min(CHAPTERS.length - 1, Math.floor(e.currentTarget.currentTime / CHAPTER_SECONDS)))}
+            // the pre-rendered film still drives the caption and the strip
+            onTimeUpdate={(e) => {
+              if (!isForms) return;
+              const t = e.currentTarget.currentTime;
+              const item = Math.min(FILM.length - 1, Math.floor(t / ITEM_SECONDS));
+              const tt = t - item * ITEM_SECONDS;
+              setPack({ item, phase: phaseOf(tt) });
+            }}
           />
         ) : null}
       </div>
@@ -313,29 +327,40 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
         ))}
       </div>
       <div className="sym-copy">{children}</div>
-      {isCiv ? (
-        <div className="sym-meta civ-meta">
-          <div className="civ-cap" aria-live="polite">
-            <Bi p={ch.year} lang={lang} as="p" className="civ-year" />
-            <Bi p={ch.title} lang={lang} as="p" className="civ-title" />
-            <Bi p={ch.line} lang={lang} as="p" className="civ-line" />
+      {isForms ? (
+        <div className="sym-meta fx-meta">
+          <div className="fx-cap" aria-live="polite">
+            <p className="fx-count">
+              {String(pack.item + 1).padStart(2, "0")} <span>/ {FILM.length}</span>
+            </p>
+            <Bi p={fp.name} lang={lang} as="p" className="fx-name" />
+            <p className="fx-spec">
+              {sizeText(fp)} · <Bi p={fp.note} lang={lang} />
+            </p>
+            <ol className="fx-phases" aria-label={lang === "en" ? "What the film shows" : "画面进度"}>
+              {PHASES.map((s, i) => (
+                <li key={i} className={i === pack.phase ? "is-on" : i < pack.phase ? "is-done" : undefined}>
+                  {one(s)}
+                </li>
+              ))}
+            </ol>
           </div>
-          <div className="sym-products civ-chapters" role="group" aria-label={lang === "en" ? "Chapters" : "章节"}>
-            {CHAPTERS.map((c, i) => (
+          <div className="fx-rail" role="group" aria-label={lang === "en" ? "Packs in the film" : "影片中的包装"}>
+            {FILM.map((x, i) => (
               <button
-                key={c.id}
+                key={x.id}
                 type="button"
-                className={i === chapter ? "is-on" : undefined}
-                aria-pressed={i === chapter}
-                title={`${c.title.zh} ${c.title.en}`}
+                className={i === pack.item ? "is-on" : i < pack.item ? "is-done" : undefined}
+                aria-pressed={i === pack.item}
+                aria-label={`${x.name.zh} ${x.name.en}`}
+                title={`${x.name.zh} ${x.name.en}`}
                 onClick={() => {
-                  setChapter(i);
-                  civ.current?.show(i, reducedMotion() ? 7.2 : 0.1);
-                  if (video.current) video.current.currentTime = i * CHAPTER_SECONDS + 0.1;
+                  setPack({ item: i, phase: 0 });
+                  forms.current?.show(i, reducedMotion() ? 3.8 : 0.05);
+                  if (video.current) video.current.currentTime = i * ITEM_SECONDS + 0.05;
                 }}
               >
-                <b>{String(i + 1).padStart(2, "0")}</b>
-                {one(c.short)}
+                <span>{String(i + 1).padStart(2, "0")}</span>
               </button>
             ))}
           </div>

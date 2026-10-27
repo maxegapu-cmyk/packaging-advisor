@@ -229,6 +229,8 @@ export function band(r: number, y0: number, y1: number, mat: THREE.Material, arc
   const g = new THREE.CylinderGeometry(r, r, y1 - y0, Math.max(16, Math.round((seg * arc) / (Math.PI * 2))), 1, true, start, arc);
   const m = new THREE.Mesh(g, mat);
   m.position.y = (y0 + y1) / 2;
+  // printed wraps are tagged so the homepage film can wrap the flat print onto them
+  m.userData.wrap = { r, arc };
   return m;
 }
 

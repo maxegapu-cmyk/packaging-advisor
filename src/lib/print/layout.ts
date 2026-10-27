@@ -10,6 +10,7 @@
  */
 import type { Pair } from "../i18n";
 import type { Effect, Finish, Form, PackSpec } from "../pack";
+import { flatOf, foldsFor, type FoldPiece } from "./folds";
 
 export type FaceKind = "front" | "back" | "left" | "right" | "top" | "bottom" | "flap" | "band" | "bandPlain" | "baseSide" | "tinWrap" | "tinCap" | "inner" | "manual";
 
@@ -185,150 +186,29 @@ export function roundAreas(form: Form, w: number, h: number) {
 /** Share of a full wrap given to the front (and to the back) panel. Matches art.ts. */
 export const WRAP_FRONT = 0.3;
 
-/* ---------------------------------------------------------------- folding carton (reverse tuck end) */
+/* ---------------------------------------------------------------- folded nets */
 
-function carton(w: number, h: number, d: number): Local {
-  const G = Math.min(15, w * 0.3);
-  const T = Math.max(10, Math.min(d * 0.55, 34));
-  const dust = Math.min(d * 0.8, w * 0.5, 40);
-  const top = d + T;
-  const xF = G;
-  const xR = G + w;
-  const xB = xR + d;
-  const xL = xB + w;
-  const xE = xL + d;
-  const yT = top;
-  const yB = top + h;
-  const ch = Math.min(T * 0.35, 6);
-  const pts: [number, number][] = [
-    [xF, yT],
-    [xF, yT - d],
-    [xF + 1.5, yT - d - T + ch],
-    [xF + ch * 1.4, yT - d - T],
-    [xR - ch * 1.4, yT - d - T],
-    [xR - 1.5, yT - d - T + ch],
-    [xR, yT - d],
-    [xR, yT],
-    [xR + 1.5, yT - 3],
-    [xR + 2.5, yT - dust],
-    [xB - d * 0.3, yT - dust],
-    [xB, yT - 3],
-    [xB, yT],
-    [xL, yT],
-    [xL, yT - 3],
-    [xL + d * 0.3, yT - dust],
-    [xE - 2.5, yT - dust],
-    [xE - 1.5, yT - 3],
-    [xE, yT],
-    [xE, yB],
-    [xE - 1.5, yB + 3],
-    [xE - 2.5, yB + dust],
-    [xL + d * 0.3, yB + dust],
-    [xL, yB + 3],
-    [xL, yB],
-    [xL, yB + d],
-    [xL - 1.5, yB + d + T - ch],
-    [xL - ch * 1.4, yB + d + T],
-    [xB + ch * 1.4, yB + d + T],
-    [xB + 1.5, yB + d + T - ch],
-    [xB, yB + d],
-    [xB, yB],
-    [xB, yB + 3],
-    [xB - d * 0.3, yB + dust],
-    [xR + 2.5, yB + dust],
-    [xR + 1.5, yB + 3],
-    [xR, yB],
-    [xF, yB],
-    [0, yB - 6],
-    [0, yT + 6],
-  ];
-  return {
-    id: "net",
-    name: P("盒身展开图", "Carton net"),
-    w: xE,
-    h: yB + d + T,
-    cutPts: pts,
-    folds: [
-      [xF, yT, xF, yB],
-      [xR, yT, xR, yB],
-      [xB, yT, xB, yB],
-      [xL, yT, xL, yB],
-      [xF, yT, xR, yT],
-      [xF, yT - d, xR, yT - d],
-      [xR, yT, xB, yT],
-      [xL, yT, xE, yT],
-      [xB, yB, xL, yB],
-      [xB, yB + d, xL, yB + d],
-      [xR, yB, xB, yB],
-      [xL, yB, xE, yB],
-    ],
-    glue: [{ x: 0, y: yT + 6, w: G, h: h - 12 }],
-    panels: [
-      { kind: "front", x: xF, y: yT, w, h, rot: 0 },
-      { kind: "right", x: xR, y: yT, w: d, h, rot: 0 },
-      { kind: "back", x: xB, y: yT, w, h, rot: 0, info: true },
-      { kind: "left", x: xL, y: yT, w: d, h, rot: 0 },
-      { kind: "top", x: xF, y: yT - d, w, h: d, rot: 0 },
-      { kind: "bottom", x: xB, y: yB, w, h: d, rot: 180 },
-    ],
-    base: "ground",
-  };
-}
-
-/* ---------------------------------------------------------------- cross-shaped wraps and trays */
-
-type Arm = { kind: FaceKind; rot: Panel["rot"] };
 /**
- * A cross: centre W × D with four walls of height H around it, each with a turn-in `t` beyond.
- * Used for the paper that wraps a rigid lid or base, and for folding trays.
+ * A folded piece's flat net, from the shared fold description (folds.ts): the same panels the
+ * homepage film folds, so the printed net and the folded pack cannot disagree.
  */
-function cross(id: string, name: Pair, W: number, D: number, H: number, t: number, centre: FaceKind | null, arms: { front: Arm; back: Arm; left: Arm; right: Arm }, centreInfo = false): Local {
-  // turn-ins fold over the rim and show: they take the walls' color
-  const base: Local["base"] = arms.left.kind === "bandPlain" || arms.left.kind === "band" ? "key" : "ground";
-  const a = H + t;
-  const x0 = a;
-  const y0 = a;
-  const pts: [number, number][] = [
-    [x0, 0],
-    [x0 + W, 0],
-    [x0 + W, y0],
-    [x0 + W + a, y0],
-    [x0 + W + a, y0 + D],
-    [x0 + W, y0 + D],
-    [x0 + W, y0 + D + a],
-    [x0, y0 + D + a],
-    [x0, y0 + D],
-    [0, y0 + D],
-    [0, y0],
-    [x0, y0],
-  ];
-  const panels: Panel[] = [];
-  if (centre) panels.push({ kind: centre, x: x0, y: y0, w: W, h: D, rot: 0, info: centreInfo });
-  panels.push({ kind: arms.front.kind, x: x0, y: y0 + D, w: W, h: H, rot: arms.front.rot });
-  panels.push({ kind: arms.back.kind, x: x0, y: t, w: W, h: H, rot: arms.back.rot });
-  panels.push({ kind: arms.left.kind, x: t, y: y0, w: H, h: D, rot: arms.left.rot });
-  panels.push({ kind: arms.right.kind, x: x0 + W, y: y0, w: H, h: D, rot: arms.right.rot });
+function fromFolds(piece: FoldPiece): Local {
+  const f = flatOf(piece);
+  const ox = f.box.x;
+  const oy = f.box.y;
   return {
-    id,
-    name,
-    w: W + 2 * a,
-    h: D + 2 * a,
-    cutPts: pts,
-    folds: [
-      [x0, y0, x0 + W, y0],
-      [x0, y0 + D, x0 + W, y0 + D],
-      [x0, y0, x0, y0 + D],
-      [x0 + W, y0, x0 + W, y0 + D],
-      [x0, t, x0 + W, t],
-      [x0, y0 + D + H, x0 + W, y0 + D + H],
-      [t, y0, t, y0 + D],
-      [x0 + W + H, y0, x0 + W + H, y0 + D],
-    ],
-    glue: [],
-    panels,
-    base,
+    id: piece.id,
+    name: piece.name,
+    w: f.box.w,
+    h: f.box.h,
+    cutPts: f.cut.map(([x, y]) => [x - ox, y - oy] as [number, number]),
+    folds: f.creases.map(([a, b, c, d]) => [a - ox, b - oy, c - ox, d - oy] as Line),
+    glue: f.glue.map((g) => ({ x: g.x - ox, y: g.y - oy, w: g.w, h: g.h })),
+    panels: f.art.map((a) => ({ kind: a.art.kind as FaceKind, x: a.x - ox, y: a.y - oy, w: a.w, h: a.h, rot: a.art.rot, info: a.art.info })),
+    base: piece.base,
   };
 }
+const nets = (form: Form, w: number, h: number, d: number) => foldsFor(form, w, h, d)!.pieces.map(fromFolds);
 
 /* ---------------------------------------------------------------- simple pieces */
 
@@ -410,161 +290,24 @@ function sheetsFor(form: Form, w: number, h: number, d: number, finish: Finish, 
   const ra = roundAreas(form, w, h);
   switch (form) {
     case "carton":
-      return [sheet(id("net"), nm(P("直立盒刀模", "Tuck carton die")), [carton(w, h, d)], mat, [...notes, DIE], qty)];
-    case "gift": {
-      const lidH = Math.max(12, h * 0.34);
-      const lid = cross("lid", P("盖面裱纸", "Lid wrap"), w, d, lidH, 15, "front", { front: { kind: "band", rot: 0 }, back: { kind: "bandPlain", rot: 180 }, left: { kind: "bandPlain", rot: 90 }, right: { kind: "bandPlain", rot: 270 } });
-      const base = cross("base", P("底盒裱纸", "Base wrap"), w - 2, d - 2, h - 3, 15, "bottom", { front: { kind: "baseSide", rot: 0 }, back: { kind: "baseSide", rot: 180 }, left: { kind: "baseSide", rot: 90 }, right: { kind: "baseSide", rot: 270 } }, true);
-      return [sheet(id("wraps"), nm(P("天地盖裱纸", "Gift box wraps")), [lid, base], mat, [...notes, DIE, P("盒底印有标签信息。", "Label information is printed on the base.")], qty)];
-    }
-    case "bookBox": {
-      const t = 15;
-      const flapH = h - 3;
-      const W = w + 2 * t;
-      const H = d + h + d + flapH + 2 * t;
-      let y = t;
-      const panels: Panel[] = [];
-      const folds: Line[] = [];
-      for (const [kind, ph, rot, info] of [
-        ["bottom", d, 180, true],
-        ["bandPlain", h, 180, false],
-        ["front", d, 0, false],
-        ["band", flapH, 0, false],
-      ] as [FaceKind, number, Panel["rot"], boolean][]) {
-        panels.push({ kind, x: t, y, w, h: ph, rot, info });
-        folds.push([t, y, t + w, y]);
-        y += ph;
-      }
-      folds.push([t, y, t + w, y], [t, t, t, y], [t + w, t, t + w, y]);
-      const cover = rectPiece("cover", P("封套裱纸", "Case wrap"), W, H, panels, [], folds);
-      const tray = cross("tray", P("内盒裱纸", "Tray wrap"), w - 6, d - 6, h - 6, 15, null, { front: { kind: "bandPlain", rot: 0 }, back: { kind: "bandPlain", rot: 180 }, left: { kind: "bandPlain", rot: 90 }, right: { kind: "bandPlain", rot: 270 } });
-      return [sheet(id("wraps"), nm(P("书型盒裱纸", "Book box wraps")), [cover, tray], mat, [...notes, DIE], qty)];
-    }
-    case "mailer": {
-      const H = h;
-      const tuck = Math.min(H * 0.7, 40);
-      // columns: inner fold | side | base | side | inner fold ; rows: tuck | lid flap | lid | back wall | base | front wall | front inner
-      const cx = H + H; // side wall + its inner fold
-      const cols = [H, H, w, H, H];
-      const xs = cols.reduce<number[]>((a, c) => [...a, a[a.length - 1] + c], [0]);
-      const rows = [tuck, H, d, H, d, H, H];
-      const ys = rows.reduce<number[]>((a, c) => [...a, a[a.length - 1] + c], [0]);
-      const yBase = ys[4];
-      const pts: [number, number][] = [
-        [cx + 3, 0],
-        [cx + w - 3, 0],
-        [cx + w, ys[1]],
-        [cx + w, ys[3]],
-        [cx + w + H, ys[3] + 4],
-        [cx + w + H, yBase],
-        [xs[5], yBase + 4],
-        [xs[5], yBase + d - 4],
-        [cx + w + H, yBase + d],
-        [cx + w, yBase + d],
-        [cx + w, ys[7]],
-        [cx, ys[7]],
-        [cx, yBase + d],
-        [H, yBase + d],
-        [0, yBase + d - 4],
-        [0, yBase + 4],
-        [H, yBase],
-        [H, ys[3] + 4],
-        [cx, ys[3]],
-        [cx, ys[1]],
-      ];
-      const local: Local = {
-        id: "net",
-        name: P("飞机盒展开图", "Mailer net"),
-        w: xs[5],
-        h: ys[7],
-        cutPts: pts,
-        folds: [
-          [cx, ys[1], cx + w, ys[1]],
-          [cx, ys[2], cx + w, ys[2]],
-          [cx, ys[3], cx + w, ys[3]],
-          [cx, yBase, cx + w, yBase],
-          [cx, yBase + d, cx + w, yBase + d],
-          [cx, ys[6], cx + w, ys[6]],
-          [cx, yBase, cx, yBase + d],
-          [cx + w, yBase, cx + w, yBase + d],
-          [H, yBase, H, yBase + d],
-          [cx + w + H, yBase, cx + w + H, yBase + d],
-        ],
-        glue: [],
-        panels: [
-          { kind: "band", x: cx, y: ys[1], w, h: H, rot: 180 },
-          { kind: "front", x: cx, y: ys[2], w, h: d, rot: 180 },
-          { kind: "bandPlain", x: cx, y: ys[3], w, h: H, rot: 180 },
-          { kind: "bottom", x: cx, y: yBase, w, h: d, rot: 0, info: true },
-          { kind: "bandPlain", x: cx, y: yBase + d, w, h: H, rot: 0 },
-          { kind: "bandPlain", x: H, y: yBase, w: H, h: d, rot: 90 },
-          { kind: "bandPlain", x: cx + w, y: yBase, w: H, h: d, rot: 270 },
-        ],
-        base: "ground",
-      };
-      return [sheet(id("net"), nm(P("飞机盒刀模", "Mailer die")), [local], mat, [...notes, DIE, P("结构参考 FEFCO 0427。", "Structure after FEFCO 0427.")], qty)];
-    }
-    case "drawer": {
-      const G = 15;
-      const strip = [
-        ["top", w, 0, false],
-        ["right", h, 90, false],
-        ["bottom", w, 180, true],
-        ["left", h, 270, false],
-      ] as [FaceKind, number, Panel["rot"], boolean][];
-      let x = 0;
-      const panels: Panel[] = [];
-      const folds: Line[] = [];
-      for (const [kind, pw, rot, info] of strip) {
-        panels.push({ kind: kind === "top" ? "front" : kind, x, y: 0, w: pw, h: d, rot, info });
-        if (x > 0) folds.push([x, 0, x, d]);
-        x += pw;
-      }
-      folds.push([x, 0, x, d]);
-      const sleeve = rectPiece("sleeve", P("外套", "Sleeve"), x + G, d, panels, [{ x, y: 0, w: G, h: d }], folds);
-      const tray = cross("tray", P("抽屉内盒", "Tray"), w - 4, d - 4, h - 4, 12, null, { front: { kind: "band", rot: 0 }, back: { kind: "bandPlain", rot: 180 }, left: { kind: "bandPlain", rot: 90 }, right: { kind: "bandPlain", rot: 270 } });
-      return [sheet(id("parts"), nm(P("抽屉盒刀模", "Drawer box die")), [sleeve, tray], mat, [...notes, DIE], qty)];
-    }
+      return [sheet(id("net"), nm(P("直立盒刀模", "Tuck carton die")), nets("carton", w, h, d), mat, [...notes, DIE], qty)];
+    case "gift":
+      return [sheet(id("wraps"), nm(P("天地盖裱纸", "Gift box wraps")), nets("gift", w, h, d), mat, [...notes, DIE, P("盒底印有标签信息。", "Label information is printed on the base.")], qty)];
+    case "bookBox":
+      return [sheet(id("wraps"), nm(P("书型盒裱纸", "Book box wraps")), nets("bookBox", w, h, d), mat, [...notes, DIE], qty)];
+    case "mailer":
+      return [sheet(id("net"), nm(P("飞机盒刀模", "Mailer die")), nets("mailer", w, h, d), mat, [...notes, DIE, P("结构参考 FEFCO 0427：前墙与侧墙双层卷边，盒盖带插舌和防尘耳。", "Structure after FEFCO 0427: rolled double front and side walls, a lid with a tuck and dust ears.")], qty)];
+    case "drawer":
+      return [sheet(id("parts"), nm(P("抽屉盒刀模", "Drawer box die")), nets("drawer", w, h, d), mat, [...notes, DIE], qty)];
     case "paperTube": {
       const ov = 8;
       const parts = [wrapLabel("body", P("罐身裱纸", "Body wrap"), ra.wrap!.w, ra.wrap!.h, ov), rectPiece("lidband", P("盖身裱纸", "Lid wrap"), ra.lidBand!.w + ov, ra.lidBand!.h, [{ kind: "band", x: 0, y: 0, w: ra.lidBand!.w, h: ra.lidBand!.h, rot: 0 }], [{ x: ra.lidBand!.w, y: 0, w: ov, h: ra.lidBand!.h }]), disc("cap", P("盖顶贴纸", "Lid top"), ra.cap!, "tinCap")];
       return [sheet(id("wraps"), nm(P("纸罐裱纸", "Paper tube wraps")), parts, mat, [...notes, P("接缝处预留 8 mm 搭接。", "8 mm overlap at the seam.")], qty)];
     }
-    case "bag": {
-      const G = 20;
-      const turn = 40;
-      const bottom = d / 2 + 15;
-      const half = d / 2;
-      const xs = [G, G + w, G + w + d, G + 2 * w + d, G + 2 * w + 2 * d];
-      const H = turn + h + bottom;
-      const panels: Panel[] = [
-        { kind: "front", x: xs[0], y: turn, w, h, rot: 0 },
-        { kind: "bandPlain", x: xs[1], y: turn, w: d, h, rot: 0 },
-        { kind: "back", x: xs[2], y: turn, w, h, rot: 0, info: true },
-        { kind: "bandPlain", x: xs[3], y: turn, w: d, h, rot: 0 },
-      ];
-      const folds: Line[] = [
-        ...xs.slice(0, 4).map((x) => [x, 0, x, H] as Line),
-        [xs[1] + half, turn, xs[1] + half, turn + h],
-        [xs[3] + half, turn, xs[3] + half, turn + h],
-        [0, turn, xs[4], turn],
-        [0, turn + h, xs[4], turn + h],
-      ];
-      return [sheet(id("net"), nm(P("手提袋刀模", "Bag die")), [rectPiece("net", P("袋身展开图", "Bag net"), xs[4], H, panels, [{ x: 0, y: 0, w: G, h: H }], folds)], mat, [...notes, DIE, P("顶部 40 mm 内折；绳孔位置由印厂确定。", "Top 40 mm folds inside; the printer sets the rope holes.")], qty)];
-    }
-    case "aseptic": {
-      const seal = 8;
-      const fin = d / 2 + 8;
-      const xs = [0, w, w + d, 2 * w + d, 2 * w + 2 * d];
-      const panels: Panel[] = [
-        { kind: "front", x: xs[0], y: fin, w, h, rot: 0 },
-        { kind: "right", x: xs[1], y: fin, w: d, h, rot: 0 },
-        { kind: "back", x: xs[2], y: fin, w, h, rot: 0, info: true },
-        { kind: "left", x: xs[3], y: fin, w: d, h, rot: 0 },
-      ];
-      const folds: Line[] = [...xs.slice(1, 5).map((x) => [x, fin, x, fin + h] as Line), [0, fin, xs[4], fin], [0, fin + h, xs[4], fin + h]];
-      return [sheet(id("web"), nm(P("利乐砖版式", "Aseptic carton artwork")), [rectPiece("web", P("包材展开", "Packaging web"), xs[4] + seal, h + 2 * fin, panels, [{ x: xs[4], y: 0, w: seal, h: h + 2 * fin }], folds)], mat, [...notes, P("无菌包材由灌装厂提供规格，请按其版式模板套用。", "The filler supplies the web spec; fit this artwork to their template.")], qty)];
-    }
+    case "bag":
+      return [sheet(id("net"), nm(P("手提袋刀模", "Bag die")), nets("bag", w, h, d), mat, [...notes, DIE, P("顶部 40 mm 内折；绳孔位置由印厂确定。", "Top 40 mm folds inside; the printer sets the rope holes.")], qty)];
+    case "aseptic":
+      return [sheet(id("web"), nm(P("利乐砖版式", "Aseptic carton artwork")), nets("aseptic", w, h, d), mat, [...notes, P("无菌包材由灌装厂提供规格，请按其版式模板套用。", "The filler supplies the web spec; fit this artwork to their template.")], qty)];
     case "pouch": {
       const s = 8;
       const front = rectPiece("front", P("正面", "Front"), w, h, [{ kind: "front", x: 0, y: 0, w, h, rot: 0 }], [

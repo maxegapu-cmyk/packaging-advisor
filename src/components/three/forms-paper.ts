@@ -258,6 +258,7 @@ export function buildPaperTube(spec: PackSpec, k: Kit, category: string): Built 
   const root = new THREE.Group();
   const foil = k.bareMetal;
   const body = tubeWall(R - T, R, 0, yBody, k.tex("tinWrap", circ / U, yBody / U), foil, k.edge);
+  body.children[0].userData.wrap = { r: R, arc: Math.PI * 2 };
   root.add(body);
   const plug = new THREE.Mesh(new THREE.CylinderGeometry(R - T - 0.02 * mm, R - T - 0.02 * mm, T - 0.3 * mm, 96), foil);
   plug.position.y = 0.3 * mm + (T - 0.3 * mm) / 2;
@@ -277,10 +278,12 @@ export function buildPaperTube(spec: PackSpec, k: Kit, category: string): Built 
   root.add(lid);
   const lIn = R - T + 0.35 * mm;
   const lidWall = tubeWall(lIn, R, 0.5 * mm, lidH - T, k.tex("band", circ / U, lidH / U), k.kraft, k.edge);
+  lidWall.children[0].userData.wrap = { r: R, arc: Math.PI * 2 };
   lid.add(lidWall);
   // cylinder groups: side, top, bottom
   const cap = splitMesh(new THREE.CylinderGeometry(R, R, T, 128), [k.plain(), k.tex("tinCap", spec.w, spec.w), k.kraft]);
   cap.position.y = lidH - T / 2;
+  cap.children[1].userData.decal = { r: R };
   lid.add(cap);
 
   const open = V(R * 2.2, R * 0.98, R * 0.4);
