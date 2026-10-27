@@ -1323,8 +1323,8 @@ textarea.short { min-height: 72px; }
 
 /* ---- hero: two films under tabs; the "flat to form" film's caption, phases and pack rail ---- */
 /* the forms film's colours: ink, celadon and vermilion on paper; glowing celadon on night */
-.sym { --fx: #2b6966; --fx-on: #f7f5ef; --fx-cut: #1d1c19; --fx-crease: #b4483a; --fx-laser: #2b6966; --fx-scan: rgb(43 105 102 / 0.06); --fx-dim: rgb(29 28 25 / 0.75); --fx-dim-t: #1d1c19; --fx-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; }
-[data-theme="dark"] .sym { --fx: #5ed6d2; --fx-on: #071312; --fx-cut: #5ed6d2; --fx-crease: #f07a64; --fx-laser: #e9fffd; --fx-scan: rgb(94 214 210 / 0.05); --fx-dim: rgb(232 244 240 / 0.82); --fx-dim-t: #eaf6f3; }
+.sym { --fx: #2b6966; --fx-on: #f7f5ef; --fx-cut: #1d1c19; --fx-crease: #b4483a; --fx-laser: #2b6966; --fx-dim: rgb(29 28 25 / 0.75); --fx-dim-t: #1d1c19; --fx-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; }
+[data-theme="dark"] .sym { --fx: #5ed6d2; --fx-on: #071312; --fx-cut: #5ed6d2; --fx-crease: #f07a64; --fx-laser: #e9fffd; --fx-dim: rgb(232 244 240 / 0.82); --fx-dim-t: #eaf6f3; }
 .sym-veil { position: absolute; inset: 0; background: var(--fx-bg); opacity: 0; pointer-events: none; }
 .sym-films { position: absolute; z-index: 3; top: 18px; right: var(--gutter); display: flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--glass-soft); border: 1px solid var(--rule); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); transition: background 0.6s, border-color 0.6s; }
 .sym-films button { border: 0; background: transparent; font: inherit; font-size: 12.5px; letter-spacing: 0.04em; padding: 6px 14px; border-radius: 999px; color: var(--ink-2); cursor: pointer; white-space: nowrap; transition: color 0.35s var(--ease); }
@@ -1338,7 +1338,6 @@ textarea.short { min-height: 72px; }
 .fx-crease { stroke: var(--fx-crease); stroke-width: 1.1; stroke-dasharray: 5 4; }
 .fx-laser-glow { stroke: var(--fx); stroke-width: 10; opacity: 0.16; }
 .fx-laser { stroke: var(--fx-laser); stroke-width: 1.6; }
-.fx-scan { fill: var(--fx-scan); stroke: var(--fx); stroke-width: 1; }
 .fx-dimg line { stroke: var(--fx-dim); stroke-width: 1; }
 .fx-dim { font: 600 12px var(--fx-mono, monospace); fill: var(--fx-dim-t); paint-order: stroke; stroke: var(--fx-bg); stroke-width: 4px; letter-spacing: 0.02em; }
 /* caption, phases and the rail of twenty */

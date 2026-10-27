@@ -49,6 +49,7 @@ const FRAG = /* glsl */ `
   uniform float uAlpha;
   uniform float uScan;
   uniform float uBand;
+  uniform float uEdge;
   varying vec3 vN;
   varying vec3 vV;
   varying float vY;
@@ -61,7 +62,7 @@ const FRAG = /* glsl */ `
     float lines = 0.75 + 0.25 * smoothstep(0.35, 0.5, abs(fract(vY / uBand) - 0.5));
     // the band traces the sides only: on a flat top it would light the whole face at once
     float edge = exp(-pow((vY - uScan) / (uBand * 0.9), 2.0)) * (1.0 - smoothstep(0.55, 0.9, vUp));
-    float a = (0.035 + 0.5 * rim) * lines * uAlpha + edge * 0.85 * step(0.001, uAlpha);
+    float a = (0.035 + 0.5 * rim) * lines * uAlpha + edge * uEdge * step(0.001, uAlpha);
     gl_FragColor = vec4(uColor * (0.7 + 1.6 * edge), a);
   }`;
 
@@ -90,7 +91,7 @@ export function holographic(root: THREE.Object3D, planes: Planes, band: number, 
 export function* holographicSteps(root: THREE.Object3D, planes: Planes, band: number, dark = true): Generator<void, Holo, void> {
   const own: { dispose(): void }[] = [];
   const mat = new THREE.ShaderMaterial({
-    uniforms: { uColor: { value: HOLO.dark.clone() }, uAlpha: { value: 0 }, uScan: { value: -1e6 }, uBand: { value: band } },
+    uniforms: { uColor: { value: HOLO.dark.clone() }, uAlpha: { value: 0 }, uScan: { value: -1e6 }, uBand: { value: band }, uEdge: { value: 0.85 } },
     vertexShader: VERT,
     fragmentShader: FRAG,
     transparent: true,
@@ -106,6 +107,8 @@ export function* holographicSteps(root: THREE.Object3D, planes: Planes, band: nu
     mat.uniforms.uColor.value.copy(d ? HOLO.dark : HOLO.light);
     line.color.copy(d ? HOLO.dark : HOLO.light);
     mat.blending = line.blending = d ? THREE.AdditiveBlending : THREE.NormalBlending;
+    // a glowing band on the dark film; on paper it would read as a smudge (the scan line shows it)
+    mat.uniforms.uEdge.value = d ? 0.85 : 0;
   };
   tone(dark);
   const meshes: THREE.Mesh[] = [];

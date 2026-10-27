@@ -41,7 +41,7 @@ const CAM_T = [0, 1.15, 2.2, 3.2, 5.1];
 type Pt2 = [number, number];
 export type HudLine = { a: Pt2; b: Pt2; kind: "cut" | "crease"; p: number; alpha: number };
 export type HudDim = { a: Pt2; b: Pt2; text: string; alpha: number };
-export type FormsFrame = { item: number; t: number; phase: number; w: number; h: number; lines: HudLine[]; dims: HudDim[]; laser: [Pt2, Pt2] | null; scan: Pt2[] | null; fade: number };
+export type FormsFrame = { item: number; t: number; phase: number; w: number; h: number; lines: HudLine[]; dims: HudDim[]; laser: [Pt2, Pt2] | null; fade: number };
 
 type Act = {
   item: FilmItem;
@@ -54,6 +54,8 @@ type Act = {
   pose: (t: number) => void;
   posedAt: number | null;
   holo: Holo | null;
+  /** Hologram and scan line in the dark or light film. */
+  tone: (dark: boolean) => void;
   /** How high the sheet is lifted to fold (scene units), for the camera to follow. */
   rise: (t: number) => number;
   dispose: () => void;
@@ -217,7 +219,7 @@ export class FormsScene {
     this.rim.intensity = t.rimI;
     this.scene.environmentIntensity = t.env;
     this.renderer.toneMappingExposure = t.exposure;
-    for (const a of this.acts.values()) a.holo?.tone(dark);
+    for (const a of this.acts.values()) a.tone(dark);
     if (!this.running && this.lastTime !== null) this.render(this.lastTime);
   }
 
@@ -410,6 +412,19 @@ export class FormsScene {
       const ranks = mids.map((m) => (hi > lo ? (m - lo) / (hi - lo) : 0));
       const box = flat.box;
       const top = item.h * U * 1.06 + 0.01;
+      // the scan line: a hairline round the pack at the scan's height, hidden where the pack
+      // hides it (drawn in 3D, so it never lies over the pack like a pane of glass)
+      const ringPts: THREE.Vector3[] = [];
+      const off = 0.008;
+      if (ROUND.has(item.form)) for (let k = 0; k < 96; k++) ringPts.push(new THREE.Vector3(Math.cos((k / 96) * Math.PI * 2) * (item.w * U * 0.5 + off), 0, Math.sin((k / 96) * Math.PI * 2) * (item.w * U * 0.5 + off)));
+      else for (const [px, pz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) ringPts.push(new THREE.Vector3(px * (item.w * U * 0.5 + off), 0, pz * (item.d * U * 0.5 + off)));
+      const ringGeo = new THREE.BufferGeometry().setFromPoints(ringPts);
+      const ringMat = new THREE.LineBasicMaterial({ color: this.dark ? "#5ED6D2" : "#2B6966", transparent: true, opacity: 0.95 });
+      own.push(ringGeo, ringMat);
+      const ring = new THREE.LineLoop(ringGeo, ringMat);
+      ring.userData.noHolo = true;
+      ring.visible = false;
+      turn.add(ring);
       const pose = (t: number) => {
         // linear here: each fold, wrap and move eases on its own stretch of the form phase
         const f = seg(t, T_.form);
@@ -424,6 +439,9 @@ export class FormsScene {
         const scanY = !hasScan ? -1e6 : sk <= 0 ? -1e6 : sk >= 1 ? 1e6 : -0.005 + (top + 0.01) * ease(sk);
         setScan(planes, scanY);
         (holo as Holo | null)?.set(ghost, scanY);
+        ring.visible = hasScan && sk > 0 && sk < 1;
+        ring.position.y = scanY + 0.0005;
+        ringMat.opacity = 0.95 * Math.min(1, sk * 8, (1 - sk) * 8);
         // after the scan, the flat print's job is done
         flat.root.visible = !hasScan || sk < 1;
         if (model) (model as THREE.Object3D).visible = t > T_.ghost[0];
@@ -443,6 +461,10 @@ export class FormsScene {
         pose,
         posedAt: null,
         holo,
+        tone: (dark: boolean) => {
+          (holo as Holo | null)?.tone(dark);
+          ringMat.color.set(dark ? "#5ED6D2" : "#2B6966");
+        },
         rise: (t) => rise(seg(t, T_.form)),
         dispose: () => {
           this.scene.remove(group);
@@ -466,7 +488,7 @@ export class FormsScene {
         // needed now: finish the steps that are left
         a = j.act = finish(j.gen);
         // the theme may have changed while it was being built
-        a.holo?.tone(this.dark);
+        a.tone(this.dark);
         j.warm = [];
         this.job = null;
       } else a = finish(this.build(ix));
@@ -505,7 +527,7 @@ export class FormsScene {
         const r = j.gen.next();
         if (r.done) {
           j.act = r.value;
-          r.value.holo?.tone(this.dark);
+          r.value.tone(this.dark);
           this.acts.set(j.ix, r.value);
           j.warm = [];
           r.value.group.traverse((o) => {
@@ -687,7 +709,7 @@ export class FormsScene {
     this.cameraAt(time);
     this.renderer.render(this.scene, this.camera);
     if (!this.onFrame) return;
-    // the 2D layer: dieline, laser, scan contour, dimensions
+    // the 2D layer: dieline, laser, dimensions (the scan line is drawn in 3D)
     const a = this.act(ix);
     const lines: HudLine[] = [];
     // the next pack's dieline starts drawing while the camera is still on its way
@@ -712,21 +734,12 @@ export class FormsScene {
       const lx = a.x + a.box.x0 + (a.box.x1 - a.box.x0) * wk;
       laser = [this.project(new THREE.Vector3(lx, 0.002, a.box.z0 - 0.01)), this.project(new THREE.Vector3(lx, 0.002, a.box.z1 + 0.01))];
     }
-    let scan: Pt2[] | null = null;
-    const sk = seg(t, T_.scan);
     const round = ROUND.has(a.item.form);
     const W = a.prod.w * U;
     const H = a.prod.h * U;
     const D = a.prod.d * U;
     const rotY = 0.38 * ease(seg(t, T_.turn));
     const toWorld = (px: number, py: number, pz: number) => new THREE.Vector3(px, py, pz).applyAxisAngle(new THREE.Vector3(0, 1, 0), rotY).add(a.group.position);
-    if (sk > 0 && sk < 1 && a.item.form !== "rsc" && a.item.form !== "pillow") {
-      const y = (H * 1.06 + 0.01) * ease(sk);
-      const pts: Pt2[] = [];
-      if (round) for (let k = 0; k < 48; k++) pts.push(this.project(toWorld(Math.cos((k / 48) * Math.PI * 2) * (W / 2 + 0.006), y, Math.sin((k / 48) * Math.PI * 2) * (W / 2 + 0.006))));
-      else for (const [px, pz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) pts.push(this.project(toWorld(px * (W / 2 + 0.006), y, pz * (D / 2 + 0.006))));
-      scan = pts;
-    }
     const dims: HudDim[] = [];
     const da = clamp((t - T_.dims[0]) / 0.3) * (1 - clamp((t - T_.dims[1]) / 0.3));
     if (da > 0) {
@@ -743,7 +756,7 @@ export class FormsScene {
     }
     // the loop closes through black: the last pack and the first are far apart on the track
     const fade = ix === 0 ? 1 - clamp(t / 0.45) : ix === FILM.length - 1 ? clamp((t - (CH - 0.45)) / 0.45) : 0;
-    this.onFrame({ item: ix, t, phase: phaseOf(t), w: this.w, h: this.h, lines, dims, laser, scan, fade });
+    this.onFrame({ item: ix, t, phase: phaseOf(t), w: this.w, h: this.h, lines, dims, laser, fade });
   }
 
   frame(now: number) {

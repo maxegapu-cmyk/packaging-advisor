@@ -92,7 +92,7 @@ function drawOverlay(svg: SVGSVGElement, o: OverlayFrame) {
   svg.innerHTML = `<g opacity="${o.alpha2d.toFixed(3)}">${out.join("")}</g>`;
 }
 
-/** Draws the forms film's 2D layer: the dieline, the print laser, the scan contour, the dimensions. */
+/** Draws the forms film's 2D layer: the dieline, the print laser, the dimensions. */
 function drawFormsOverlay(svg: SVGSVGElement, f: FormsFrame) {
   svg.setAttribute("viewBox", `0 0 ${f.w} ${f.h}`);
   const out: string[] = [];
@@ -106,7 +106,6 @@ function drawFormsOverlay(svg: SVGSVGElement, f: FormsFrame) {
     const [[x0, y0], [x1, y1]] = f.laser;
     out.push(`<line x1="${f1(x0)}" y1="${f1(y0)}" x2="${f1(x1)}" y2="${f1(y1)}" class="fx-laser-glow"/><line x1="${f1(x0)}" y1="${f1(y0)}" x2="${f1(x1)}" y2="${f1(y1)}" class="fx-laser"/>`);
   }
-  if (f.scan) out.push(`<polygon points="${pts(f.scan)}" class="fx-scan"/>`);
   for (const d of f.dims) {
     const [ax, ay] = d.a;
     const [bx, by] = d.b;
