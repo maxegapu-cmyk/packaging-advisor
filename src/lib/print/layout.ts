@@ -11,6 +11,7 @@
 import type { Pair } from "../i18n";
 import type { Effect, Finish, Form, PackSpec } from "../pack";
 import { flatOf, foldsFor, type FoldPiece } from "./folds";
+import { materialLine, offListOf } from "../materials";
 
 export type FaceKind = "front" | "back" | "left" | "right" | "top" | "bottom" | "flap" | "band" | "bandPlain" | "baseSide" | "tinWrap" | "tinCap" | "inner" | "manual" | "slip";
 
@@ -245,35 +246,25 @@ function wrapLabel(id: string, name: Pair, circ: number, h: number, overlap: num
 
 /* ---------------------------------------------------------------- per form */
 
-const MAT: Record<Form, Pair> = {
-  carton: P("白卡纸 300–400 g/m²", "Folding boxboard (SBS) 300–400 gsm"),
-  gift: P("1200 g 灰板 + 157 g 铜版纸裱糊", "1200 gsm greyboard wrapped in 157 gsm art paper"),
-  bookBox: P("1200 g 灰板 + 157 g 铜版纸裱糊，磁铁", "1200 gsm greyboard wrapped in 157 gsm art paper, magnets"),
-  mailer: P("E 楞瓦楞纸板，白面牛卡", "E-flute corrugated board, white-top kraft"),
-  drawer: P("外套 350 g 白卡；内盒 350 g 白卡或灰板裱纸", "Sleeve 350 gsm board; tray 350 gsm board or wrapped greyboard"),
-  paperTube: P("纸管 + 157 g 铜版纸裱糊", "Paper tube wrapped in 157 gsm art paper"),
-  bag: P("250 g 白卡或牛皮纸，覆膜，绳提手", "250 gsm board or kraft, laminated, rope handles"),
-  aseptic: P("纸 / PE / 铝箔复合包材", "Board / PE / foil laminate"),
-  pouch: P("PET / AL / PE 复合膜，凹版印刷", "PET / AL / PE laminate, gravure printed"),
-  bottle: P("不干胶标签（PP 膜）", "Self-adhesive label (PP film)"),
-  tube: P("PE 软管，管身胶印", "PE tube, offset printed on the body"),
-  blister: P("350 g 白卡 + PET 吸塑", "350 gsm board with a PET blister"),
-  jar: P("不干胶标签（铜版纸或合成纸）", "Self-adhesive label (art paper or synthetic)"),
-  glassBottle: P("不干胶标签（铜版纸或合成纸）", "Self-adhesive label (art paper or synthetic)"),
-  tin: P("马口铁 0.21–0.25 mm，印铁", "Tinplate 0.21–0.25 mm, printed flat"),
-  can: P("两片铝罐，罐身曲面印刷", "Two-piece aluminium can, printed on the body"),
-  ceramic: P("陶瓷贴花纸，烤花", "Ceramic decal, fired on"),
-  woodBox: P("松木，盖面激光雕刻", "Pine, laser-engraved lid"),
-  brocade: P("1500 g 灰板裱宋锦；题签 120 g 宣纸或仿古纸，骨扣丝绳", "1500 gsm greyboard covered in Song brocade; title slip on 120 gsm xuan or antique paper; bone clasp and silk loop"),
-};
 
 export const FINISH_NOTE: Record<Finish, Pair> = {
   matte: P("表面处理：覆哑膜", "Finish: matte lamination"),
   gloss: P("表面处理：覆亮膜或过光油", "Finish: gloss lamination or varnish"),
   softTouch: P("表面处理：覆触感膜（丝绒膜）", "Finish: soft-touch (velvet) lamination"),
   paper: P("表面处理：特种纸，不覆膜", "Finish: textured paper, no lamination"),
-  xuan: P("承印物：宣纸（或仿宣特种纸），不覆膜；吸墨，深色大面积宜减墨量", "Stock: xuan paper (or a xuan-like specialty paper), unlaminated; absorbent, so cut ink density on large dark areas"),
-  goldFleck: P("承印物：洒金笺（纸中含金箔碎片），不覆膜；金片为纸张本身所有，不在印版上", "Stock: gold-flecked paper (flakes of gold leaf in the sheet), unlaminated; the flecks are the paper's, not on any plate"),
+  xuan: P("承印物：宣纸，按清单 M038 手工装饰纸采购，不覆膜；吸墨，深色大面积宜减墨量", "Stock: xuan paper, bought as the list's M038 handmade decorative paper, unlaminated; absorbent, so cut ink density on large dark areas"),
+  goldFleck: P("承印物：洒金笺，按清单 M038 手工装饰纸采购，不覆膜；金片为纸张本身所有，不在印版上", "Stock: gold-flecked paper, bought as the list's M038 handmade decorative paper, unlaminated; the flecks are the paper's, not on any plate"),
+};
+
+/** Metal, film and ceramic are varnished, not laminated, and take no specialty paper. */
+const VARNISHED: readonly Form[] = ["tin", "can", "tube", "pouch", "aseptic", "ceramic"];
+const VARNISH_NOTE: Record<Finish, Pair> = {
+  matte: P("表面处理：哑光油", "Finish: matte varnish"),
+  gloss: P("表面处理：亮光油", "Finish: gloss varnish"),
+  softTouch: P("表面处理：触感哑光油", "Finish: soft-touch matte varnish"),
+  paper: P("表面处理：不上光", "Finish: no varnish"),
+  xuan: P("表面处理：不上光（宣纸只用于纸面部件）", "Finish: no varnish (xuan paper is for the paper parts only)"),
+  goldFleck: P("表面处理：不上光（洒金笺只用于纸面部件）", "Finish: no varnish (gold-flecked paper is for the paper parts only)"),
 };
 
 /** Each extra effect gets its own plate in the print file. */
@@ -290,9 +281,8 @@ export const EFFECT_NOTE: Record<Effect, Pair> = {
 const DIE = P("刀线和压痕为标准结构，开模前请以印厂刀模为准。", "Cut and crease lines are a standard structure; use your printer's die line before cutting.");
 const CURVED = P("此为平面展开示意，曲面印刷的变形由印厂补偿。", "A flat representation; the printer compensates for printing on the curve.");
 
-function sheetsFor(form: Form, w: number, h: number, d: number, finish: Finish, prefix = "", qty = 1, effects: Effect[] = []): Sheet[] {
-  const mat = MAT[form];
-  const notes = [FINISH_NOTE[finish], ...effects.map((e) => EFFECT_NOTE[e])];
+function sheetsFor(form: Form, w: number, h: number, d: number, finish: Finish, mat: Pair, prefix = "", qty = 1, effects: Effect[] = []): Sheet[] {
+  const notes = [(VARNISHED.includes(form) ? VARNISH_NOTE : FINISH_NOTE)[finish], ...effects.map((e) => EFFECT_NOTE[e])];
   const id = (s: string) => prefix + s;
   const nm = (p: Pair): Pair => (prefix ? { zh: `内装 · ${p.zh}`, en: `Inside · ${p.en}` } : p);
   const ra = roundAreas(form, w, h);
@@ -368,8 +358,13 @@ function sheetsFor(form: Form, w: number, h: number, d: number, finish: Finish, 
 /** Every printed part of a package, including the products packed inside a combination. */
 export function printLayout(spec: PackSpec): PrintLayout {
   const fx = spec.effects ?? [];
-  const sheets = sheetsFor(spec.form, spec.w, spec.h, spec.d, spec.finish, "", 1, fx);
-  if (spec.inner) sheets.push(...sheetsFor(spec.inner.form, spec.inner.w, spec.inner.h, spec.inner.d, spec.finish, "inner-", spec.inner.count, fx));
+  // each sheet names its materials from the principal's list, as picked in the 3D space, and any
+  // part the list does not cover
+  const off = offListOf(spec);
+  const offText = (lang: "zh" | "en") => (off.length ? (lang === "zh" ? `；清单外（待委托方确认）：${off.map((o) => o.label.zh).join("、")}` : `; off the list (for the principal to confirm): ${off.map((o) => o.label.en.toLowerCase()).join(", ")}`) : "");
+  const outerMat = materialLine(spec, "other", false);
+  const sheets = sheetsFor(spec.form, spec.w, spec.h, spec.d, spec.finish, { zh: outerMat.zh + offText("zh"), en: outerMat.en + offText("en") }, "", 1, fx);
+  if (spec.inner) sheets.push(...sheetsFor(spec.inner.form, spec.inner.w, spec.inner.h, spec.inner.d, spec.finish, materialLine(spec, "other", true), "inner-", spec.inner.count, fx));
   return { sheets, bleed: BLEED, margin: MARGIN };
 }
 

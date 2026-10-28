@@ -144,7 +144,7 @@ export function buildCan(spec: PackSpec, k: Kit, a: ArtInput): Built {
   };
   const S = spec;
   const pins = [
-    pin(1, "拉环", "Pull tab", "铝制拉环，拉起后压开刻痕处", "an aluminium tab; lifted, it presses the scored opening in", tab, V(0, 0.6 * mm, -tail * 0.6), V(0, 1, 0)),
+    pin(1, "拉环", "Pull tab", "{body}拉环，拉起后压开刻痕处", "a tab of {body}; lifted, it presses the scored opening in", tab, V(0, 0.6 * mm, -tail * 0.6), V(0, 1, 0)),
     pin(2, "罐盖", "Can end", `Ø${mmOf(2 * Rl)} mm，与罐身二重卷封`, `Ø${mmOf(2 * Rl)} mm, double-seamed onto the body`, panel, V(-pr * 0.55, 0, -pr * 0.3), V(0, 1, 0)),
     pin(3, "罐身印刷", "Printed body", `Ø${S.w} × ${S.h} mm，铝罐直接印刷，展开 ${mmOf(circ)} × ${mmOf(py1 - py0)} mm`, `Ø${S.w} × ${S.h} mm, printed straight onto the aluminium, unrolled ${mmOf(circ)} × ${mmOf(py1 - py0)} mm`, print, V(0, 0, R + 0.3 * mm), V(0, 0, 1)),
     pin(4, "缩颈", "Neck", "罐肩收窄，罐盖更小更省料", "the shoulder narrows so a smaller end can be used", body, V(0, H - neckH * 0.5, R * 0.95), V(0, 0, 1)),
@@ -251,8 +251,8 @@ export function buildBlister(spec: PackSpec, k: Kit): Built {
   };
   const S = spec;
   const pins = [
-    pin(1, "泡罩", "Blister", `${mmOf(bw)} × ${mmOf(bh)} × ${S.d} mm，透明 PET 吸塑，热封在卡上`, `${mmOf(bw)} × ${mmOf(bh)} × ${S.d} mm, clear thermoformed PET, heat-sealed to the card`, bubble, V(bw * 0.3, by + bh * 0.3, D + t), V(0, 0, 1)),
-    pin(2, "背卡", "Backing card", `${S.w} × ${S.h} mm，白卡印刷，背面涂热封胶`, `${S.w} × ${S.h} mm, printed board with heat-seal coating`, card, V(-W * 0.35, H * 0.82, t), V(0, 0, 1)),
+    pin(1, "泡罩", "Blister", `${mmOf(bw)} × ${mmOf(bh)} × ${S.d} mm，透明{blister}吸塑，热封在卡上`, `${mmOf(bw)} × ${mmOf(bh)} × ${S.d} mm, clear thermoformed {blister}, heat-sealed to the card`, bubble, V(bw * 0.3, by + bh * 0.3, D + t), V(0, 0, 1)),
+    pin(2, "背卡", "Backing card", `${S.w} × ${S.h} mm，{card}印刷，背面涂热封胶`, `${S.w} × ${S.h} mm, printed {card} with heat-seal coating`, card, V(-W * 0.35, H * 0.82, t), V(0, 0, 1)),
     pin(3, "挂孔", "Hang slot", "欧式挂孔，挂在货架挂钩上", "a euro slot for the store peg", card, V(0, sy, t), V(0, 0, 1)),
     pin(4, "产品", "Product", "被泡罩固定，看得见摸不着", "held in place by the blister: visible, not touchable", product, V(cw * 0.2, ch * 0.2, cd / 2), V(0, 0, 1)),
   ];
@@ -339,7 +339,7 @@ export function buildAseptic(spec: PackSpec, k: Kit, a: ArtInput): Built {
   };
   const S = spec;
   const pins = [
-    pin(1, "旋盖", "Screw cap", `Ø${mmOf(2 * cr)} mm，带防盗环`, `Ø${mmOf(2 * cr)} mm, with a tamper ring`, cap, V(0, capH, 0), V(0, 1, 0)),
+    pin(1, "旋盖", "Screw cap", `Ø${mmOf(2 * cr)} mm，{cap}，带防盗环`, `Ø${mmOf(2 * cr)} mm, {cap}, with a tamper ring`, cap, V(0, capH, 0), V(0, 1, 0)),
     pin(2, "六层复合纸板", "Six-layer board", `${S.w} × ${S.h} × ${S.d} mm，PE / 纸板 / PE / 铝箔 / PE / PE，常温保存不用冷藏`, `${S.w} × ${S.h} × ${S.d} mm, PE / board / PE / foil / PE / PE, keeps without refrigeration`, body, V(-W * 0.25, 0, D / 2), V(0, 0, 1)),
     pin(3, "顶部封边", "Top seal", "横向热封后折平", "the transverse seal, folded flat", finM, V(W * 0.3, fin / 2, 0), V(0, 1, 0)),
     pin(4, "折耳", "Ears", "成型时多出的三角，折贴在两侧", "the triangles left by forming, folded onto the sides", ears[1], V(0.7 * mm, -D * 0.12, 0), V(1, 0, 0)),
@@ -411,9 +411,9 @@ export function buildWoodBox(spec: PackSpec, k: Kit, holds?: Holds, insertKind: 
   const S = spec;
   const pins = [
     pin(1, "抽拉盖", "Sliding lid", `${mmOf(lw)} × ${mmOf(ld)} × ${mmOf(lidT)} mm，激光烙印品牌`, `${mmOf(lw)} × ${mmOf(ld)} × ${mmOf(lidT)} mm, brand laser-engraved`, lid, V(-lw * 0.25, lidT, 0), V(0, 1, 0)),
-    pin(2, "侧板", "Side wall", `松木 ${mmOf(T)} mm，内侧开 ${mmOf(groove)} mm 槽`, `${mmOf(T)} mm pine, with a ${mmOf(groove)} mm groove inside`, base, V(W / 2, H * 0.5, D * 0.2), V(1, 0, 0)),
+    pin(2, "侧板", "Side wall", `{body} ${mmOf(T)} mm，内侧开 ${mmOf(groove)} mm 槽`, `${mmOf(T)} mm {body}, with a ${mmOf(groove)} mm groove inside`, base, V(W / 2, H * 0.5, D * 0.2), V(1, 0, 0)),
     pin(3, "前板", "Front wall", `比侧板低 ${mmOf(H - Hf)} mm，盖子从上面抽出`, `${mmOf(H - Hf)} mm lower than the sides so the lid slides out over it`, base, V(-W * 0.2, Hf * 0.6, D / 2), V(0, 0, 1)),
-    pin(4, "内托", "Insert", holds ? `高 ${mmOf(insH)} mm，按产品开孔` : `高 ${mmOf(insH)} mm`, holds ? `${mmOf(insH)} mm high, cut to each product` : `${mmOf(insH)} mm high`, insert, V(inW * 0.36, insH, inD * 0.3), V(0, 1, 0)),
+    pin(4, "内托", "Insert", holds ? `高 ${mmOf(insH)} mm，{insert}，按产品开孔` : `高 ${mmOf(insH)} mm，{insert}`, holds ? `${mmOf(insH)} mm high, {insert}, cut to each product` : `${mmOf(insH)} mm high, {insert}`, insert, V(inW * 0.36, insH, inD * 0.3), V(0, 1, 0)),
   ];
   return { root, apply, explode, pins, slot: { parent: slotG, y: holds ? 0 : insH } };
 }

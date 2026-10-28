@@ -94,9 +94,9 @@ export function buildMailer(spec: PackSpec, k: Kit, holds?: Holds, insertKind: I
     pin(1, "盒盖", "Lid", `${S.w} × ${S.d} mm，外面印刷，内面牛皮原色`, `${S.w} × ${S.d} mm, printed outside, plain kraft inside`, lid, V(-W * 0.2, T, D * 0.55), V(0, 1, 0)),
     pin(2, "卷边前墙", "Rolled front wall", "双层，顶边卷折，开箱时手感圆润", "two layers rolled over at the top, so the edge is smooth to the hand", base, V(W * 0.25, wallH * 0.55, D / 2), V(0, 0, 1)),
     pin(3, "插舌", "Tuck flap", `深 ${mmOf(tuckH)} mm，插进前墙内侧锁住盒盖`, `${mmOf(tuckH)} mm deep, tucks behind the front wall to lock the lid`, tuck, V(W * 0.2, -tuckH * 0.5, 0), V(0, 0, 1), true),
-    pin(4, "瓦楞边", "Flute edge", "3 mm E/B 楞，抗压、轻，可回收", "3 mm E/B flute: crush-resistant, light and recyclable", base, V(-W / 2, wallH * 0.5, D * 0.2), V(-1, 0, 0)),
+    pin(4, "瓦楞边", "Flute edge", "{body}，3 mm E/B 楞，抗压、轻，可回收", "{body}, 3 mm E/B flute: crush-resistant, light and recyclable", base, V(-W / 2, wallH * 0.5, D * 0.2), V(-1, 0, 0)),
     pin(5, "防尘耳", "Dust ears", `高 ${mmOf(earH)} mm，折进侧墙内`, `${mmOf(earH)} mm high, fold inside the side walls`, lid, V(W / 2 - 2.5 * T, -earH * 0.5, D * 0.5), V(1, 0, 0), true),
-    pin(6, "内衬", "Insert", holds ? `高 ${mmOf(insH)} mm，按产品开孔定位` : "垫底卡纸", holds ? `${mmOf(insH)} mm high, cut to locate each product` : "card pad on the floor", insert, V(inW * 0.38, insH, inD * 0.3), V(0, 1, 0)),
+    pin(6, "内衬", "Insert", holds ? `高 ${mmOf(insH)} mm，{insert}，按产品开孔定位` : "{insert}垫底", holds ? `${mmOf(insH)} mm high, {insert}, cut to locate each product` : "a pad of {insert} on the floor", insert, V(inW * 0.38, insH, inD * 0.3), V(0, 1, 0)),
   ];
   return { root, apply, explode, pins, slot: { parent: slotG, y: insH > 0 && holds ? 0 : insH } };
 }
@@ -163,10 +163,10 @@ export function buildDrawer(spec: PackSpec, k: Kit, holds?: Holds, insertKind: I
   };
   const S = spec;
   const pins = [
-    pin(1, "外套", "Sleeve", `${S.w} × ${S.h} × ${S.d} mm，1.5 mm 灰板外裱印刷纸`, `${S.w} × ${S.h} × ${S.d} mm, 1.5 mm chipboard wrapped in printed paper`, sleeve, V(-W * 0.2, H, D * 0.1), V(0, 1, 0)),
+    pin(1, "外套", "Sleeve", `${S.w} × ${S.h} × ${S.d} mm，1.5 mm {core}外裱{wrap}`, `${S.w} × ${S.h} × ${S.d} mm, 1.5 mm {core} wrapped in {wrap}`, sleeve, V(-W * 0.2, H, D * 0.1), V(0, 1, 0)),
     pin(2, "抽屉", "Tray", `${mmOf(tw)} × ${mmOf(th)} × ${mmOf(td)} mm，每边留 ${mmOf(gap)} mm 滑动间隙`, `${mmOf(tw)} × ${mmOf(th)} × ${mmOf(td)} mm, ${mmOf(gap)} mm sliding clearance each side`, tray, V(tw * 0.3, th * 0.5, td / 2), V(0, 0, 1)),
-    pin(3, "拉带", "Ribbon pull", "丝带拉环，拉出抽屉", "ribbon loop to pull the tray out", ribbon, V(0, 3 * mm, 7 * mm), V(0, 0, 1)),
-    pin(4, "内托", "Insert", holds ? `高 ${mmOf(insH)} mm，按产品开孔` : "植绒垫", holds ? `${mmOf(insH)} mm high, cut to each product` : "flocked pad", insert, V(inW * 0.36, insH, inD * 0.3), V(0, 1, 0)),
+    pin(3, "拉带", "Ribbon pull", "{ribbon}拉环，拉出抽屉", "a loop of {ribbon} to pull the tray out", ribbon, V(0, 3 * mm, 7 * mm), V(0, 0, 1)),
+    pin(4, "内托", "Insert", holds ? `高 ${mmOf(insH)} mm，{insert}，按产品开孔` : "{insert}垫", holds ? `${mmOf(insH)} mm high, {insert}, cut to each product` : "a pad of {insert}", insert, V(inW * 0.36, insH, inD * 0.3), V(0, 1, 0)),
   ];
   return { root, apply, explode, pins, slot: { parent: slotG, y: holds ? 0 : insH } };
 }
@@ -235,11 +235,11 @@ export function buildBookBox(spec: PackSpec, k: Kit, holds?: Holds, insertKind: 
   };
   const S = spec;
   const pins = [
-    pin(1, "翻盖", "Lid", `${S.w} × ${S.d} mm，2 mm 灰板外裱印刷纸`, `${S.w} × ${S.d} mm, 2 mm chipboard wrapped in printed paper`, lid, V(-W * 0.2, 0, D * 0.5), V(0, 1, 0)),
+    pin(1, "翻盖", "Lid", `${S.w} × ${S.d} mm，2 mm {core}外裱{wrap}`, `${S.w} × ${S.d} mm, 2 mm {core} wrapped in {wrap}`, lid, V(-W * 0.2, 0, D * 0.5), V(0, 1, 0)),
     pin(2, "前翻边", "Front flap", "内嵌磁铁，合上时吸住", "magnets inside hold it shut", flap, V(W * 0.25, -flapH * 0.5, 0), V(0, 0, 1)),
     pin(3, "书脊", "Spine", "连接底板与翻盖，像精装书一样开合", "joins the base board and lid, opening like a hardback", cover, V(W * 0.3, H * 0.5, -D / 2), V(0, 0, -1)),
     pin(4, "内盒", "Base tray", `${mmOf(bw)} × ${mmOf(bd)} × ${mmOf(bh)} mm，内裱纸`, `${mmOf(bw)} × ${mmOf(bd)} × ${mmOf(bh)} mm, paper-lined`, base, V(-bw * 0.3, bh, bd * 0.2), V(0, 1, 0)),
-    pin(5, "内托", "Insert", holds ? `高 ${mmOf(insH)} mm，按产品开孔` : `高 ${mmOf(insH)} mm`, holds ? `${mmOf(insH)} mm high, cut to each product` : `${mmOf(insH)} mm high`, insert, V(inW * 0.36, insH, inD * 0.3), V(0, 1, 0)),
+    pin(5, "内托", "Insert", holds ? `高 ${mmOf(insH)} mm，{insert}，按产品开孔` : `高 ${mmOf(insH)} mm，{insert}`, holds ? `${mmOf(insH)} mm high, {insert}, cut to each product` : `${mmOf(insH)} mm high, {insert}`, insert, V(inW * 0.36, insH, inD * 0.3), V(0, 1, 0)),
   ];
   return { root, apply, explode, pins, slot: { parent: slotG, y: holds ? 0 : insH } };
 }
@@ -258,7 +258,7 @@ export function buildPaperTube(spec: PackSpec, k: Kit, category: string): Built 
   const yBody = H - lidH;
   const circ = 2 * Math.PI * R;
   const root = new THREE.Group();
-  const foil = k.bareMetal;
+  const foil = k.liner;
   const body = tubeWall(R - T, R, 0, yBody, k.tex("tinWrap", circ / U, yBody / U), foil, k.edge);
   body.children[0].userData.wrap = { r: R, arc: Math.PI * 2 };
   root.add(body);
@@ -313,9 +313,9 @@ export function buildPaperTube(spec: PackSpec, k: Kit, category: string): Built 
   const S = spec;
   const pins = [
     pin(1, "筒盖", "Lid", `Ø${S.w} × ${mmOf(lidH)} mm，与筒身平齐`, `Ø${S.w} × ${mmOf(lidH)} mm, flush with the body`, lid, V(R * 0.3, lidH, R * 0.3), V(0, 1, 0)),
-    pin(2, "筒身", "Body", `Ø${S.w} × ${mmOf(yBody)} mm，${mmOf(T)} mm 纸板卷制，外裱印刷纸`, `Ø${S.w} × ${mmOf(yBody)} mm, ${mmOf(T)} mm spiral-wound board, printed wrap`, body, V(0, yBody * 0.45, R), V(0, 0, 1)),
-    pin(3, "内颈", "Neck", "牛皮纸内颈高出筒身，盖子套在上面", "a kraft neck stands proud of the body; the lid slides over it", neck, V(0, yBody + 6 * mm, nOut), V(0, 0, 1)),
-    pin(4, "铝箔内衬", "Foil liner", "防潮阻氧，茶叶常用", "keeps out moisture and oxygen, as tea needs", body, V(0, yBody * 0.8, -(R - T)), V(0, 0, 1), true),
+    pin(2, "筒身", "Body", `Ø${S.w} × ${mmOf(yBody)} mm，${mmOf(T)} mm {body}卷制，外裱{wrap}`, `Ø${S.w} × ${mmOf(yBody)} mm, ${mmOf(T)} mm wound {body}, wrapped in printed {wrap}`, body, V(0, yBody * 0.45, R), V(0, 0, 1)),
+    pin(3, "内颈", "Neck", "{body}内颈高出筒身，盖子套在上面", "a neck of {body} stands proud of the body; the lid slides over it", neck, V(0, yBody + 6 * mm, nOut), V(0, 0, 1)),
+    pin(4, "内衬", "Liner", "{liner}，隔开内容物与筒壁", "{liner}, keeps the contents off the tube wall", body, V(0, yBody * 0.8, -(R - T)), V(0, 0, 1), true),
   ];
   return { root, apply, explode, pins, turn: 18 };
 }
@@ -404,10 +404,10 @@ export function buildBag(spec: PackSpec, k: Kit, a: ArtInput): Built {
   };
   const S = spec;
   const pins = [
-    pin(1, "正面", "Front", `${S.w} × ${S.h} mm，157–250 g 铜版纸或牛皮纸印刷`, `${S.w} × ${S.h} mm, 157–250 g art paper or kraft, printed`, front, V(-W * 0.2, H * 0.3, t), V(0, 0, 1)),
+    pin(1, "正面", "Front", `${S.w} × ${S.h} mm，{body}，157–250 g，印刷`, `${S.w} × ${S.h} mm, {body}, 157–250 gsm, printed`, front, V(-W * 0.2, H * 0.3, t), V(0, 0, 1)),
     pin(2, "侧面风琴折", "Side gusset", `展开 ${S.d} mm，向内折，袋子可以压平`, `${S.d} mm deep, folded inward so the bag flattens`, sides[1], V(W / 2 - inset / 2, H * 0.5, D * 0.2), V(1, 0, 0)),
-    pin(3, "绳提手", "Rope handle", "棉绳或纸绳，金属扣眼加固", "cotton or paper rope, reinforced with metal grommets", handles[0], V(0, H + hh, D * 0.3), V(0, 1, 0)),
-    pin(4, "底板", "Base card", "硬卡垫底，袋子站得稳", "a stiff card in the base so the bag stands", card, V(W * 0.3, 1.2 * mm, D * 0.2), V(0, 1, 0), true),
+    pin(3, "绳提手", "Rope handle", "{handle}绳，金属扣眼加固", "{handle} rope, reinforced with metal eyelets", handles[0], V(0, H + hh, D * 0.3), V(0, 1, 0)),
+    pin(4, "底板", "Base card", "{base}垫底，袋子站得稳", "{base} in the base so the bag stands", card, V(W * 0.3, 1.2 * mm, D * 0.2), V(0, 1, 0), true),
   ];
   return { root, apply, explode, pins };
 }

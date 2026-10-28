@@ -6,6 +6,7 @@
  */
 import * as THREE from "three";
 import { drawFace, fiberNormal, foilRoughMetal, rolesOf, type ArtInput, type FaceKind } from "./art";
+import type { Look } from "@/lib/materials";
 
 /** What the print sits on. */
 export type Surface = "board" | "film" | "metal" | "plastic" | "glaze";
@@ -41,8 +42,10 @@ export type Kit = {
   cork: THREE.MeshStandardMaterial;
   /** Song brocade covering a box, `wMm` × `hMm` of it. */
   brocade: (wMm: number, hMm: number) => THREE.MeshPhysicalMaterial;
-  /** Polished bone, for a clasp. */
+  /** The brocade box's toggle (named for the bone clasp it stands in for). */
   bone: THREE.MeshPhysicalMaterial;
+  /** A paper tube's inner liner. */
+  liner: THREE.MeshPhysicalMaterial;
   dispose: () => void;
 };
 
@@ -452,7 +455,8 @@ const fluteCanvas = once("flute", fluteCanvasRaw);
  * returned at once with a blank map, and the drawing is handed to `defer` as a job; the map
  * fills in when the job runs (used by the homepage film to spread the work over frames).
  */
-export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: number, category = "other", opts: { defer?: (job: () => void) => void } = {}): Kit {
+export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: number, category = "other", opts: { defer?: (job: () => void) => void; look?: Look } = {}): Kit {
+  const look = opts.look ?? {};
   const disposables: { dispose: () => void }[] = [];
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   const fiber = new THREE.CanvasTexture(fiberNormal());
@@ -581,14 +585,16 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
     return live(m);
   };
 
-  const edge = new THREE.MeshStandardMaterial({ color: "#ECE7DC", roughness: 0.95, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  // the board's cut edge and back follow the board picked from the material list
+  const edge = new THREE.MeshStandardMaterial({ color: look.board?.edge ?? "#ECE7DC", roughness: 0.95, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
   const insideFiber = fiber.clone();
   insideFiber.repeat.set(4, 4);
   insideFiber.needsUpdate = true;
   disposables.push(insideFiber);
-  const inside = new THREE.MeshStandardMaterial({ color: "#D9D4C8", roughness: 0.92, normalMap: insideFiber, normalScale: nScale(0.3) });
+  const inside = new THREE.MeshStandardMaterial({ color: look.board?.inside ?? "#D9D4C8", roughness: 0.92, normalMap: insideFiber, normalScale: nScale(0.3) });
   const lining = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(roles.ground).lerp(new THREE.Color("#ffffff"), 0.15), roughness: 0.85, normalMap: insideFiber, normalScale: nScale(0.18), sheen: 0.3 });
-  const velvet = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(roles.ink).lerp(new THREE.Color(roles.key), 0.35), roughness: 1, sheen: 1, sheenRoughness: 0.55, sheenColor: new THREE.Color(roles.key).lerp(new THREE.Color("#ffffff"), 0.4) });
+  // flock and velvet pile (satin, when picked, is smoother and glossier)
+  const velvet = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(roles.ink).lerp(new THREE.Color(roles.key), 0.35), roughness: look.velvet?.rough ?? 1, sheen: look.velvet?.sheen ?? 1, sheenRoughness: 0.55, sheenColor: new THREE.Color(roles.key).lerp(new THREE.Color("#ffffff"), 0.4), clearcoat: look.velvet ? 0.25 : 0, clearcoatRoughness: 0.35 });
   const bareMetal = new THREE.MeshPhysicalMaterial({ color: "#D7D9D8", metalness: 1, roughness: 0.22 });
   const kraft = new THREE.MeshStandardMaterial({ color: "#B7905E", roughness: 0.93, normalMap: insideFiber, normalScale: nScale(0.45) });
   const rope = new THREE.MeshStandardMaterial({ color: new THREE.Color(roles.ink).lerp(new THREE.Color(roles.key), 0.3), roughness: 0.95 });
@@ -609,8 +615,9 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
     disposables.push(t, n);
     return live(new THREE.MeshPhysicalMaterial({ map: t, roughness: 0.62, sheen: 1, sheenRoughness: 0.42, sheenColor: new THREE.Color(roles.accent).lerp(new THREE.Color("#ffffff"), 0.55), normalMap: n, normalScale: nScale(0.35) }));
   };
-  // bone (骨扣): warm ivory, polished
-  const bone = live(new THREE.MeshPhysicalMaterial({ color: "#EDE3CF", roughness: 0.32, clearcoat: 0.4, clearcoatRoughness: 0.25, sheen: 0.2 }));
+  // the brocade box's toggle: ABS in bone ivory by default, or walnut, or jade-like acrylic
+  const tg = look.toggle ?? { color: "#EDE3CF", rough: 0.32, clearcoat: 0.4 };
+  const bone = live(new THREE.MeshPhysicalMaterial({ color: tg.color, roughness: tg.rough, clearcoat: tg.clearcoat, clearcoatRoughness: 0.25, sheen: 0.2, transmission: tg.transmission ?? 0, thickness: tg.transmission ? 0.04 : 0, ior: 1.49 }));
 
   const fluteBase = canvasTex(fluteCanvas(), true, true);
   const flute = (lengthMm: number, vertical = false) => {
@@ -651,26 +658,30 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
     return live(new THREE.MeshStandardMaterial({ map: canvasTex(noiseCanvas(contents.dry, 0.55), true, true), roughness: 0.92 }));
   };
 
-  const pulpTex = canvasTex(noiseCanvas("#CBC1AC", 0.3, 256, 5200), true, true);
+  // inserts in the colour of the picked pulp, foam or card
+  const tint = look.insertTint;
+  const pulpTex = canvasTex(noiseCanvas(tint ?? "#CBC1AC", 0.3, 256, 5200), true, true);
   pulpTex.repeat.set(3, 3);
-  const foamTex = canvasTex(noiseCanvas("#F3F3EF", 0.12, 256, 3000), true, true);
+  const foamTex = canvasTex(noiseCanvas(tint ?? "#F3F3EF", 0.12, 256, 3000), true, true);
   foamTex.repeat.set(4, 4);
   const inserts = {
     velvet: velvet as THREE.MeshStandardMaterial,
     pulp: live(new THREE.MeshStandardMaterial({ map: pulpTex, roughness: 1, normalMap: insideFiber, normalScale: nScale(1.1) })),
     foam: live(new THREE.MeshPhysicalMaterial({ map: foamTex, roughness: 0.82, sheen: 0.6, sheenRoughness: 0.5, sheenColor: new THREE.Color("#ffffff") })),
-    card: live(new THREE.MeshStandardMaterial({ color: "#ECE8DF", roughness: 0.9, normalMap: insideFiber, normalScale: nScale(0.35) })),
+    card: live(new THREE.MeshStandardMaterial({ color: tint ?? "#ECE8DF", roughness: 0.9, normalMap: insideFiber, normalScale: nScale(0.35) })),
   };
   const ceramic = (hex: string) => live(new THREE.MeshPhysicalMaterial({ color: hex, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.03, sheen: 0.2, sheenColor: new THREE.Color("#ffffff") }));
   // pine: one grain image for the walls, and engraving drawn over a copy of it
   const woodImg = woodCanvas();
+  // pine by default; bamboo, plywood or walnut tint the same grain
+  const woodTint = new THREE.Color(look.wood ?? "#FFFFFF");
   const woodBase = canvasTex(woodImg, true, true);
   const wood = (uMm: number, vMm: number) => {
     const t = woodBase.clone();
     t.repeat.set(uMm / 320, vMm / 160);
     t.needsUpdate = true;
     disposables.push(t);
-    return live(new THREE.MeshPhysicalMaterial({ map: t, roughness: 0.78, sheen: 0.25, sheenRoughness: 0.7, sheenColor: new THREE.Color("#fff3df"), normalMap: insideFiber, normalScale: nScale(0.25) }));
+    return live(new THREE.MeshPhysicalMaterial({ map: t, color: woodTint, roughness: 0.78, sheen: 0.25, sheenRoughness: 0.7, sheenColor: new THREE.Color("#fff3df"), normalMap: insideFiber, normalScale: nScale(0.25) }));
   };
   const engraved = (kind: FaceKind, wMm: number, hMm: number) => {
     const ppm = Math.min(8, maxTex / Math.max(wMm, hMm));
@@ -697,7 +708,7 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
       dst.data[i + 2] = dst.data[i + 2] * (1 - k) + 20 * k;
     }
     ctx.putImageData(dst, 0, 0);
-    return live(new THREE.MeshPhysicalMaterial({ map: canvasTex(c, true), roughness: 0.8, sheen: 0.25, sheenRoughness: 0.7, sheenColor: new THREE.Color("#fff3df"), normalMap: insideFiber, normalScale: nScale(0.25) }));
+    return live(new THREE.MeshPhysicalMaterial({ map: canvasTex(c, true), color: woodTint, roughness: 0.8, sheen: 0.25, sheenRoughness: 0.7, sheenColor: new THREE.Color("#fff3df"), normalMap: insideFiber, normalScale: nScale(0.25) }));
   };
   const plainCache = new Map<Surface, THREE.MeshPhysicalMaterial>();
   const plain = (surface: Surface = "board") => {
@@ -706,5 +717,7 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
     return m;
   };
 
-  return { tex, edge, inside, lining, velvet, bareMetal, kraft, flute, plastic, anodised, glass, fill, insert: (kind) => inserts[kind], ceramic, plain, wood, engraved, rope, cork, brocade, bone, dispose: () => disposables.forEach((x) => x.dispose()) };
+  // a paper tube's liner: foil-faced (the default) or PE-coated paper
+  const liner = look.liner === "paper" ? live(new THREE.MeshPhysicalMaterial({ color: "#EEEAE0", roughness: 0.55, clearcoat: 0.3, clearcoatRoughness: 0.4, normalMap: insideFiber, normalScale: nScale(0.15) })) : bareMetal;
+  return { tex, edge, inside, lining, velvet, bareMetal, liner, kraft, flute, plastic, anodised, glass, fill, insert: (kind) => inserts[kind], ceramic, plain, wood, engraved, rope, cork, brocade, bone, dispose: () => disposables.forEach((x) => x.dispose()) };
 }

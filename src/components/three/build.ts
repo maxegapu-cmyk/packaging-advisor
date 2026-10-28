@@ -12,9 +12,18 @@ import { buildBag, buildBookBox, buildDrawer, buildMailer, buildPaperTube } from
 import { buildBottle, buildCeramic, buildGlassBottle, buildJar, buildPouch, buildTube } from "./forms-round";
 import { buildAseptic, buildBlister, buildCan, buildWoodBox } from "./forms-more";
 import type { InsertKind, Kit } from "./kit";
+import { fillWords, materialWords } from "@/lib/materials";
 import { buildBrocade } from "./forms-song";
 
 export type BuildCtx = { spec: PackSpec; kit: Kit; art: ArtInput; maxTex: number; own: { dispose: () => void }[]; category: string };
+
+/** Puts the picked materials' names into the pins' text ("{wrap}" → "单面铜版纸"). */
+function named(pins: Pin[], c: BuildCtx, prefix = ""): Pin[] {
+  const w = materialWords(c.spec, c.category, prefix);
+  const zh = Object.fromEntries(Object.entries(w).map(([k, v]) => [k, v.zh]));
+  const en = Object.fromEntries(Object.entries(w).map(([k, v]) => [k, v.en]));
+  return pins.map((p) => ({ ...p, label: { zh: fillWords(p.label.zh, zh), en: fillWords(p.label.en, en) }, detail: { zh: fillWords(p.detail.zh, zh), en: fillWords(p.detail.en, en) } }));
+}
 
 /** Outer packs that hold their products in an insert (the rest show them beside). */
 const SLOTTED = new Set(["gift", "bookBox", "mailer", "drawer", "woodBox", "brocade"]);
@@ -169,10 +178,10 @@ function combo(c: BuildCtx): Built {
   };
 
   const label = FORM_LABELS[inner.form];
-  const first = products[0].b.pins;
+  const first = named(products[0].b.pins, c, "inner.");
   const off = outer.pins.length;
   const pins: Pin[] = [
-    ...outer.pins,
+    ...named(outer.pins, c),
     ...first.map((pn) => ({ ...pn, n: pn.n + off, label: { zh: `${label.zh}·${pn.label.zh}`, en: `${label.en}: ${pn.label.en}` } })),
   ];
   return { root, apply, explode, pins, staged: outer.staged, stages: outer.stages, lines: outer.lines };
@@ -180,7 +189,10 @@ function combo(c: BuildCtx): Built {
 
 /** The package for a spec, wrapped to rest on the floor and framed from its real extent. */
 export function buildForm(c: BuildCtx): Built {
-  const b = c.spec.inner && isOuter(c.spec.form) ? combo(c) : single(c.spec, c);
+  const b = c.spec.inner && isOuter(c.spec.form) ? combo(c) : (() => {
+    const one = single(c.spec, c);
+    return { ...one, pins: named(one.pins, c) };
+  })();
   const holder = new THREE.Group();
   holder.add(b.root);
   const bx = new THREE.Box3();

@@ -22,6 +22,7 @@ import { aim, RAD, step, tw, type Built, type Pair, type PinOnScreen } from "./c
 import { buildForm } from "./build";
 import { compileInBackground } from "./compile";
 import { LIVE_SWEEP_ENV, makeKit, type Kit } from "./kit";
+import { lookOf } from "@/lib/materials";
 import { backdropLook, studioEquirect, sweepGeometry, type Backdrop } from "./studio";
 
 /** A build and what it owns. */
@@ -465,7 +466,7 @@ export class PackScene {
     // its glyphs, and rebuild (the epoch is in the key) when they arrive
     const hand = handTextOf(input.d, input.brand, input.spec.form);
     if (hand) needInscription(hand);
-    const key = [inscriptionEpoch(), input.d.id, input.d.layout, input.d.palette.map((p) => p.hex).join(), input.d.mockup.headline, input.d.mockup.detail, input.brand, input.spec.form, input.spec.w, input.spec.h, input.spec.d, input.spec.finish, (input.spec.effects ?? []).join("+"), JSON.stringify(input.spec.inner ?? null), input.category ?? "", input.info?.key ?? ""].join("|");
+    const key = [inscriptionEpoch(), input.d.id, input.d.layout, input.d.palette.map((p) => p.hex).join(), input.d.mockup.headline, input.d.mockup.detail, input.brand, input.spec.form, input.spec.w, input.spec.h, input.spec.d, input.spec.finish, (input.spec.effects ?? []).join("+"), JSON.stringify(input.spec.inner ?? null), JSON.stringify(input.spec.materials ?? null), input.category ?? "", input.info?.key ?? ""].join("|");
     let changed = false;
     if (key !== this.buildKey) {
       this.buildKey = key;
@@ -562,7 +563,7 @@ export class PackScene {
     const own: { dispose: () => void }[] = [];
     const a: ArtInput = { d: input.d, brand: input.brand, finish: input.spec.finish, effects: input.spec.effects ?? [], info: input.info ?? null };
     const category = input.category ?? "other";
-    const kit = makeKit(this.renderer, a, this.maxTex, category);
+    const kit = makeKit(this.renderer, a, this.maxTex, category, { look: lookOf(input.spec) });
     const built = buildForm({ spec: input.spec, kit, art: a, maxTex: this.maxTex, own, category });
     return { built, kit, own, fresh };
   }

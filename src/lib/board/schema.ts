@@ -7,6 +7,7 @@
  * The validator is tolerant of small model slips (a plain string where a bilingual pair is
  * expected, "65%" instead of 65) but rejects anything structurally wrong.
  */
+import { MATERIAL_IDS } from "../materials/ids";
 
 export type Bi = { zh: string; en: string };
 
@@ -138,6 +139,9 @@ export function validateDirection(raw: unknown, path: string, c: Collector, inde
   const m = isObj(d.mockup) ? d.mockup : {};
   const car = isObj(d.carriers) ? d.carriers : {};
   const dna = isObj(d.styleDna) ? d.styleDna : {};
+  // materials may only be named from the principal's list, by number
+  for (const id of new Set(JSON.stringify(d).match(/\bM\d{3}\b/g) ?? []))
+    if (!MATERIAL_IDS.has(id)) c.add(path, `材料编号 ${id} 不在委托方材料清单中 material ${id} is not on the principal's list`);
   return {
     id: str(d.id, `${path}.id`, c, { optional: true, max: 4 }) || "ABC"[index] || String(index + 1),
     route: pick(d.route, ROUTES, ROUTES[Math.min(index, 2)]),

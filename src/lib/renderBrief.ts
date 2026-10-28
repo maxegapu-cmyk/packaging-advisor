@@ -9,6 +9,7 @@
 import type { Direction } from "./board/schema";
 import type { Pair } from "./i18n";
 import { FORM_LABELS, formatInner, formatSize, INSERT_LABELS, type Effect, type PackSpec } from "./pack";
+import { materialLine } from "./materials";
 
 const FINISH_TEXT: Record<PackSpec["finish"], Pair> = {
   matte: { zh: "哑光纸面，低反射，颜色饱满不发灰", en: "matte paper stock, low reflection, colors full and not greyed" },
@@ -45,10 +46,10 @@ const FORM_TEXT: Record<PackSpec["form"], Pair> = {
   tin: { zh: "金属圆罐，标签环绕罐身，金属罐盖", en: "round metal tin with a wrap-around label and a metal lid" },
   ceramic: { zh: "釉面瓷罐配瓷盖，釉上贴花", en: "glazed porcelain caddy with a porcelain lid and a fired-on decal" },
   can: { zh: "两片式铝制易拉罐，缩颈罐肩，拉环在罐盖上", en: "two-piece aluminium drink can with a necked shoulder and a pull tab on the end" },
-  blister: { zh: "泡罩卡：印刷背卡带欧式挂孔，透明 PET 泡罩内装产品", en: "blister card: a printed backing card with a euro hang slot and the product in a clear PET blister" },
+  blister: { zh: "泡罩卡：印刷背卡带欧式挂孔，透明塑料泡罩内装产品", en: "blister card: a printed backing card with a euro hang slot and the product in a clear plastic blister" },
   aseptic: { zh: "无菌砖形纸盒，顶部封边折平，两侧折耳，带旋盖", en: "aseptic brick carton with the top seal folded flat, ears folded onto the sides and a screw cap" },
   woodBox: { zh: "松木抽盖木箱，盖面激光烙印", en: "pine crate with a sliding lid, laser-engraved on top" },
-  brocade: { zh: "宋锦翻盖锦盒，盖上贴竖长题签，正面骨扣丝绳扣合", en: "Song brocade box with a hinged lid, a tall title slip on the lid and a bone clasp with a silk loop at the front" },
+  brocade: { zh: "宋锦纹翻盖锦盒，盖上贴竖长题签，正面扣与绳圈扣合", en: "Song brocade-pattern box with a hinged lid, a tall title slip on the lid and a toggle with a loop at the front" },
 };
 
 /** Surface notes for forms whose outside is not printed paper. */
@@ -61,8 +62,8 @@ const SURFACE_TEXT: Partial<Record<PackSpec["form"], Pair>> = {
   can: { zh: "铝面印刷，罐肩和罐底露出拉丝铝的金属高光", en: "print on aluminium, with bare brushed-metal highlights on the shoulder and base" },
   blister: { zh: "泡罩清透，边缘有细窄高光，不发雾", en: "a clear blister with thin edge highlights, not hazy" },
   aseptic: { zh: "表面是 PE 淋膜，柔和光泽", en: "PE-coated board with a soft sheen" },
-  woodBox: { zh: "松木纹理自然，烙印处颜色深、边缘略焦", en: "natural pine grain; the engraving dark with slightly scorched edges" },
-  brocade: { zh: "宋锦织面有细密经纬与丝光，纹样随角度微微反光；题签是纸，骨扣温润", en: "Song brocade with a fine warp-and-weft and silk sheen, the pattern glinting with the angle; the slip is paper, the clasp smooth bone" },
+  woodBox: { zh: "木纹自然（按用料所列木材），烙印处颜色深、边缘略焦", en: "natural wood grain (of the timber in the materials line); the engraving dark with slightly scorched edges" },
+  brocade: { zh: "织面有细密经纬与光泽，纹样随角度微微反光；题签是纸，扣按用料所列材料", en: "the woven cover has a fine warp-and-weft and a sheen, the pattern glinting with the angle; the slip is paper, the toggle of the material in the materials line" },
 };
 
 const role = (d: Direction, r: string) => d.palette.find((s) => s.role === r);
@@ -81,6 +82,10 @@ export function renderBrief(d: Direction, spec: PackSpec, product: Pair, brand: 
       }
     : null;
   const surface = SURFACE_TEXT[spec.form];
+  // what each part is made of, as picked from the principal's list
+  const outerLine = materialLine(spec, "other", false);
+  const innerLine = spec.inner ? materialLine(spec, "other", true) : null;
+  const mats = innerLine ? { zh: `${outerLine.zh}；内装 ${innerLine.zh}`, en: `${outerLine.en}; inside, ${innerLine.en}` } : outerLine;
   const zh = [
     `用途：电商主图与详情页的包装渲染，产品为「${product.zh}」，品牌「${name}」。`,
     `结构：${FORM_TEXT[spec.form].zh}，外尺寸 ${size}。保持盒型、比例、开口和接缝不变；正面版式、文字内容与位置、图形位置都不改动，不增加装饰零件。`,
@@ -89,6 +94,7 @@ export function renderBrief(d: Direction, spec: PackSpec, product: Pair, brand: 
     `视觉锚点：${d.anchor.zh}`,
     `配色：${colors.map((c) => c.zh).join("、")}。底色 ${ground.hex} 与品牌色 ${key.hex} 在成片中必须准确，不受背景光污染。`,
     `材质：${[FINISH_TEXT[spec.finish].zh, ...(spec.effects ?? []).map((e) => EFFECT_TEXT[e].zh)].join("；")}${surface ? `；${surface.zh}` : ""}。`,
+    `用料（委托方材料清单）：${mats.zh}。`,
     "灯光与背景：浅灰到白色无缝棚拍背景；左上方大面积柔光作主光，一条窄长轮廓光勾出盒边，弱正面补光；自然接触阴影。高光连续、受控，用来说明形体；不过度 HDR、不发光、不过度锐化。",
     "镜头：四分之三视角，略高于产品俯视，产品居中，约占画面 60%；另出一张正面平视图。",
     "检查：轮廓与部件数量未变，文字清楚可读，看起来是真实可售的商品，而不是概念图。",
@@ -101,6 +107,7 @@ export function renderBrief(d: Direction, spec: PackSpec, product: Pair, brand: 
     `Visual anchor: ${d.anchor.en}`,
     `Colors: ${colors.map((c) => c.en).join(", ")}. The ground ${ground.hex} and brand color ${key.hex} must stay accurate and must not be tinted by the background light.`,
     `Material: ${[FINISH_TEXT[spec.finish].en, ...(spec.effects ?? []).map((e) => EFFECT_TEXT[e].en)].join("; ")}${surface ? `; ${surface.en}` : ""}.`,
+    `Materials (from the principal's list): ${mats.en}.`,
     "Light and background: light-grey-to-white seamless studio sweep; a large soft key light from the upper left, one narrow rim light along the box edge, weak front fill; natural contact shadow. Highlights continuous and controlled, describing the form; no heavy HDR, bloom or over-sharpening.",
     "Camera: three-quarter view from slightly above, product centred at about 60% of the frame; plus one straight-on front view.",
     "Check: silhouette and part count unchanged, text legible, and it reads as a real product for sale rather than a concept image.",

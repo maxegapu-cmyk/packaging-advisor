@@ -170,7 +170,7 @@ export function buildCarton(spec: PackSpec, k: Kit): Built {
   };
   const S = spec;
   const pins: Pin[] = [
-    { n: 1, label: { zh: "正面", en: "Front panel" }, detail: { zh: `${S.w} × ${S.h} mm，350 g 白卡（约 0.45 mm）四色印刷`, en: `${S.w} × ${S.h} mm, 350 g white board (about 0.45 mm), four-colour print` }, obj: frontG, at: new THREE.Vector3(-w * 0.18, h * 0.12, 0.001), normal: new THREE.Vector3(0, 0, 1) },
+    { n: 1, label: { zh: "正面", en: "Front panel" }, detail: { zh: `${S.w} × ${S.h} mm，{body}，厚约 0.45 mm，四色印刷`, en: `${S.w} × ${S.h} mm, {body}, about 0.45 mm, four-colour print` }, obj: frontG, at: new THREE.Vector3(-w * 0.18, h * 0.12, 0.001), normal: new THREE.Vector3(0, 0, 1) },
     { n: 2, label: { zh: "侧面", en: "Side panel" }, detail: { zh: `${S.d} × ${S.h} mm，压痕折成 90°`, en: `${S.d} × ${S.h} mm, creased and folded to 90°` }, obj: rightH, at: new THREE.Vector3(d / 2, -h * 0.2, 0.001), normal: new THREE.Vector3(0, 0, 1) },
     { n: 3, label: { zh: "顶盖", en: "Top panel" }, detail: { zh: `${S.w} × ${S.d} mm，开合的盖`, en: `${S.w} × ${S.d} mm, the opening lid` }, obj: topH, at: new THREE.Vector3(-w * 0.25, d / 2, 0.001), normal: new THREE.Vector3(0, 0, 1) },
     { n: 4, label: { zh: "插舌", en: "Tuck flap" }, detail: { zh: `深 ${mmOf(tuck)} mm，插进盒内把盖锁住`, en: `${mmOf(tuck)} mm deep, tucks inside to lock the lid` }, obj: tuckT, at: new THREE.Vector3(w * 0.2, tuck * 0.55, 0.001), normal: new THREE.Vector3(0, 0, 1) },
@@ -293,10 +293,10 @@ export function buildGift(spec: PackSpec, k: Kit, holds?: Holds, insertKind: Ins
   };
   const S = spec;
   const trayPin: Pin = holds
-    ? { n: 3, label: { zh: "内托", en: "Insert" }, detail: { zh: `高 ${mmOf(trayH)} mm，按产品外形开孔，固定不晃动`, en: `${mmOf(trayH)} mm high, die-cut to each product so nothing moves` }, obj: tray, at: new THREE.Vector3(tw_ * 0.42, trayH, td_ * 0.38), normal: new THREE.Vector3(0, 1, 0) }
-    : { n: 3, label: { zh: "内托", en: "Tray" }, detail: { zh: `高 ${mmOf(trayH)} mm，植绒，托住内容物`, en: `${mmOf(trayH)} mm high, flocked, holds the contents` }, obj: tray, at: new THREE.Vector3(bw * 0.38, trayH / 2, bd * 0.3), normal: new THREE.Vector3(0, 1, 0) };
+    ? { n: 3, label: { zh: "内托", en: "Insert" }, detail: { zh: `高 ${mmOf(trayH)} mm，{insert}，按产品外形开孔，固定不晃动`, en: `${mmOf(trayH)} mm high, {insert}, die-cut to each product so nothing moves` }, obj: tray, at: new THREE.Vector3(tw_ * 0.42, trayH, td_ * 0.38), normal: new THREE.Vector3(0, 1, 0) }
+    : { n: 3, label: { zh: "内托", en: "Tray" }, detail: { zh: `高 ${mmOf(trayH)} mm，{insert}，托住内容物`, en: `${mmOf(trayH)} mm high, {insert}, holds the contents` }, obj: tray, at: new THREE.Vector3(bw * 0.38, trayH / 2, bd * 0.3), normal: new THREE.Vector3(0, 1, 0) };
   const pins: Pin[] = [
-    { n: 1, label: { zh: "天盖", en: "Lid" }, detail: { zh: `${S.w} × ${S.d} × ${mmOf(lidH)} mm，1.5 mm 灰板外裱印刷纸`, en: `${S.w} × ${S.d} × ${mmOf(lidH)} mm, 1.5 mm chipboard wrapped in printed paper` }, obj: lid, at: new THREE.Vector3(W * 0.3, lidH, D * 0.2), normal: new THREE.Vector3(0, 1, 0) },
+    { n: 1, label: { zh: "天盖", en: "Lid" }, detail: { zh: `${S.w} × ${S.d} × ${mmOf(lidH)} mm，1.5 mm {core}外裱{wrap}`, en: `${S.w} × ${S.d} × ${mmOf(lidH)} mm, 1.5 mm {core} wrapped in {wrap}` }, obj: lid, at: new THREE.Vector3(W * 0.3, lidH, D * 0.2), normal: new THREE.Vector3(0, 1, 0) },
     { n: 2, label: { zh: "地盒", en: "Base" }, detail: { zh: `${mmOf(bw)} × ${mmOf(bd)} × ${mmOf(bh)} mm，比盖每边小 ${mmOf(T + gap)} mm，盖能顺滑套上`, en: `${mmOf(bw)} × ${mmOf(bd)} × ${mmOf(bh)} mm, ${mmOf(T + gap)} mm smaller per side so the lid slides on` }, obj: base, at: new THREE.Vector3(-bw * 0.25, bh * 0.45, bd / 2), normal: new THREE.Vector3(0, 0, 1) },
     trayPin,
     ...(holds ? [] : ([
@@ -423,8 +423,8 @@ export function buildTin(spec: PackSpec, k: Kit, a: ArtInput, maxTex: number, ow
   };
   const S = spec;
   const pins: Pin[] = [
-    { n: 1, label: { zh: "罐盖", en: "Lid" }, detail: { zh: `Ø${mmOf(2 * LR)} × ${mmOf(lidH)} mm，印铁，罩清漆，卷边包口`, en: `Ø${mmOf(2 * LR)} × ${mmOf(lidH)} mm, printed tinplate, lacquered, rolled edge` }, obj: lid, at: new THREE.Vector3(R * 0.4, lidH, R * 0.3), normal: new THREE.Vector3(0, 1, 0) },
-    { n: 2, label: { zh: "铝箔内封", en: "Foil seal" }, detail: { zh: `Ø${mmOf(2 * (R - 1.9 * mm))} mm，开罐前保鲜防潮`, en: `Ø${mmOf(2 * (R - 1.9 * mm))} mm, keeps it fresh and dry until opened` }, obj: seal, at: new THREE.Vector3(R * 0.35, -R * 0.3, 0), normal: new THREE.Vector3(0, 0, 1) },
+    { n: 1, label: { zh: "罐盖", en: "Lid" }, detail: { zh: `Ø${mmOf(2 * LR)} × ${mmOf(lidH)} mm，{body}印刷，罩清漆，卷边包口`, en: `Ø${mmOf(2 * LR)} × ${mmOf(lidH)} mm, printed {body}, lacquered, rolled edge` }, obj: lid, at: new THREE.Vector3(R * 0.4, lidH, R * 0.3), normal: new THREE.Vector3(0, 1, 0) },
+    { n: 2, label: { zh: "内封", en: "Inner seal" }, detail: { zh: `Ø${mmOf(2 * (R - 1.9 * mm))} mm，{seal}，开罐前保鲜防潮`, en: `Ø${mmOf(2 * (R - 1.9 * mm))} mm, {seal}, keeps it fresh and dry until opened` }, obj: seal, at: new THREE.Vector3(R * 0.35, -R * 0.3, 0), normal: new THREE.Vector3(0, 0, 1) },
     { n: 3, label: { zh: "罐身印刷", en: "Printed body" }, detail: { zh: `Ø${S.w} × ${S.h} mm，印刷面展开 ${mmOf(circ)} × ${mmOf(labelH)} mm`, en: `Ø${S.w} × ${S.h} mm, printed area unrolled ${mmOf(circ)} × ${mmOf(labelH)} mm` }, obj: wrap, at: new THREE.Vector3(0, labelH * 0.1, R + 0.4 * mm), normal: new THREE.Vector3(0, 0, 1) },
     { n: 4, label: { zh: "罐口", en: "Neck" }, detail: { zh: `收口 ${mmOf(1.2 * mm)} mm，罐盖套在这里`, en: `stepped in ${mmOf(1.2 * mm)} mm for the lid to sit on` }, obj: root, at: new THREE.Vector3(0, neckY + 1 * mm, R - 1.2 * mm), normal: new THREE.Vector3(0, 0, 1) },
     { n: 5, label: { zh: "底部卷边", en: "Bottom bead" }, detail: { zh: "金属卷边，罐底不刮桌面", en: "rolled metal bead, so the base doesn't scratch" }, obj: root, at: new THREE.Vector3(0, 1.6 * mm, R + 0.8 * mm), normal: new THREE.Vector3(0, 0, 1) },

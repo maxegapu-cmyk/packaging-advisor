@@ -51,7 +51,12 @@ export const INSERT_LABELS: Record<Insert, Pair> = {
 };
 
 export type InnerSpec = { form: InnerForm; count: 1 | 2; w: number; h: number; d: number; insert?: Insert };
-export type PackSpec = { form: Form; w: number; h: number; d: number; finish: Finish; effects?: Effect[]; inner?: InnerSpec | null };
+/**
+ * `materials` holds the seller's picks from the principal's material list, by part ("wrap",
+ * "insert", "inner.body"…) → material number ("M019"); parts not named use their default (see
+ * src/lib/materials).
+ */
+export type PackSpec = { form: Form; w: number; h: number; d: number; finish: Finish; effects?: Effect[]; inner?: InnerSpec | null; materials?: Record<string, string> };
 
 /** Turns an effect on or off, keeping a single foil and a single pressing. */
 export function withEffect(spec: PackSpec, e: Effect, on: boolean): PackSpec {
@@ -113,9 +118,9 @@ export const FORM_NOTES: Record<Form, Pair> = {
   paperTube: { zh: "纸质圆筒，盖子套在内颈上，茶叶和化妆品常用，环保。", en: "A paperboard cylinder with a lid over an inner neck; used for tea and cosmetics, and recyclable." },
   bag: { zh: "门店和礼品用的手提纸袋，带绳提手和侧面风琴折。", en: "A retail and gift bag with rope handles and gusseted sides." },
   aseptic: { zh: "纸 / 塑 / 铝复合的无菌砖，牛奶、果汁、植物饮品常用，顶部折耳，带旋盖。", en: "A board / PE / foil aseptic brick for milk, juice and plant drinks, with folded ears and a screw cap." },
-  blister: { zh: "印刷卡纸加透明 PET 泡罩，挂钩陈列，小件化妆品和五金常用。", en: "A printed card with a clear PET blister, made to hang on a peg; common for small cosmetics and hardware." },
+  blister: { zh: "印刷卡纸加透明塑料泡罩，挂钩陈列，小件化妆品和五金常用。", en: "A printed card with a clear plastic blister, made to hang on a peg; common for small cosmetics and hardware." },
   can: { zh: "两片式铝罐，罐身直接印刷，带拉环，饮料和特产饮品常用。", en: "A two-piece aluminium can printed directly on the body, with a pull tab, for drinks and specialty beverages." },
-  woodBox: { zh: "松木箱，盖子沿槽抽出，盖面激光烙印品牌，茶叶、酒、土特产礼盒常用。", en: "A pine crate whose lid slides out along grooves, with the brand laser-engraved on the lid; used for tea, spirits and specialty gifts." },
+  woodBox: { zh: "实木箱（默认松木），盖子沿槽抽出，盖面激光烙印品牌，茶叶、酒、土特产礼盒常用。", en: "A solid-wood crate (pine by default) whose lid slides out along grooves, with the brand laser-engraved on the lid; used for tea, spirits and specialty gifts." },
   pouch: { zh: "复合膜自立袋，带自封拉链，零食、茶叶、特产最常用。", en: "A laminated stand-up pouch with a zip, the most common pack for snacks, tea and specialties." },
   bottle: { zh: "塑料按压泵瓶，洗护和护肤品常用。", en: "A plastic pump bottle for body care and skincare." },
   tube: { zh: "可挤压软管，倒立放置，洁面和护手霜常用。", en: "A squeeze tube that stands on its cap, for cleansers and hand creams." },
@@ -123,7 +128,7 @@ export const FORM_NOTES: Record<Form, Pair> = {
   glassBottle: { zh: "玻璃瓶配瓶塞，酒、油、饮品常用。", en: "A glass bottle with a stopper, for spirits, oils and drinks." },
   tin: { zh: "茶叶、糖果常用的金属圆罐，标签环绕一周。", en: "Metal tin for tea and sweets, with a wrap-around print." },
   ceramic: { zh: "上釉的瓷罐配瓷盖，茶叶和土特产常用，可重复使用。", en: "A glazed porcelain jar with a porcelain lid, for tea and specialties; reusable." },
-  brocade: { zh: "灰板裱宋锦的翻盖锦盒，盖上贴一张印刷题签，骨扣丝绳扣合，茶器、名茶、文房与珍品常用。", en: "A hinged box of greyboard covered in Song brocade, with a printed title slip on the lid and a bone clasp with a silk loop; for tea ware, fine tea, scholar's objects and treasures." },
+  brocade: { zh: "灰板外裱宋锦纹织物的翻盖锦盒，盖上贴一张印刷题签，扣与绳圈扣合，茶器、名茶、文房与珍品常用。", en: "A hinged box of greyboard covered in a fabric woven in the Song brocade pattern, with a printed title slip on the lid and a toggle with a loop; for tea ware, fine tea, scholar's objects and treasures." },
 };
 
 export const FINISH_LABELS: Record<Finish, Pair> = {
@@ -272,6 +277,15 @@ export function normalizePack(v: unknown, fallback: PackSpec = DEFAULT_PACK): Pa
   const base: PackSpec = { form, w, h, d, finish };
   if (effects.length && takesEffects({ form, inner })) base.effects = effects;
   if (inner) base.inner = inner;
+  // material picks: well-formed part keys and material numbers only; whether a pick is a real
+  // option for the part is the materials module's call (an unknown one falls back to the default)
+  const mo = o.materials;
+  if (mo && typeof mo === "object" && !Array.isArray(mo)) {
+    const picks: Record<string, string> = {};
+    for (const [k, v] of Object.entries(mo as Record<string, unknown>).slice(0, 24))
+      if (/^(inner\.)?[a-z][A-Za-z]{0,15}$/.test(k) && typeof v === "string" && /^M\d{3}$/.test(v) && (inner || !k.startsWith("inner."))) picks[k] = v;
+    if (Object.keys(picks).length) base.materials = picks;
+  }
   return base;
 }
 

@@ -42,6 +42,8 @@ import { rolesOf } from "@/lib/artwork";
 import { Orbit, REST_ANGLE, reducedMotion, VIEWS, type Angle } from "./orbit";
 import { Stage3D } from "./Stage3D";
 import { FormGlyph } from "./FormGlyph";
+import { MaterialPanel } from "./MaterialPanel";
+import { pruneMaterials } from "@/lib/materials";
 import { ColorStrip, RegMarks, sheetVars } from "../PressSheet";
 
 /* ---------------------------------------------------------------- Text */
@@ -52,7 +54,7 @@ const S = {
   direction: { zh: "方向", en: "Direction" },
   structure: { zh: "盒型与尺寸", en: "Structure and size" },
   effects: { zh: "附加工艺", en: "Extra effects" },
-  effectsWood: { zh: "松木箱盖面是激光雕刻，不做烫金、UV 或击凸。箱里装了带标签的产品时，标签可以加这些工艺。", en: "The pine crate's lid is laser-engraved, so it takes no foil, UV or embossing. When it holds labelled products, their labels can." },
+  effectsWood: { zh: "木箱盖面是激光雕刻，不做烫金、UV 或击凸。箱里装了带标签的产品时，标签可以加这些工艺。", en: "The wooden crate's lid is laser-engraved, so it takes no foil, UV or embossing. When it holds labelled products, their labels can." },
   effectsNote: { zh: "可多选，作用在品名和重点图形上（凸版压印作用于全部文字）；烫金、烫银、镭射三选一，击凸、压凹、凸版压印三选一。", en: "Combine freely; they apply to the name and key graphics (letterpress to all the type). Gold, silver and holographic foil are one-of; so are emboss, deboss and letterpress." },
   finish: { zh: "表面工艺", en: "Finish" },
   backdrop: { zh: "背景", en: "Backdrop" },
@@ -89,6 +91,7 @@ const S = {
   handoff: { zh: "出成品文件", en: "Make the final files" },
   tabLook: { zh: "外观", en: "Look" },
   tabCheck: { zh: "尺寸", en: "Size" },
+  tabMaterials: { zh: "材料", en: "Materials" },
   refH: { zh: "放个东西对比大小", en: "Compare with something familiar" },
   refNote: { zh: "常见物品按真实尺寸放在包装旁边，一眼看出包装有多大。", en: "Everyday objects at their real size, beside the package, so you can see how big it is." },
   refNone: { zh: "不放", en: "None" },
@@ -130,7 +133,7 @@ const BACKDROPS: { id: Backdrop; label: Pair; hint: Pair }[] = [
   { id: "brand", label: { zh: "品牌色", en: "Brand" }, hint: { zh: "包装的主色", en: "The pack's key colour" } },
 ];
 
-type PanelTab = "pack" | "look" | "check";
+type PanelTab = "pack" | "materials" | "look" | "check";
 
 type Detail = { id: string; label: Pair; angle: Angle; zoom: number; open?: boolean; text: (d: Direction) => Pair };
 
@@ -304,7 +307,9 @@ export function Studio({
   const setSpec = useCallback(
     (next: PackSpec) => {
       // an engraved crate on its own has nothing printed to carry the effects
-      const s = takesEffects(next) || !next.effects?.length ? next : { ...next, effects: undefined };
+      const s0 = takesEffects(next) || !next.effects?.length ? next : { ...next, effects: undefined };
+      // material picks that no longer name a part (a new form) or fit it (a new finish) fall away
+      const s = pruneMaterials(s0);
       setSpecState(s);
       if (!saveUrl) return;
       clearTimeout(saveTimer.current);
@@ -447,7 +452,9 @@ export function Studio({
     setOpen(false);
     // a combination keeps its product when the outer pack changes
     const keep = isOuter(form) && spec.inner ? { inner: spec.inner } : {};
-    setSpec({ ...FORM_PRESET[form], finish: spec.finish, ...keep });
+    // picks for the product inside travel with it
+    const innerPicks = keep.inner && spec.materials ? Object.fromEntries(Object.entries(spec.materials).filter(([k]) => k.startsWith("inner."))) : null;
+    setSpec({ ...FORM_PRESET[form], finish: spec.finish, ...keep, ...(innerPicks && Object.keys(innerPicks).length ? { materials: innerPicks } : {}) });
     orbit.tween(REST_ANGLE, 700, 1);
   };
   const changeInner = (form: InnerForm | null) => {
@@ -492,6 +499,7 @@ export function Studio({
 
   const panelTabs: { id: PanelTab; label: Pair }[] = [
     { id: "pack", label: S.tabPack },
+    { id: "materials", label: S.tabMaterials },
     { id: "look", label: S.tabLook },
     { id: "check", label: S.tabCheck },
   ];
@@ -852,6 +860,8 @@ export function Studio({
             </section>
           </div>
         ) : null}
+
+        {tab === "materials" ? <MaterialPanel spec={spec} category={board.meta.category} lang={lang} onChange={setSpec} /> : null}
 
         {tab === "look" ? (
           <div className="st-tabpanel" role="tabpanel">

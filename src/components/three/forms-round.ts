@@ -107,8 +107,8 @@ export function buildPouch(spec: PackSpec, k: Kit, own: { dispose: () => void }[
   };
   const S = spec;
   const pins = [
-    pin(1, "正面复合膜", "Front laminate", `${S.w} × ${S.h} mm，PET / 镀铝 / PE 三层复合，凹版印刷`, `${S.w} × ${S.h} mm, PET / metallised / PE three-layer laminate, gravure printed`, frontG, V(-W2 * 0.3, Hn * 0.45, thick(0.35, 0.45)), V(0, 0, 1)),
-    pin(2, "自封拉链", "Zip", "可重复开合，开封后保鲜", "reclosable, keeps it fresh after opening", zip, V(W2 * 0.4, vz * Hn, thick(0.7, vz) + 1 * mm), V(0, 0, 1)),
+    pin(1, "正面复合膜", "Front laminate", `${S.w} × ${S.h} mm，{film}，凹版印刷`, `${S.w} × ${S.h} mm, {film}, gravure printed`, frontG, V(-W2 * 0.3, Hn * 0.45, thick(0.35, 0.45)), V(0, 0, 1)),
+    pin(2, "自封拉链", "Zip", "{zip}，可重复开合，开封后保鲜", "{zip}, reclosable, keeps it fresh after opening", zip, V(W2 * 0.4, vz * Hn, thick(0.7, vz) + 1 * mm), V(0, 0, 1)),
     pin(3, "底部展开", "Bottom gusset", `展开 ${S.d} mm，装满后袋子能自己站立`, `${S.d} mm gusset; filled, the pouch stands by itself`, gusset, V(0, 0, D * 0.4), V(0, -1, 0), true),
     pin(4, "封边", "Seals", `侧封 ${mmOf(seal)} mm，顶封 ${mmOf(topSeal)} mm，带易撕口`, `${mmOf(seal)} mm side seals, ${mmOf(topSeal)} mm top seal with a tear notch`, seals, V(W / 2 - seal / 2, H - topSeal / 2, ft), V(0, 0, 1)),
   ];
@@ -191,11 +191,11 @@ export function buildBottle(spec: PackSpec, k: Kit, a: ArtInput): Built {
   };
   const S = spec;
   const pins = [
-    pin(1, "泵头", "Pump head", "按压出料，约 1–2 mL 一泵，带锁扣", "press to dispense about 1–2 mL; twist-locks for shipping", head, V(0, headH, 0), V(0, 1, 0)),
+    pin(1, "泵头", "Pump head", "{pump}，按压出料，约 1–2 mL 一泵，带锁扣", "{pump}; press to dispense about 1–2 mL; twist-locks for shipping", head, V(0, headH, 0), V(0, 1, 0)),
     pin(2, "螺纹盖", "Screw collar", `Ø${mmOf(2 * rc)} mm，24/410 口径，外圈防滑纹`, `Ø${mmOf(2 * rc)} mm, 24/410 neck finish, ribbed for grip`, collar, V(0, 0, rc), V(0, 0, 1)),
     pin(3, "吸管", "Dip tube", "伸到瓶底，用到最后一滴", "reaches the base so the last drop comes out", dip, V(0, -bodyH * 0.2, 2 * mm), V(0, 0, 1), true),
-    pin(4, "瓶身", "Bottle", `Ø${S.w} × ${mmOf(bodyH)} mm，HDPE 吹塑`, `Ø${S.w} × ${mmOf(bodyH)} mm, blow-moulded HDPE`, body, V(R * 0.7, sh0 + shH * 0.4, R * 0.5), V(0, 0, 1)),
-    pin(5, "标签", "Label", `展开 ${mmOf(circ)} × ${mmOf(ly1 - ly0)} mm，薄膜不干胶，防水`, `unrolled ${mmOf(circ)} × ${mmOf(ly1 - ly0)} mm, waterproof film label`, label, V(0, 0, R + 0.4 * mm), V(0, 0, 1)),
+    pin(4, "瓶身", "Bottle", `Ø${S.w} × ${mmOf(bodyH)} mm，{body}吹塑`, `Ø${S.w} × ${mmOf(bodyH)} mm, blow-moulded {body}`, body, V(R * 0.7, sh0 + shH * 0.4, R * 0.5), V(0, 0, 1)),
+    pin(5, "标签", "Label", `展开 ${mmOf(circ)} × ${mmOf(ly1 - ly0)} mm，{label}不干胶`, `unrolled ${mmOf(circ)} × ${mmOf(ly1 - ly0)} mm, self-adhesive {label}`, label, V(0, 0, R + 0.4 * mm), V(0, 0, 1)),
   ];
   return { root, apply, explode, pins, turn: 18 };
 }
@@ -274,9 +274,9 @@ export function buildTube(spec: PackSpec, k: Kit, a: ArtInput): Built {
   };
   const S = spec;
   const pins = [
-    pin(1, "管身", "Tube body", `Ø${S.w} mm，PE 或铝塑复合（ABL / PBL），可挤压`, `Ø${S.w} mm, PE or aluminium-plastic laminate (ABL / PBL), squeezable`, body, V(0, (y0 + y1) * 0.5, R * 0.9), V(0, 0, 1)),
+    pin(1, "管身", "Tube body", `Ø${S.w} mm，{body}，可挤压`, `Ø${S.w} mm, {body}, squeezable`, body, V(0, (y0 + y1) * 0.5, R * 0.9), V(0, 0, 1)),
     pin(2, "尾封", "Crimp seal", `宽 ${mmOf(2 * flat)} mm，热封，印批号`, `${mmOf(2 * flat)} mm wide, heat-sealed, carries the batch code`, crimp, V(flat * 0.5, 0, 0.4 * mm), V(0, 0, 1)),
-    pin(3, "翻盖", "Flip cap", `Ø${mmOf(2 * Rc)} × ${mmOf(capH)} mm，倒立站放`, `Ø${mmOf(2 * Rc)} × ${mmOf(capH)} mm; the tube stands on it`, cap, V(0, capH * 0.4, Rc), V(0, 0, 1)),
+    pin(3, "翻盖", "Flip cap", `Ø${mmOf(2 * Rc)} × ${mmOf(capH)} mm，{cap}，倒立站放`, `Ø${mmOf(2 * Rc)} × ${mmOf(capH)} mm, {cap}; the tube stands on it`, cap, V(0, capH * 0.4, Rc), V(0, 0, 1)),
     pin(4, "肩部", "Shoulder", "管肩注塑，连接管口与盖", "moulded shoulder joining the tube to the cap", tube, V(0, capH + shH * 0.6, R * 0.8), V(0, 0, 1)),
   ];
   return { root, apply, explode, pins };
@@ -388,10 +388,10 @@ export function buildJar(spec: PackSpec, k: Kit, a: ArtInput, category: string):
   };
   const S = spec;
   const pins = [
-    pin(1, "旋盖", "Lug cap", `Ø${mmOf(2 * Rc)} × ${mmOf(capH)} mm，马口铁，内有密封垫`, `Ø${mmOf(2 * Rc)} × ${mmOf(capH)} mm, tinplate with a sealing liner`, lid, V(R * 0.3, capH, R * 0.3), V(0, 1, 0)),
-    pin(2, "玻璃罐身", "Glass", `Ø${S.w} × ${mmOf(Hg)} mm，钠钙玻璃，壁厚约 ${mmOf(Tg)} mm`, `Ø${S.w} × ${mmOf(Hg)} mm, soda-lime glass, about ${mmOf(Tg)} mm wall`, glass, V(R * 0.6, yS * 0.9, R * 0.75), V(0, 0, 1)),
+    pin(1, "旋盖", "Lug cap", `Ø${mmOf(2 * Rc)} × ${mmOf(capH)} mm，{lid}，内有{liner}`, `Ø${mmOf(2 * Rc)} × ${mmOf(capH)} mm, {lid} with a liner of {liner}`, lid, V(R * 0.3, capH, R * 0.3), V(0, 1, 0)),
+    pin(2, "玻璃罐身", "Glass", `Ø${S.w} × ${mmOf(Hg)} mm，{glass}，壁厚约 ${mmOf(Tg)} mm`, `Ø${S.w} × ${mmOf(Hg)} mm, {glass}, about ${mmOf(Tg)} mm wall`, glass, V(R * 0.6, yS * 0.9, R * 0.75), V(0, 0, 1)),
     pin(3, "螺纹口", "Threads", "宽口螺纹，盖子旋紧密封", "wide-mouth thread; the cap screws down to seal", glass, V(0, yN + 5 * mm, rnO), V(0, 0, 1)),
-    pin(4, "标签", "Label", `正面贴标，${mmOf(R * arc)} × ${mmOf(ly1 - ly0)} mm`, `front label, ${mmOf(R * arc)} × ${mmOf(ly1 - ly0)} mm`, label, V(0, 0, R + 0.5 * mm), V(0, 0, 1)),
+    pin(4, "标签", "Label", `正面贴标，${mmOf(R * arc)} × ${mmOf(ly1 - ly0)} mm，{label}`, `front label, ${mmOf(R * arc)} × ${mmOf(ly1 - ly0)} mm, {label}`, label, V(0, 0, R + 0.5 * mm), V(0, 0, 1)),
     pin(5, "内容物", "Contents", "透过玻璃看得见", "visible through the glass", fill, V(R * 0.4, fillY * 0.6, 0), undefined, true),
   ];
   return { root, apply, explode, pins, turn: 14 };
@@ -505,9 +505,9 @@ export function buildGlassBottle(spec: PackSpec, k: Kit, a: ArtInput, category: 
   };
   const S = spec;
   const pins = [
-    pin(1, "瓶塞", "Stopper", `软木塞身 + 塑料塞头，Ø${mmOf(2 * rh)} mm`, `cork shank with a moulded head, Ø${mmOf(2 * rh)} mm`, stopper, V(0, hh + 0.3 * mm, 0), V(0, 1, 0)),
-    pin(2, "瓶身", "Glass", `Ø${S.w} × ${S.h} mm，钠钙玻璃，瓶底内凹`, `Ø${S.w} × ${S.h} mm, soda-lime glass with a punt`, glass, V(R * 0.6, y0 + shH * 0.3, R * 0.6), V(0, 0, 1)),
-    pin(3, "正标", "Front label", `${mmOf(R * arc)} × ${mmOf(ly1 - ly0)} mm，纸标`, `${mmOf(R * arc)} × ${mmOf(ly1 - ly0)} mm, paper label`, label, V(0, 0, R + 0.5 * mm), V(0, 0, 1)),
+    pin(1, "瓶塞", "Stopper", `{stopper}塞身 + {head}塞头，Ø${mmOf(2 * rh)} mm`, `a shank of {stopper} with a head of {head}, Ø${mmOf(2 * rh)} mm`, stopper, V(0, hh + 0.3 * mm, 0), V(0, 1, 0)),
+    pin(2, "瓶身", "Glass", `Ø${S.w} × ${S.h} mm，{glass}，瓶底内凹`, `Ø${S.w} × ${S.h} mm, {glass} with a punt`, glass, V(R * 0.6, y0 + shH * 0.3, R * 0.6), V(0, 0, 1)),
+    pin(3, "正标", "Front label", `${mmOf(R * arc)} × ${mmOf(ly1 - ly0)} mm，{label}`, `${mmOf(R * arc)} × ${mmOf(ly1 - ly0)} mm, {label}`, label, V(0, 0, R + 0.5 * mm), V(0, 0, 1)),
     ...(neckBand ? [pin(4, "颈标", "Neck band", "环绕瓶颈的封签", "a band round the neck that also seals it", neckBand, V(0, 0, rn + 0.4 * mm), V(0, 0, 1))] : []),
   ];
   return { root, apply, explode, pins, turn: 10 };
@@ -605,7 +605,7 @@ export function buildCeramic(spec: PackSpec, k: Kit, a: ArtInput, category: stri
   const S = spec;
   const pins = [
     pin(1, "瓷盖", "Lid", `Ø${mmOf(2 * ro)} mm，套在罐口上，内壁不碰罐口`, `Ø${mmOf(2 * ro)} mm, sits over the neck without touching its rim`, lid, V(0, neckH + domeH + knobH, 0), V(0, 1, 0)),
-    pin(2, "罐身", "Body", `Ø${S.w} × ${mmOf(Hb)} mm，高温瓷，釉面`, `Ø${S.w} × ${mmOf(Hb)} mm, high-fired porcelain, glazed`, body, V(R * 0.7, yS + shH * 0.4, R * 0.55), V(0, 0, 1)),
+    pin(2, "罐身", "Body", `Ø${S.w} × ${mmOf(Hb)} mm，{body}，高温烧制，釉面`, `Ø${S.w} × ${mmOf(Hb)} mm, {body}, high-fired and glazed`, body, V(R * 0.7, yS + shH * 0.4, R * 0.55), V(0, 0, 1)),
     pin(3, "釉上贴花", "Decal", `展开 ${mmOf(circ)} × ${mmOf(dy1 - dy0)} mm，烧制后耐洗`, `unrolled ${mmOf(circ)} × ${mmOf(dy1 - dy0)} mm, fired on so it washes`, decal, V(0, 0, R + 0.4 * mm), V(0, 0, 1)),
     pin(4, "罐口", "Neck", `Ø${mmOf(2 * rn)} mm，盖子落在肩上`, `Ø${mmOf(2 * rn)} mm; the lid rests on the shoulder`, body, V(0, Hb - neckH * 0.5, rn), V(0, 0, 1), true),
   ];

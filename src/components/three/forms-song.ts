@@ -1,7 +1,8 @@
 /**
  * Song structures. The brocade box (宋锦盒): greyboard covered in Song brocade, a lid hinged at
- * the back, a printed title slip (题签) pasted on the lid, and a bone toggle (骨扣) at the front
- * that a silk loop from the lid hooks over. Inside, a silk lining and an insert for the products.
+ * the back, a printed title slip (题签) pasted on the lid, and a toggle (扣) at the front
+ * that a loop from the lid hooks over. Inside, a satin-covered pad or an insert for the products.
+ * The cover, slip, toggle and loop are of the materials picked from the principal's list.
  * Everything at real size in millimetres (U per mm).
  */
 import * as THREE from "three";
@@ -105,10 +106,10 @@ export function buildBrocade(spec: PackSpec, k: Kit, holds?: Holds, insertKind: 
   };
   const S = spec;
   const pins = [
-    pin(1, "宋锦面", "Song brocade", `${S.w} × ${S.h} × ${S.d} mm，灰板外裱宋锦，龟背纹`, `${S.w} × ${S.h} × ${S.d} mm, greyboard covered in Song brocade, tortoise-shell pattern`, base, V(W * 0.3, hb * 0.5, D / 2), V(0, 0, 1)),
-    pin(2, "题签", "Title slip", `${ss.w} × ${mmOf(sh)} mm，印刷纸签贴于盖面`, `${ss.w} × ${mmOf(sh)} mm, a printed paper slip pasted on the lid`, slip, V(0, 0.2 * mm, -sh * 0.3), V(0, 1, 0)),
-    pin(3, "骨扣", "Bone clasp", "牛骨或仿玉扣，丝绳圈扣合", "a bone or jade-like toggle; the silk loop hooks over it", toggle, V(0, 0, 2 * mm), V(0, 0, 1)),
-    pin(4, "内衬", "Lining", holds ? `高 ${mmOf(trayH)} mm，按产品开孔` : "丝绸内衬软垫", holds ? `${mmOf(trayH)} mm high, cut to each product` : "a silk-covered pad", tray, V(tw * 0.3, trayH / 2, td * 0.25), V(0, 1, 0), true),
+    pin(1, "宋锦面", "Song brocade", `${S.w} × ${S.h} × ${S.d} mm，{core}外裱{cover}，提花宋锦龟背纹`, `${S.w} × ${S.h} × ${S.d} mm, {core} covered in {cover}, jacquard-woven in the Song tortoise-shell pattern`, base, V(W * 0.3, hb * 0.5, D / 2), V(0, 0, 1)),
+    pin(2, "题签", "Title slip", `${ss.w} × ${mmOf(sh)} mm，{slip}印刷，贴于盖面`, `${ss.w} × ${mmOf(sh)} mm, printed {slip} pasted on the lid`, slip, V(0, 0.2 * mm, -sh * 0.3), V(0, 1, 0)),
+    pin(3, "扣", "Toggle", "{toggle}扣，{loop}绳圈扣合", "a toggle of {toggle}; a loop of {loop} hooks over it", toggle, V(0, 0, 2 * mm), V(0, 0, 1)),
+    pin(4, "内衬", "Lining", holds ? `高 ${mmOf(trayH)} mm，{insert}，按产品开孔` : "{insert}软垫", holds ? `${mmOf(trayH)} mm high, {insert}, cut to each product` : "a pad covered in {insert}", tray, V(tw * 0.3, trayH / 2, td * 0.25), V(0, 1, 0), true),
   ];
   return { root, apply, explode, pins, slot: { parent: slotG, y: holds ? 0 : trayH } };
 }

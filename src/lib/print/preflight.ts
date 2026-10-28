@@ -8,6 +8,7 @@ import { labelFields } from "../artwork";
 import type { Board } from "../board/schema";
 import { ROUND_FORMS, type PackSpec } from "../pack";
 import { layoutBack, MIN_TEXT_MM } from "./backpanel";
+import { LIST, offListOf, problemsOf, rulesFor, usesOf } from "../materials";
 import { contrast, deltaE } from "./color";
 import { checkEan13, EAN_NOMINAL } from "./ean13";
 import { artSize, infoPanels, printLayout, wrapBack } from "./layout";
@@ -88,6 +89,20 @@ export function preflight(a: Artwork, board: Board, spec: PackSpec): Check[] {
   }
   if (pf.confirmed) out.push(C("sample", "ok", `已与实物打样核对${pf.at ? `（${pf.at}）` : ""}`, `Checked against the printed sample${pf.at ? ` (${pf.at})` : ""}`));
   else out.push(C("sample", "warn", "还没有和实物打样核对", "Not yet checked against a printed sample", "在实物打样到手前，电商图片只是渲染图。拿到样品后在「实物核对」里比对并确认，图片才算与实物一致。", "Until the printed sample arrives the listing images are renders. Compare and confirm it under “Match the sample” before treating them as true to the product."));
+
+  // materials: the principal's list
+  const uses = usesOf(spec, board.meta.category);
+  for (const p of problemsOf(uses)) out.push(C(`mat-${p.key}`, p.level, p.text.zh, p.text.en));
+  const offList = offListOf(spec);
+  if (offList.length) out.push(C("mat-off", "warn", `清单外部件：${offList.map((o) => o.label.zh).join("、")}`, `Off the material list: ${offList.map((o) => o.label.en.toLowerCase()).join(", ")}`, offList.map((o) => o.why.zh).join(" ") + " 请委托方确认或补列后再下单。", offList.map((o) => o.why.en).join(" ") + " Have the principal confirm or add them before ordering."));
+  const contact = uses.filter((u) => u.touches);
+  if (contact.length) {
+    const what = contact[0].touches === "food" ? ["食品", "food"] : ["化妆品", "the cosmetic"];
+    const ids = rulesFor(spec, board.meta.category, uses).filter((r) => r.by.some((k) => contact.some((u) => u.key === k)) && r.rule.id !== "G01").map((r) => r.rule.id);
+    out.push(C("mat-contact", "warn", `${contact.length} 个部件直接接触${what[0]}：向供应商取得符合性资料`, `${contact.length} part${contact.length > 1 ? "s" : ""} touch ${what[1]}: get compliance documents from the suppliers`, `${contact.map((u) => `${u.label.zh}（${u.m.name.zh} ${u.id}）`).join("、")}。按 ${ids.join("、")} 取得符合性声明和成品检测，报告须覆盖实际结构与使用条件。`, `${contact.map((u) => `${u.label.en} (${u.m.name.en} ${u.id})`).join(", ")}. Under ${ids.join(", ")}, get declarations of compliance and finished-product tests that cover the actual structure and conditions of use.`));
+  }
+  const listed = new Set(uses.map((u) => u.id)).size;
+  out.push(C("mat-list", "ok", `材料均来自委托方清单（${listed} 种）`, `All materials from the principal's list (${listed})`, `清单核对日期 ${LIST.checked}；所需资料见印刷工单第 2 页。`, `List checked ${LIST.checked}; the documents needed are on page 2 of the job sheet.`));
 
   // always
   out.push(C("die", "info", "刀模以印厂为准", "Your printer's die line wins", "结构尺寸是标准做法；开模前请印厂核对。", "Structural sizes are standard practice; have the printer check before cutting."));

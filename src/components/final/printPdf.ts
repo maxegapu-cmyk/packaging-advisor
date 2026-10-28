@@ -1,7 +1,8 @@
 /**
  * The print file: a PDF a printer can work from.
  *
- * Page 1 is the job sheet (parts, sizes, materials, colors, checks). Then one page per printed
+ * Page 1 is the job sheet (parts, sizes, materials, colors, checks); page 2 its materials and
+ * compliance, from the principal's material list. Then one page per printed
  * part at 1:1: artwork at 300 dpi with 3 mm bleed, cut lines in a spot color named
  * "CutContour" and creases in "Crease" (the names cutting tables and RIPs look for), crop
  * marks and a slug line. A foil finish adds a foil plate page per part.
@@ -17,6 +18,7 @@ import { BLEED, type PrintLayout, type Sheet } from "@/lib/print/layout";
 import type { Check } from "@/lib/print/preflight";
 import { handTextOf, rolesOf, type ArtInput } from "../three/art";
 import { loadInscription } from "@/lib/fonts";
+import { documentsFor, LIST, offListOf, rulesFor, usesOf } from "@/lib/materials";
 import { baseColor, drawSheetPreview, panelArt, panelPpm } from "./render";
 
 const PT = 72 / 25.4;
@@ -235,6 +237,122 @@ export type PdfInput = {
   onProgress?: (done: number, total: number) => void;
 };
 
+const SANS = '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "Helvetica Neue", Arial, sans-serif';
+
+/** Breaks text into lines no wider than `maxMm` (at spaces in Latin text, anywhere in Chinese). */
+function lines(ctx: CanvasRenderingContext2D, t: string, maxPx: number): string[] {
+  const out: string[] = [];
+  let cur = "";
+  const tokens = t.match(/[A-Za-z0-9][\w./%°×–\-()'’]*\s*|\s+|./gu) ?? [];
+  for (const tok of tokens) {
+    if (ctx.measureText(cur + tok).width > maxPx && cur.trim()) {
+      out.push(cur.trimEnd());
+      cur = tok.trimStart();
+    } else cur += tok;
+  }
+  if (cur.trim()) out.push(cur.trimEnd());
+  return out;
+}
+
+/** Sets a wrapped paragraph from baseline `y` (mm); returns the last line's baseline. */
+function para(ctx: CanvasRenderingContext2D, t: string, x: number, y: number, size: number, maxMm: number, mm: (v: number) => number, color = "#111", weight = 400): number {
+  ctx.font = `${weight} ${mm(size).toFixed(1)}px ${SANS}`;
+  ctx.fillStyle = color;
+  const ls = lines(ctx, t, mm(maxMm));
+  ls.forEach((l, i) => ctx.fillText(l, mm(x), mm(y + i * size * 1.45)));
+  return y + Math.max(0, ls.length - 1) * size * 1.45;
+}
+
+/**
+ * Page 2 of the job sheet: what each part is made of, from the principal's material list, the
+ * rules that apply and the documents to get from the suppliers.
+ */
+function materialSheet(inp: PdfInput): HTMLCanvasElement {
+  const dpm = 150 / 25.4;
+  const W = Math.round(210 * dpm);
+  const H = Math.round(297 * dpm);
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext("2d")!;
+  const mm = (v: number) => v * dpm;
+  const en = inp.lang === "en";
+  const one = (p: { zh: string; en: string }) => (en ? p.en : p.zh);
+  const text = (t: string, x: number, y: number, size: number, weight = 400, color = "#111") => {
+    ctx.font = `${weight} ${mm(size).toFixed(1)}px ${SANS}`;
+    ctx.fillStyle = color;
+    ctx.fillText(t, mm(x), mm(y));
+  };
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = rolesOf(inp.art.d).key;
+  ctx.fillRect(0, 0, W, mm(6));
+  const cat = inp.board.meta.category;
+  const uses = usesOf(inp.spec, cat);
+  const rules = rulesFor(inp.spec, cat, uses);
+  text(en ? "Materials and compliance" : "材料与合规  Materials and compliance", 14, 22, 7, 700);
+  let y = para(ctx, en ? `From the principal's material list (${LIST.title.en}), checked ${LIST.checked}. A path to compliance, not a certificate: the supplier's documents and finished-product tests decide.` : `材料取自委托方提供的《${LIST.title.zh}》（核对日期 ${LIST.checked}）。清单给出的是合规路径，不是合格证明：以供应商资料和成品检测为准。`, 14, 31, 3, 182, mm, "#555");
+  const bottom = 282;
+  let cut = false;
+  const room = (need: number) => {
+    if (y + need > bottom) cut = true;
+    return !cut;
+  };
+  const heading = (t: string) => {
+    y += 10;
+    if (room(6)) text(t, 14, y, 3.6, 700);
+  };
+  const groups: [string, typeof uses][] = [[en ? `Parts: ${inp.spec.inner ? "outer pack" : "the pack"}` : `部件：${inp.spec.inner ? "外包装" : "包装"}`, uses.filter((u) => !u.inner && !u.process)]];
+  if (inp.spec.inner) groups.push([en ? "Parts: the product inside" : "部件：内装产品", uses.filter((u) => u.inner && !u.process)]);
+  groups.push([en ? "With the finish and effects" : "随工艺", uses.filter((u) => u.process)]);
+  for (const [title, list] of groups) {
+    heading(title);
+    for (const u of list) {
+      y += 6;
+      if (!room(10)) break;
+      const name = `${one(u.m.name)}${u.note ? (en ? ` (${u.note.en})` : `（${u.note.zh}）`) : ""}  ${u.id}`;
+      text(one(u.label), 14, y, 2.9, 600);
+      text(name, 52, y, 2.9, 600);
+      const touch = u.touches === "food" ? (en ? "touches food" : "直接接触食品") : u.touches === "cosmetics" ? (en ? "touches the cosmetic" : "直接接触化妆品") : "";
+      if (touch) text(touch, 170, y, 2.5, 600, "#A3392B");
+      const extra = [u.grade ? one(u.grade) : "", one(u.m.boundary)].filter(Boolean).join(en ? " · " : "；");
+      y = para(ctx, extra, 52, y + 4.3, 2.5, 144, mm, "#555");
+      const ids = rules.filter((r) => r.by.includes(u.key)).map((r) => r.rule.id);
+      if (ids.length) {
+        y += 4.1;
+        text(ids.join("  "), 52, y, 2.4, 600, "#3B675C");
+      }
+    }
+  }
+  const off = offListOf(inp.spec);
+  if (off.length) {
+    heading(en ? "Off the list: for the principal to confirm" : "清单外部件（待委托方确认）");
+    for (const o of off) {
+      y += 6;
+      if (!room(8)) break;
+      text(one(o.label), 14, y, 2.9, 600, "#8F5410");
+      y = para(ctx, one(o.why), 52, y, 2.5, 144, mm, "#555");
+    }
+  }
+  heading(en ? "Rules that apply" : "适用规则");
+  for (const a of rules) {
+    y += 5.6;
+    if (!room(8)) break;
+    text(a.rule.id, 14, y, 2.8, 700);
+    y = para(ctx, `${one(a.rule.standard)}  —  ${one(a.rule.scope)}`, 26, y, 2.6, 170, mm, "#222");
+    y = para(ctx, (en ? "Obtain: " : "应取得：") + one(a.rule.docs), 26, y + 3.9, 2.4, 170, mm, "#555");
+  }
+  heading(en ? "Ask the suppliers for" : "向供应商索取");
+  for (const d of documentsFor(uses)) {
+    y += 5.6;
+    if (!room(8)) break;
+    y = para(ctx, `${one(d.docs)}  (${d.ids.join(", ")})`, 14, y, 2.6, 182, mm, "#222");
+  }
+  if (cut) text(en ? "More in the 3D space under Materials." : "其余见 3D 空间「材料」。", 14, bottom + 4, 2.6, 600, "#8F5410");
+  text(en ? "Made with Packaging Advisor from the principal's list. Not a compliance review." : "由包装视觉顾问按委托方材料清单生成，不构成合规审查。", 14, 290, 2.5, 400, "#777");
+  return c;
+}
+
 /** The job sheet: an A4 page drawn in the browser (Chinese text needs the system fonts). */
 function jobSheet(inp: PdfInput): HTMLCanvasElement {
   const dpm = 150 / 25.4;
@@ -244,7 +362,6 @@ function jobSheet(inp: PdfInput): HTMLCanvasElement {
   c.width = W;
   c.height = H;
   const ctx = c.getContext("2d")!;
-  const SANS = '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "Helvetica Neue", Arial, sans-serif';
   const mm = (v: number) => v * dpm;
   const text = (t: string, x: number, y: number, size: number, weight = 400, color = "#111") => {
     ctx.font = `${weight} ${mm(size).toFixed(1)}px ${SANS}`;
@@ -280,10 +397,10 @@ function jobSheet(inp: PdfInput): HTMLCanvasElement {
     text(`${two(s.name)}`, 14, y, 3, 600);
     text(`${Math.round(s.w)} × ${Math.round(s.h)} mm  ×${s.qty}`, 110, y, 3, 400, "#333");
     y += 4.6;
-    text(two(s.material), 18, y, 2.6, 400, "#555");
+    y = para(ctx, two(s.material), 18, y, 2.6, 178, mm, "#555");
     for (const n of s.notes) {
       y += 4.2;
-      text(two(n), 18, y, 2.6, 400, "#555");
+      y = para(ctx, two(n), 18, y, 2.6, 178, mm, "#555");
     }
   }
   // colors
@@ -343,7 +460,7 @@ export async function buildPrintPdf(inp: PdfInput): Promise<Uint8Array> {
   doc.setProducer("Packaging Advisor (pdf-lib)");
   const font = await doc.embedFont(L.StandardFonts.Helvetica);
   const fx = inp.spec.effects ?? [];
-  const total = 1 + inp.layout.sheets.reduce((n, s) => n + 1 + (s.process === "print" ? fx.length : 0), 0);
+  const total = 2 + inp.layout.sheets.reduce((n, s) => n + 1 + (s.process === "print" ? fx.length : 0), 0);
   let done = 0;
   const tick = () => inp.onProgress?.(++done, total);
 
@@ -351,6 +468,9 @@ export async function buildPrintPdf(inp: PdfInput): Promise<Uint8Array> {
   const jsImg = await doc.embedJpg(await toJpeg(js, 0.9));
   const jp = doc.addPage([210 * PT, 297 * PT]);
   jp.drawImage(jsImg, { x: 0, y: 0, width: 210 * PT, height: 297 * PT });
+  tick();
+  const ms = await doc.embedJpg(await toJpeg(materialSheet(inp), 0.9));
+  doc.addPage([210 * PT, 297 * PT]).drawImage(ms, { x: 0, y: 0, width: 210 * PT, height: 297 * PT });
   tick();
 
   const slug = `${inp.artwork.brand} ${inp.artwork.headline}`.trim() || "Packaging Advisor";
