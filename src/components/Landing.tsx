@@ -246,11 +246,11 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
             ))}
           </div>
           <Bi key={sample.id} p={board.reading.product} lang={lang} as="p" className="sample-reading fade-in" />
-          <PackProvider key={sample.id} initial={sample.pack} studioBase={`/space/demo?s=${sample.id}`} category={board.meta.category}>
+          <PackProvider initial={sample.pack} studioBase={`/space/demo?s=${sample.id}`} category={board.meta.category}>
             <BoxSync label={one(UI.rotateTogether)} hint={one(UI.dragHint)} toolbar={<PackBar lang={lang} />}>
               <div className="sample-grid">
                 {board.directions.map((d) => (
-                  <div className={d.id === board.recommendation.pick ? "sample is-recommended" : "sample"} key={`${sample.id}-${d.id}`}>
+                  <div className={d.id === board.recommendation.pick ? "sample is-recommended" : "sample"} key={d.id}>
                     <div className="sample-stage" style={paletteVars(d)}>
                       <Box3D d={d} brand={board.meta.brand} lang={lang} label={`${d.id} ${one(d.name)}`} />
                     </div>

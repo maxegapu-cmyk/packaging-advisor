@@ -490,7 +490,11 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
   };
 
   const tex = (kind: FaceKind, wMm: number, hMm: number, surface: Surface = "board", arc?: number) => {
-    const ppm = Math.min(16, maxTex / Math.max(wMm, hMm));
+    // a face printed in one flat colour needs no resolution: a few pixels instead of a
+    // full-size canvas to paint and a large texture to upload (papers with fibres or flecks keep
+    // theirs, since those are drawn into the print)
+    const flat = (kind === "flap" || kind === "baseSide" || (kind === "bottom" && a.info?.on !== "bottom")) && a.finish !== "goldFleck" && a.finish !== "xuan";
+    const ppm = flat ? 8 / Math.max(wMm, hMm) : Math.min(16, maxTex / Math.max(wMm, hMm));
     // effects need the drawn masks now; plain print can wait
     // (洒金 needs the print too: its flakes change the roughness and metalness maps)
     const lazy = !!opts.defer && !(a.effects ?? []).length && a.finish !== "goldFleck";

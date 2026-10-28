@@ -122,6 +122,10 @@ function drawFormsOverlay(svg: SVGSVGElement, f: FormsFrame) {
 }
 
 export type Film = "symbiosis" | "forms";
+/** A film's controls, whichever film it is. */
+type Run = { start(): void; stop(): void; dispose(): void; resize(w: number, h: number): void; setTone(dark: boolean): void };
+/** A built film: its canvas, its scene, the items it was built for, and how to wire its frames to the page (returns its still). */
+type Kept = { canvas: HTMLCanvasElement; sc: Run; items: HeroItem[]; dark?: boolean; attach: (reveal: () => void) => () => void };
 const FILMS: { id: Film; label: Pair }[] = [
   { id: "symbiosis", label: { zh: "共生", en: "Symbiosis" } },
   { id: "forms", label: { zh: "平面到立体", en: "Flat to form" } },
@@ -170,9 +174,16 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
   const darkRef = useRef(dark);
   darkRef.current = dark;
 
+  // Each film, once built, is kept (stopped, its canvas hidden) for the rest of the visit: going
+  // back to it is instant, with no new WebGL context and nothing to compile. Both go on unmount.
+  const kept = useRef(new Map<Film, Kept>());
   useEffect(() => {
-    scene.current?.setTone(dark);
-    forms.current?.setTone(dark);
+    // the film on screen follows the theme now; a kept one catches up when shown
+    for (const [f, k] of kept.current)
+      if ((f === "symbiosis" ? scene.current : forms.current) === k.sc) {
+        k.dark = dark;
+        k.sc.setTone(dark);
+      }
   }, [dark]);
 
   useEffect(() => {
@@ -196,83 +207,129 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
   };
 
   useEffect(() => {
+    const k = kept.current;
+    return () => {
+      for (const f of k.values()) {
+        f.sc.dispose();
+        f.canvas.remove();
+      }
+      k.clear();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!ready) return;
     let alive = true;
     let ro: ResizeObserver | undefined;
     let io: IntersectionObserver | undefined;
     let canvas: HTMLCanvasElement | undefined;
-    let run: { start(): void; stop(): void; dispose(): void } | undefined;
+    let run: Run | undefined;
     const onVis = () => (document.hidden ? run?.stop() : io && run?.start());
-    if (svg.current) svg.current.innerHTML = "";
-    if (veil.current) veil.current.style.opacity = "0";
-    const mount = (make: (c: HTMLCanvasElement) => { start(): void; stop(): void; dispose(): void; resize(w: number, h: number): void }, still: () => void) => {
+    // Switching films crossfades: the old film holds its last frame while the new one is built
+    // (after the tab's highlight has started gliding), then fades out once the new one draws.
+    let revealed = false;
+    const reveal = () => {
+      if (revealed || !alive) return;
+      revealed = true;
+      if (svg.current) svg.current.innerHTML = "";
+      if (veil.current) veil.current.style.opacity = "0";
+      canvas?.classList.remove("is-entering");
+      host.current?.querySelectorAll(".sym-canvas.is-leaving").forEach((c) => c.classList.add("is-gone"));
+    };
+    /** Puts a film (new or kept) on the stage and runs it. */
+    const show = (k: Kept) => {
       const el = host.current;
       if (!alive || !el) return;
-      // exactly one film canvas, whatever order things finished in
-      el.querySelectorAll(".sym-canvas").forEach((c) => c.remove());
-      canvas = document.createElement("canvas");
-      canvas.className = "sym-canvas";
-      el.prepend(canvas);
-      let sc: ReturnType<typeof make>;
-      try {
-        sc = make(canvas);
-      } catch {
-        canvas.remove();
-        setOk((o) => ({ ...o, [film]: false }));
-        return;
+      canvas = k.canvas;
+      run = k.sc;
+      const others = Array.from(el.querySelectorAll(".sym-canvas")).filter((c) => c !== k.canvas && !c.classList.contains("is-gone"));
+      k.canvas.classList.remove("is-leaving", "is-gone");
+      k.canvas.classList.toggle("is-entering", others.length > 0);
+      if (!k.canvas.isConnected) el.prepend(k.canvas);
+      // (a kept film may have missed a change of theme while hidden)
+      if (k.dark !== darkRef.current) {
+        k.dark = darkRef.current;
+        k.sc.setTone(k.dark);
       }
-      run = sc;
+      const still = k.attach(reveal);
+      if (!k.canvas.classList.contains("is-entering")) reveal();
       const r = el.getBoundingClientRect();
-      sc.resize(r.width, r.height);
+      k.sc.resize(r.width, r.height);
       ro = new ResizeObserver(([e]) => {
-        sc.resize(e.contentRect.width, e.contentRect.height);
+        k.sc.resize(e.contentRect.width, e.contentRect.height);
         if (reducedMotion()) still();
       });
       ro.observe(el);
       if (reducedMotion()) {
         still();
+        reveal();
         return;
       }
-      io = new IntersectionObserver(([e]) => (e.isIntersecting && !document.hidden ? sc.start() : sc.stop()), { threshold: 0.05 });
+      io = new IntersectionObserver(([e]) => (e.isIntersecting && !document.hidden ? k.sc.start() : k.sc.stop()), { threshold: 0.05 });
       io.observe(el);
       document.addEventListener("visibilitychange", onVis);
-      (window as unknown as { __hero?: unknown }).__hero = sc;
+      (window as unknown as { __hero?: unknown }).__hero = k.sc;
+    };
+    /** Builds a film for the first time (its canvas not yet on the page). */
+    const build = (make: (c: HTMLCanvasElement) => Run, attach: Kept["attach"]) => {
+      if (!alive || !host.current) return;
+      const c = document.createElement("canvas");
+      c.className = "sym-canvas";
+      let sc: Run;
+      try {
+        sc = make(c);
+      } catch {
+        setOk((o) => ({ ...o, [film]: false }));
+        return;
+      }
+      const k: Kept = { canvas: c, sc, items, attach };
+      kept.current.set(film, k);
+      show(k);
     };
 
-    if (film === "symbiosis") {
-      let last = { item: -1, stage: -1 };
+    const have = kept.current.get(film);
+    if (have && have.items !== items) {
+      have.sc.dispose();
+      have.canvas.remove();
+      kept.current.delete(film);
+    }
+    const k = kept.current.get(film);
+    if (k) show(k);
+    else if (film === "symbiosis") {
       whenIdle()
         .then(() => import("./symbiosis"))
         .then(({ SymbiosisScene }) =>
-          mount(
-            (c) => {
-              const sc = new SymbiosisScene(c, items);
-              sc.setTone(darkRef.current);
+          build(
+            (c) => new SymbiosisScene(c, items),
+            (rv) => {
+              const sc = kept.current.get("symbiosis")!.sc as SymbiosisScene;
+              let last = { item: -1, stage: -1 };
               scene.current = sc;
               sc.onFrame = (f: FrameInfo, o: OverlayFrame) => {
+                rv();
                 if (svg.current) drawOverlay(svg.current, o);
                 if (f.item !== last.item || f.stage !== last.stage) {
                   last = { item: f.item, stage: f.stage };
                   setInfo(last);
                 }
               };
-              return sc;
+              return () => sc.still(last.item < 0 ? 0 : last.item, 7.4);
             },
-            () => scene.current?.still(last.item < 0 ? 0 : last.item, 7.4),
           ),
         )
         .catch(() => setOk((o) => ({ ...o, symbiosis: false })));
     } else {
-      let last = { item: -1, phase: -1 };
       whenIdle()
         .then(() => import("./forms/film"))
         .then(({ FormsScene }) =>
-          mount(
-            (c) => {
-              const sc = new FormsScene(c);
-              sc.setTone(darkRef.current);
+          build(
+            (c) => new FormsScene(c),
+            (rv) => {
+              const sc = kept.current.get("forms")!.sc as FormsScene;
+              let last = { item: -1, phase: -1 };
               forms.current = sc;
               sc.onFrame = (f: FormsFrame) => {
+                rv();
                 if (svg.current) drawFormsOverlay(svg.current, f);
                 if (veil.current) veil.current.style.opacity = f.fade.toFixed(3);
                 if (f.item !== last.item || f.phase !== last.phase) {
@@ -280,9 +337,8 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
                   setPack(last);
                 }
               };
-              return sc;
+              return () => sc.still(...FORMS_STILL);
             },
-            () => forms.current?.still(...FORMS_STILL),
           ),
         )
         .catch(() => setOk((o) => ({ ...o, forms: false })));
@@ -292,10 +348,13 @@ export function SymbiosisHero({ samples, lang, children }: { samples: Sample[]; 
       ro?.disconnect();
       io?.disconnect();
       document.removeEventListener("visibilitychange", onVis);
-      run?.dispose();
+      // the film being left stops and keeps its last frame on screen until the next one draws,
+      // then fades out; it stays built (hidden) for a quick return
+      run?.stop();
+      canvas?.classList.remove("is-entering");
+      canvas?.classList.add("is-leaving");
       scene.current = null;
       forms.current = null;
-      canvas?.remove();
       const w = window as unknown as { __hero?: unknown };
       if (run && w.__hero === run) w.__hero = undefined;
     };

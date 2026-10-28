@@ -23,6 +23,9 @@ import { buildForm } from "./build";
 import { LIVE_SWEEP_ENV, makeKit, type Kit } from "./kit";
 import { backdropLook, studioEquirect, sweepGeometry, type Backdrop } from "./studio";
 
+/** A build and what it owns. */
+type Parts = { built: Built | null; kit: Kit | null; own: { dispose: () => void }[]; fresh: boolean };
+
 export type { Pin, PinOnScreen } from "./common";
 
 /** Samples before the path-traced photo is clean enough to fade in over the live view. */
@@ -220,6 +223,25 @@ export class PackScene {
   private centreX = 0;
   private kit: Kit | null = null;
   private own: { dispose: () => void }[] = [];
+  /**
+   * A rebuild waiting for its frame. A click that changes the package (a tab, a direction) first
+   * gets a frame of its own to paint, so the control's highlight starts moving; the rebuild runs
+   * in the next frame, and only one scene rebuilds per frame when several share a page.
+   */
+  private pending: { input: SceneInput; fresh: boolean; wait: number } | null = null;
+  /**
+   * Builds just replaced, kept until the new one has been drawn: their materials hold the
+   * compiled shaders, so the new build reuses them instead of compiling them again.
+   */
+  private retired: { built: Built | null; kit: Kit | null; own: { dispose: () => void }[] }[] = [];
+  /**
+   * A new build being readied off screen while the current one stays in view: its shaders
+   * compiled in the background (KHR_parallel_shader_compile) and its textures uploaded a few
+   * per frame, then swapped in, so no single frame carries the whole cost.
+   */
+  private preparing: (Parts & { ready: boolean }) | null = null;
+  /** The frame in which some scene last rebuilt (one per frame across the page). */
+  private static builtAt = -1;
   private input: SceneInput | null = null;
   private buildKey = "";
   /** Redraws the print when the inscription hand's glyphs arrive. */
@@ -446,8 +468,9 @@ export class PackScene {
     let changed = false;
     if (key !== this.buildKey) {
       this.buildKey = key;
-      this.rebuild(input, !prev || prev.spec.form !== input.spec.form);
-      if (this.backdrop === "brand") this.setBackdrop("brand");
+      const fresh = !prev || prev.spec.form !== input.spec.form || !!this.pending?.fresh;
+      // the first build waits for nothing but its turn; later ones let the click paint first
+      this.pending = { input, fresh, wait: this.built ? 1 : 0 };
       changed = true;
     }
     const now = performance.now();
@@ -463,8 +486,23 @@ export class PackScene {
     if (changed || !prev || prev.fit !== input.fit) this.invalidate();
   }
 
+  /** Does a waiting rebuild now, for callers that use the model straight away (stills, exports). */
+  settle() {
+    const q = this.pending;
+    if (q) {
+      this.pending = null;
+      this.dropPreparing();
+      this.adopt(this.make(q.input, q.fresh));
+    } else if (this.preparing) {
+      const p = this.preparing;
+      this.preparing = null;
+      this.adopt(p);
+    }
+  }
+
   /** Holds the open and anatomy progress at fixed values (for stills and tests). */
   freeze(p: number, x = 0) {
+    this.settle();
     this.openT = tw(p);
     if (this.built?.stages) for (const s of this.built.stages) Object.assign(s, tw(1 - p));
     this.anatomyT = tw(x);
@@ -496,6 +534,7 @@ export class PackScene {
 
   /** The numbered parts of the current package, for the parts list. */
   parts(): { n: number; label: Pair; detail: Pair }[] {
+    this.settle();
     return (this.built?.pins ?? []).map(({ n, label, detail }) => ({ n, label, detail }));
   }
 
@@ -517,29 +556,94 @@ export class PackScene {
     } else aim(this.openT, open ? 1 : 0, now, 1150);
   }
 
-  private rebuild(input: SceneInput, fresh: boolean) {
-    const keepStages = !fresh && this.built?.stages ? this.built.stages.map((s) => ({ ...s })) : null;
-    if (this.built) this.turn.remove(this.built.root);
-    this.disposeBuilt();
+  /** Builds the package for `input` without showing it. */
+  private make(input: SceneInput, fresh: boolean): Parts {
+    const own: { dispose: () => void }[] = [];
     const a: ArtInput = { d: input.d, brand: input.brand, finish: input.spec.finish, effects: input.spec.effects ?? [], info: input.info ?? null };
     const category = input.category ?? "other";
-    this.kit = makeKit(this.renderer, a, this.maxTex, category);
-    const b = buildForm({ spec: input.spec, kit: this.kit, art: a, maxTex: this.maxTex, own: this.own, category });
+    const kit = makeKit(this.renderer, a, this.maxTex, category);
+    const built = buildForm({ spec: input.spec, kit, art: a, maxTex: this.maxTex, own, category });
+    return { built, kit, own, fresh };
+  }
+
+  /** Shows a build in place of the current one (which retires once the new one has drawn). */
+  private adopt(p: Parts) {
+    const b = p.built!;
+    const keepStages = !p.fresh && this.built?.stages ? this.built.stages.map((s) => ({ ...s })) : null;
+    if (this.built) {
+      this.turn.remove(this.built.root);
+      this.retired.push({ built: this.built, kit: this.kit, own: this.own });
+    }
     if (keepStages && b.stages) b.stages.forEach((s, i) => Object.assign(s, keepStages[i]));
+    else if (p.fresh && b.stages) for (const s of b.stages) Object.assign(s, tw(1 - (this.input?.open ? 1 : 0)));
     this.built = b;
+    this.kit = p.kit;
+    this.own = p.own;
     this.turn.add(b.root);
+    if (this.backdrop === "brand") this.setBackdrop("brand");
+    this.ptActive = false;
+    this.dirty = true;
+    // a renderer that is not drawing (hidden) would keep the old build forever: let it go now
+    if (!this.visible) this.disposeRetired();
+  }
+
+  /** Readies a build off screen (see `preparing`): shaders compiled in the background, textures uploaded a few per frame. */
+  private prepare(p: Parts) {
+    const prep = { ...p, ready: false };
+    this.preparing = prep;
+    const r = this.renderer;
+    const finish = () => {
+      if (this.preparing !== prep) return;
+      prep.ready = true;
+      this.request();
+    };
+    // the first build too: a new page's 3D appears once its shaders are compiled off the main
+    // thread, instead of freezing the page (and the click that opened it) while they compile
+    if (typeof r.compileAsync !== "function") return finish();
+    const textures = new Set<THREE.Texture>();
+    p.built!.root.traverse((o) => {
+      const m = (o as THREE.Mesh).material;
+      if (!m) return;
+      for (const mat of Array.isArray(m) ? m : [m]) for (const v of Object.values(mat)) if (v && (v as THREE.Texture).isTexture) textures.add(v as THREE.Texture);
+    });
+    const queue = [...textures];
+    const upload = () => {
+      if (this.preparing !== prep) return;
+      const t0 = performance.now();
+      while (queue.length && performance.now() - t0 < 8) r.initTexture(queue.shift()!);
+      if (queue.length) requestAnimationFrame(upload);
+      else finish();
+    };
+    r.compileAsync(p.built!.root, this.camera, this.scene)
+      .then(() => requestAnimationFrame(upload))
+      .catch(finish);
+  }
+
+  private dropPreparing() {
+    if (!this.preparing) return;
+    PackScene.disposeParts(this.preparing);
+    this.preparing = null;
+  }
+
+  private static disposeParts(p: { built: Built | null; kit: Kit | null; own: { dispose: () => void }[] }) {
+    p.built?.root.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.geometry) m.geometry.dispose();
+    });
+    p.built?.lines?.dispose();
+    p.kit?.dispose();
+    p.own.forEach((x) => x.dispose());
+  }
+
+  private disposeRetired() {
+    for (const r of this.retired) PackScene.disposeParts(r);
+    this.retired = [];
   }
 
   private disposeBuilt() {
-    if (this.built) {
-      this.built.root.traverse((o) => {
-        const m = o as THREE.Mesh;
-        if (m.geometry) m.geometry.dispose();
-      });
-      this.built.lines?.dispose();
-    }
-    this.kit?.dispose();
-    this.own.forEach((x) => x.dispose());
+    this.disposeRetired();
+    this.dropPreparing();
+    PackScene.disposeParts({ built: this.built, kit: this.kit, own: this.own });
     this.own = [];
     this.kit = null;
   }
@@ -580,7 +684,26 @@ export class PackScene {
 
   private tick = (now: number) => {
     this.frame = 0;
-    if (!this.visible || !this.built || !this.input) return;
+    if (!this.visible || !this.input) return;
+    if (this.pending) {
+      // let the page paint once first, and leave this frame to a scene that already rebuilt in it
+      if (this.pending.wait > 0 || PackScene.builtAt === now) {
+        this.pending.wait = Math.max(0, this.pending.wait - 1);
+        this.request();
+        return;
+      }
+      PackScene.builtAt = now;
+      const q = this.pending;
+      this.pending = null;
+      this.dropPreparing();
+      this.prepare(this.make(q.input, q.fresh));
+    }
+    if (this.preparing?.ready) {
+      const p = this.preparing;
+      this.preparing = null;
+      this.adopt(p);
+    }
+    if (!this.built) return;
     let moving = false;
     if (this.built.stages) for (const s of this.built.stages) moving = step(s, now) || moving;
     moving = step(this.openT, now) || moving;
@@ -693,6 +816,8 @@ export class PackScene {
     this.shadow.update(this.renderer, this.scene, above ? 0.62 * shadowK : 0);
     if (this.sweep) this.sweep.visible = above;
     this.renderer.render(this.scene, this.camera);
+    // the new build is drawn (its shaders taken over from the old one): the old can go
+    if (this.retired.length) this.disposeRetired();
     this.emitPins();
     this.afterRender?.(this.canvas);
     if (!this.firstFrame) {
@@ -729,6 +854,7 @@ export class PackScene {
    * on `background`.
    */
   async exportImage(scale = 2, background: string | ((ctx: CanvasRenderingContext2D, w: number, h: number) => void) = "#ffffff", samples = 160): Promise<Blob> {
+    this.settle();
     if (this.canPathTrace()) {
       const frame = await new Promise<HTMLCanvasElement>((resolve) => {
         // past the clean threshold plus the fade-in, so the export is the finished photo

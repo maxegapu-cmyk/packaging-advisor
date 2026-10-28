@@ -33,6 +33,13 @@ export function usePack(): PackCtxValue {
  */
 export function PackProvider({ initial, saveUrl, studioBase, category, children }: { initial: PackSpec; saveUrl?: string; studioBase?: string; category?: string; children: ReactNode }) {
   const [spec, setLocal] = useState(initial);
+  // a new starting pack (another sample) replaces the local one, without remounting the boxes:
+  // their 3D scenes stay and only redraw, so switching samples does not rebuild WebGL contexts
+  const [base, setBase] = useState(initial);
+  if (base !== initial) {
+    setBase(initial);
+    setLocal(initial);
+  }
   const [saving, setSaving] = useState<PackCtxValue["saving"]>("idle");
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const setSpec = (s: PackSpec) => {

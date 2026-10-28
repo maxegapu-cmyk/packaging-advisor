@@ -5,22 +5,18 @@ art use for inscriptions and title slips, straight from the font's Glyphs source
     git clone --depth 1 https://github.com/TrionesType/zhuque
     python3 scripts/fonts/build_zhuque.py <path to zhuque>
 
-It decomposes every glyph into a CFF outline, then slices the font into small WOFF2 files by
-Unicode range, the way web font services do, so a page downloads only the slices for the
-characters it shows: public/fonts/zhuque/zq-NN.woff2, their @font-face rules in
-src/app/fonts.css, and the licence beside them. Needs fontTools; brotli is optional (without it,
-Node's zlib compresses, see shim/brotli.py).
+It decomposes every glyph into a CFF outline, then slices the font by Unicode range (slicer.py)
+so a page downloads only the slices for the characters it shows: public/fonts/zhuque/zq-NNN.woff2,
+their @font-face rules in src/app/fonts.css, and the licence beside them. Needs fontTools; brotli
+is optional (without it, Node's zlib compresses, see shim/brotli.py).
 """
 import os
 import re
 import sys
-from collections import Counter
 from pathlib import Path
 
-try:
-    import brotli  # noqa: F401
-except ImportError:
-    sys.path.insert(0, str(Path(__file__).parent / "shim"))
+sys.path.insert(0, str(Path(__file__).parent))
+from slicer import slice_font, wanted  # noqa: E402
 
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
 from fontTools.fontBuilder import FontBuilder
@@ -29,9 +25,7 @@ from fontTools.pens.boundsPen import BoundsPen
 from fontTools.pens.recordingPen import RecordingPen
 from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.pens.transformPen import TransformPen
-from fontTools.subset import Options, Subsetter
 from io import BytesIO
-from fontTools.ttLib import TTFont
 
 FAMILY = "Zhuque Fangsong"
 ROOT = Path(__file__).resolve().parents[2]
@@ -161,42 +155,12 @@ def draw(glyphs, name, pen, depth=0):
         pen.closePath()
 
 
-def gb2312():
-    """GB 2312's hanzi in its own order: level 1 (common, by pinyin), then level 2."""
-    one, two = [], []
-    for hi in range(0xB0, 0xF8):
-        for lo in range(0xA1, 0xFF):
-            try:
-                c = bytes([hi, lo]).decode("gb2312")
-            except UnicodeDecodeError:
-                continue
-            (one if hi < 0xD8 else two).append(ord(c))
-    return one, two
-
-
-def ranges(cps):
-    cps = sorted(set(cps))
-    out = []
-    start = prev = cps[0]
-    for c in cps[1:]:
-        if c == prev + 1:
-            prev = c
-            continue
-        out.append((start, prev))
-        start = prev = c
-    out.append((start, prev))
-    return ", ".join(f"U+{a:X}" if a == b else f"U+{a:X}-{b:X}" for a, b in out)
-
-
 def main(src):
     info, glyphs = load_glyphs(src)
     cmap = {}
     for name, g in glyphs.items():
         for u in g["unicodes"]:
             cmap.setdefault(u, name)
-    # what the web font carries: Latin and punctuation, CJK symbols and full-width forms, every hanzi
-    def wanted(u):
-        return 0x20 <= u <= 0x7E or 0xA0 <= u <= 0x17F or 0x2000 <= u <= 0x206F or 0x3000 <= u <= 0x303F or 0xFF00 <= u <= 0xFFEF or 0x3400 <= u <= 0x9FFF or 0xF900 <= u <= 0xFAFF
     cmap = {u: n for u, n in cmap.items() if wanted(u)}
     # vertical forms of punctuation (。，「」 set upright in a column), for the vert feature
     verts = {n: n + ".vert" for n in set(cmap.values()) if n + ".vert" in glyphs}
@@ -240,43 +204,7 @@ def main(src):
     fb.font.save(full)
     print("full font:", len(order), "glyphs,", len(verts), "vertical forms,", round(len(full.getvalue()) / 1e6, 2), "MB")
 
-    # slices: Latin and punctuation; then the hanzi this app's own text uses, most used first, so a
-    # page's headings come from a few slices; then the rest of GB 2312 in its order; then the rest
-    have = set(cmap)
-    one, two = gb2312()
-    base = [u for u in have if u < 0x3400 or 0xFF00 <= u <= 0xFFEF]
-    used = Counter()
-    for f in list((ROOT / "src").rglob("*.ts")) + list((ROOT / "src").rglob("*.tsx")):
-        used.update(ord(ch) for ch in f.read_text("utf-8") if 0x3400 <= ord(ch) <= 0x9FFF)
-    own = [u for u, _ in used.most_common() if u in have]
-    taken = set(base) | set(own)
-    slices = [base]
-    for group, size in ((own, 60), ([u for u in one if u not in taken], 80), ([u for u in two if u not in taken], 100), (sorted(u for u in have if u not in taken | set(one) | set(two)), 160)):
-        g = [u for u in group if u in have]
-        slices += [g[i:i + size] for i in range(0, len(g), size)]
-    OUT.mkdir(parents=True, exist_ok=True)
-    for f in OUT.glob("zq-*.woff2"):
-        f.unlink()
-    rules = []
-    total = 0
-    for i, cps in enumerate(slices):
-        font = TTFont(BytesIO(full.getvalue()))
-        opts = Options()
-        opts.flavor = "woff2"
-        opts.layout_features = ["vert", "vrt2"]
-        opts.notdef_outline = True
-        opts.name_IDs = ["*"]
-        opts.name_languages = ["*"]
-        opts.drop_tables += ["FFTM"]
-        sub = Subsetter(opts)
-        sub.populate(unicodes=cps)
-        sub.subset(font)
-        name = f"zq-{i:03d}.woff2"
-        font.flavor = "woff2"
-        font.save(OUT / name)
-        total += (OUT / name).stat().st_size
-        rules.append(f'@font-face {{ font-family: "{FAMILY}"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/zhuque/{name}") format("woff2"); unicode-range: {ranges(cps)}; }}')
-    print("slices:", len(slices), "total", round(total / 1e6, 2), "MB")
+    rules = slice_font(full.getvalue(), FAMILY, OUT, "zq", "/fonts/zhuque/")
     (OUT / "OFL.txt").write_text((Path(src) / "LICENSE.txt").read_text("utf-8"), "utf-8")
     CSS.write_text(
         "/* 朱雀仿宋 Zhuque Fangsong (SIL OFL 1.1, TrionesType), sliced by Unicode range so a page loads only\n"

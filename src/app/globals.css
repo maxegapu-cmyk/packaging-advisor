@@ -179,7 +179,8 @@ code { font-family: var(--mono); font-size: 0.86em; }
 /* ---------- Segmented controls and tabs: the sliding highlight (SegPill) ---------- */
 .seg { position: relative; isolation: isolate; }
 .seg > button, .seg > label, .seg > a { position: relative; z-index: 1; }
-.seg-pill { position: absolute; left: 0; top: 0; z-index: 0; width: 0; height: 0; border-radius: var(--r-pill); background: var(--ink); opacity: 0; pointer-events: none; transition: transform 0.42s var(--ease), width 0.42s var(--ease), height 0.42s var(--ease), opacity 0.25s; }
+/* the glide itself is a transform-only animation started by SegPill.tsx (compositor-driven, smooth under load) */
+.seg-pill { position: absolute; left: 0; top: 0; z-index: 0; width: 0; height: 0; border-radius: var(--r-pill); background: var(--ink); opacity: 0; pointer-events: none; transform-origin: 0 0; will-change: transform; transition: opacity 0.25s; }
 .seg-pill.seg-line { border-radius: 0; background: transparent; }
 .seg-pill.seg-line::after { content: ""; position: absolute; left: 22%; right: 22%; bottom: 0; height: 2px; background: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .seg-pill { transition: opacity 0.2s; } .fade-in { animation: none; } }
@@ -294,7 +295,7 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
   .is-zh .band > .band-h {
     position: sticky; top: 96px; margin: 0; writing-mode: vertical-rl;
     min-height: 11em; padding: 48px 15px 26px;
-    font-family: var(--hand); font-size: clamp(23px, 1.85vw, 28px); line-height: 1.3; letter-spacing: 0.2em; font-weight: 400;
+    font-family: var(--hand); font-size: clamp(25px, 2vw, 30px); line-height: 1.3; letter-spacing: 0.2em; font-weight: 400;
     background: var(--surface) var(--fishtail) no-repeat center 18px / 15px 11px;
     border: 1px solid var(--ink-2); box-shadow: inset 0 0 0 3px var(--surface), inset 0 0 0 4px var(--rule-strong);
   }
@@ -1221,7 +1222,11 @@ textarea.short { min-height: 72px; }
 /* the film is the painting on silk, mounted (装裱) on the 天青 page: a hairline at its edge, a second line outside */
 .sym { position: relative; height: clamp(620px, calc(100svh - 64px - var(--mount)), 940px); margin: var(--mount) var(--mount) 0; overflow: hidden; background: var(--film-bg); isolation: isolate; border: 1px solid var(--rule-strong); box-shadow: 0 0 0 5px var(--canvas), 0 0 0 6px var(--rule-strong); transition: background-color 0.6s var(--ease); }
 .sym-stage { position: absolute; inset: 0; }
-.sym-canvas { display: block; width: 100%; height: 100%; }
+.sym-canvas { display: block; width: 100%; height: 100%; transition: opacity 0.45s var(--ease); }
+/* switching films: the new one fades in over the old one's last frame, then the old one goes */
+.sym-canvas.is-entering { opacity: 0; }
+.sym-canvas.is-leaving { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.sym-canvas.is-leaving.is-gone { opacity: 0; }
 .sym-2d { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 /* the symbiosis film's 2D layer: drawn on the press sheet, so in ink on paper in either theme */
 .sym-dim { font: 600 12.5px var(--sans); fill: #1d1c19; paint-order: stroke; stroke: #f8f6f0; stroke-width: 4px; letter-spacing: 0.02em; }

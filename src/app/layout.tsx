@@ -4,6 +4,8 @@ import "./globals.css";
 import { InscriptionFont } from "@/components/InscriptionFont";
 import { THEME_SCRIPT } from "@/lib/theme";
 
+const SHOUJIN_CSS = /\.css(\?|$)/.test(process.env.NEXT_PUBLIC_SHOUJIN_FONT_URL ?? "") ? process.env.NEXT_PUBLIC_SHOUJIN_FONT_URL : "";
+
 export const metadata: Metadata = {
   title: "包装视觉顾问 Packaging Advisor",
   description: "上传产品照片，得到三个可交给设计师的包装方向。 Upload a product photo and get three packaging directions.",
@@ -25,6 +27,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="zh-CN" data-theme="light" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        {/* a licensed 瘦金体, when configured (lib/fonts.ts) */}
+        {SHOUJIN_CSS ? <link rel="stylesheet" href={SHOUJIN_CSS} /> : null}
       </head>
       <body>
         <InscriptionFont />

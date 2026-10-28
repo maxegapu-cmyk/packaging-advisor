@@ -2,9 +2,10 @@
  * The calligraphic face for inscriptions and title slips (题签), on the page and on the package.
  *
  *   瘦金体 Slender Gold — Emperor Huizong's hand, the Song inscription script. No 瘦金体 font is
- *     free for commercial use, so it is used only when a licensed web font is configured:
- *     NEXT_PUBLIC_SHOUJIN_FONT_URL (for example /fonts/shoujin/FZShouJinShu.woff2, bought from
- *     FounderType or Hanyi with a web-embedding licence that also covers print).
+ *     free for commercial use, so it is used only when a licensed one is configured:
+ *     NEXT_PUBLIC_SHOUJIN_FONT_URL, the stylesheet scripts/fonts/add_shoujin.py writes (set
+ *     automatically when public/fonts/shoujin/shoujin.css exists at build time) or a single font
+ *     file. The licence must cover web embedding and print.
  *   朱雀仿宋 Zhuque Fangsong — an open (SIL OFL 1.1) face cut after a Republican-era revival of
  *     Song book type; bundled in public/fonts/zhuque and sliced by Unicode range (src/app/fonts.css).
  *   楷 — the system's Kaiti, last.
@@ -30,16 +31,44 @@ const shoujinUrl = (() => {
 /** Whether a licensed 瘦金体 is configured for this deployment. */
 export const hasShoujin = () => !!shoujinUrl;
 
-let registered = false;
-/** Adds the configured 瘦金体 face to the page (it loads when first used). */
-export function registerShoujin(): void {
-  if (registered || !shoujinUrl || typeof document === "undefined" || !document.fonts || typeof FontFace === "undefined") return;
-  registered = true;
-  try {
-    document.fonts.add(new FontFace(SHOUJIN, `url("${shoujinUrl}")`, { display: "swap" }));
-  } catch {
-    // a bad URL leaves the stack to the next face
-  }
+let registered: Promise<void> | null = null;
+/**
+ * Adds the configured 瘦金体 to the page: a stylesheet of sliced faces (loaded when first used) or
+ * one font file. Resolves when the faces are known to the page (or could not be added).
+ */
+export function registerShoujin(): Promise<void> {
+  if (registered) return registered;
+  if (!shoujinUrl || typeof document === "undefined" || !document.fonts || typeof FontFace === "undefined") return Promise.resolve();
+  registered = new Promise<void>((done) => {
+    try {
+      if (/\.css(\?|$)/.test(shoujinUrl)) {
+        // the layout puts the stylesheet in the page's head; add it only where it is missing
+        const had = [...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].find((l) => l.href === new URL(shoujinUrl, location.href).href);
+        if (had) {
+          if (had.sheet) done();
+          else {
+            had.addEventListener("load", () => done());
+            had.addEventListener("error", () => done());
+          }
+          return;
+        }
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = shoujinUrl;
+        link.dataset.font = SHOUJIN;
+        link.onload = () => done();
+        link.onerror = () => done();
+        document.head.appendChild(link);
+      } else {
+        document.fonts.add(new FontFace(SHOUJIN, `url("${shoujinUrl}")`, { display: "swap" }));
+        done();
+      }
+    } catch {
+      // a bad address leaves the stack to the next face
+      done();
+    }
+  });
+  return registered;
 }
 
 let epoch = 0;
@@ -72,13 +101,34 @@ export function loadInscription(text: string): Promise<boolean> {
   return p;
 }
 
+/** Whether `cp` falls in a CSS unicode-range ("U+4E00-9FFF, U+3001"). */
+function inRange(range: string, cp: number): boolean {
+  for (const part of range.split(",")) {
+    const m = /U\+([0-9A-F?]+)(?:-([0-9A-F]+))?/i.exec(part.trim());
+    if (!m) continue;
+    const a = parseInt(m[1].replace(/\?/g, "0"), 16);
+    const b = m[2] ? parseInt(m[2], 16) : m[1].includes("?") ? parseInt(m[1].replace(/\?/g, "F"), 16) : a;
+    if (cp >= a && cp <= b) return true;
+  }
+  return false;
+}
+
 async function load(text: string): Promise<boolean> {
-  registerShoujin();
-  const fams = shoujinUrl ? [SHOUJIN, ZHUQUE] : [ZHUQUE];
+  await registerShoujin();
+  // 瘦金体 for everything it covers; 朱雀仿宋 only for the characters it does not, so a page with
+  // the licensed face downloads no 朱雀 slices it will not use
+  const jobs: [string, string][] = [];
+  let rest = text;
+  if (shoujinUrl) {
+    jobs.push([SHOUJIN, text]);
+    const faces = Array.from(document.fonts).filter((f) => f.family.replace(/["']/g, "") === SHOUJIN);
+    if (faces.length) rest = Array.from(text).filter((ch) => !faces.some((f) => inRange(f.unicodeRange, ch.codePointAt(0)!))).join("");
+  }
+  if (rest.trim()) jobs.push([ZHUQUE, rest]);
   try {
     // already there (or nothing to load): canvas text drawn so far was right
-    if (fams.every((f) => document.fonts.check(`400 40px "${f}"`, text))) return false;
-    const lists = await Promise.all(fams.map((f) => document.fonts.load(`400 40px "${f}"`, text).catch(() => [] as FontFace[])));
+    if (jobs.every(([f, t]) => document.fonts.check(`400 40px "${f}"`, t))) return false;
+    const lists = await Promise.all(jobs.map(([f, t]) => document.fonts.load(`400 40px "${f}"`, t).catch(() => [] as FontFace[])));
     const fresh = lists.some((faces) => faces.some((f) => f.status === "loaded"));
     if (fresh) {
       epoch++;

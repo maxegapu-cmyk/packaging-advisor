@@ -547,6 +547,8 @@ export class SymbiosisScene {
   private t0 = 0;
   private raf = 0;
   private running = false;
+  /** Whether the first start has compiled the shaders yet. */
+  private compiled = false;
   private shiftX = 0;
   /** Override for the sideways framing (fraction of the width; null = automatic). */
   private shiftOverride: number | null = null;
@@ -932,6 +934,19 @@ export class SymbiosisScene {
   start() {
     if (this.running) return;
     this.running = true;
+    // the first start compiles the shaders off the main thread (KHR_parallel_shader_compile)
+    // before the first frame, so switching to this film does not freeze the page while they
+    // compile; until then the film being left keeps its last frame on screen
+    if (!this.compiled) {
+      this.compiled = true;
+      const go = () => {
+        if (!this.running) return;
+        this.running = false;
+        this.start();
+      };
+      this.renderer.compileAsync(this.scene, this.camera).then(go, go);
+      return;
+    }
     const base = performance.now() / 1000;
     if (!this.t0) this.t0 = base;
     const loop = () => {

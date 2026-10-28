@@ -1,8 +1,14 @@
+import { existsSync } from "node:fs";
 import type { NextConfig } from "next";
+
+// a licensed 瘦金体, sliced by scripts/fonts/add_shoujin.py into public/fonts/shoujin (git-ignored),
+// becomes the inscription face; NEXT_PUBLIC_SHOUJIN_FONT_URL can point elsewhere instead
+const shoujin = process.env.NEXT_PUBLIC_SHOUJIN_FONT_URL || (existsSync("public/fonts/shoujin/shoujin.css") ? "/fonts/shoujin/shoujin.css" : "");
 
 const nextConfig: NextConfig = {
   // Standalone output keeps the Docker image small.
   output: "standalone",
+  env: { NEXT_PUBLIC_SHOUJIN_FONT_URL: shoujin },
   // sharp is native; keep it out of the server bundle.
   serverExternalPackages: ["sharp"],
   // Skill files are read at runtime from ./skills; ship them with the standalone build.

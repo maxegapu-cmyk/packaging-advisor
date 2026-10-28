@@ -135,6 +135,8 @@ export class FormsScene {
   private t0 = 0;
   private raf = 0;
   private running = false;
+  /** Whether the first start has compiled the shaders yet. */
+  private compiled = false;
   private maxTex: number;
   private job: Job | null = null;
   onFrame?: (f: FormsFrame) => void;
@@ -845,6 +847,18 @@ export class FormsScene {
   start() {
     if (this.running) return;
     this.running = true;
+    // the first start compiles the shaders off the main thread before the first frame (see
+    // SymbiosisScene.start)
+    if (!this.compiled) {
+      this.compiled = true;
+      const go = () => {
+        if (!this.running) return;
+        this.running = false;
+        this.start();
+      };
+      this.renderer.compileAsync(this.scene, this.camera).then(go, go);
+      return;
+    }
     if (!this.t0) this.t0 = performance.now() / 1000;
     const loop = () => {
       if (!this.running) return;
