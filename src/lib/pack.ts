@@ -52,11 +52,22 @@ export const INSERT_LABELS: Record<Insert, Pair> = {
 
 export type InnerSpec = { form: InnerForm; count: 1 | 2; w: number; h: number; d: number; insert?: Insert };
 /**
- * `materials` holds the seller's picks from the principal's material list, by part ("wrap",
- * "insert", "inner.body"…) → material number ("M019"); parts not named use their default (see
- * src/lib/materials).
+ * The seller's choices for one material part (see src/lib/materials): the material number from the
+ * principal's list ("none" drops a process material such as a lamination film), and their own
+ * grade or thickness, colour (#RRGGBB, shown in 3D where the part is drawn), supplier and note,
+ * and whether the part touches the contents (which decides the food and cosmetics rules).
  */
-export type PackSpec = { form: Form; w: number; h: number; d: number; finish: Finish; effects?: Effect[]; inner?: InnerSpec | null; materials?: Record<string, string> };
+export type MaterialPick = { id?: string; grade?: string; color?: string; supplier?: string; note?: string; contact?: "direct" | "outer" };
+/** A part the seller adds (a sticker, a ribbon, a desiccant sachet…), made of a listed material. */
+export type ExtraPart = { key: string; label: string; id: string; inner?: boolean } & Omit<MaterialPick, "id">;
+/** How the pack is used, when the seller says so (otherwise read from the structure). */
+export type PackUsage = { courier?: boolean; shoppingBag?: boolean };
+
+/**
+ * `materials` holds the seller's picks by part ("wrap", "insert", "inner.body", "process.film",
+ * "off.magnets"…); parts not named use their defaults. `extraParts` are parts the seller added.
+ */
+export type PackSpec = { form: Form; w: number; h: number; d: number; finish: Finish; effects?: Effect[]; inner?: InnerSpec | null; materials?: Record<string, MaterialPick>; extraParts?: ExtraPart[]; usage?: PackUsage };
 
 /** Turns an effect on or off, keeping a single foil and a single pressing. */
 export function withEffect(spec: PackSpec, e: Effect, on: boolean): PackSpec {
@@ -240,6 +251,37 @@ const clampDim = (v: unknown, fallback: number) => {
   return Math.round(Math.max(DIM_RANGE.min, Math.min(DIM_RANGE.max, n)));
 };
 
+const text = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, max) : "");
+
+/** One part's choices, cleaned (a bare string is a material number, as first stored). */
+function pickFields(v: unknown): MaterialPick | null {
+  if (typeof v === "string") return /^(M\d{3}|none)$/.test(v) ? { id: v } : null;
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  const out: MaterialPick = {};
+  if (typeof o.id === "string" && /^(M\d{3}|none)$/.test(o.id)) out.id = o.id;
+  const grade = text(o.grade, 40);
+  const supplier = text(o.supplier, 60);
+  const note = text(o.note, 160);
+  if (grade) out.grade = grade;
+  if (supplier) out.supplier = supplier;
+  if (note) out.note = note;
+  if (typeof o.color === "string" && /^#[0-9a-fA-F]{6}$/.test(o.color)) out.color = o.color.toUpperCase();
+  if (o.contact === "direct" || o.contact === "outer") out.contact = o.contact;
+  return Object.keys(out).length ? out : null;
+}
+
+function normalizePicks(v: unknown, hasInner: boolean): Record<string, MaterialPick> | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const out: Record<string, MaterialPick> = {};
+  for (const [k, raw] of Object.entries(v as Record<string, unknown>).slice(0, 48)) {
+    if (!/^(inner\.)?(process\.|off\.)?[a-z][A-Za-z]{0,15}$/.test(k) || (!hasInner && k.startsWith("inner."))) continue;
+    const p = pickFields(raw);
+    if (p) out[k] = p;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 /** Accepts anything (stored JSON, request body) and returns a valid spec. */
 export function normalizePack(v: unknown, fallback: PackSpec = DEFAULT_PACK): PackSpec {
   let o: Record<string, unknown> = {};
@@ -277,14 +319,29 @@ export function normalizePack(v: unknown, fallback: PackSpec = DEFAULT_PACK): Pa
   const base: PackSpec = { form, w, h, d, finish };
   if (effects.length && takesEffects({ form, inner })) base.effects = effects;
   if (inner) base.inner = inner;
-  // material picks: well-formed part keys and material numbers only; whether a pick is a real
-  // option for the part is the materials module's call (an unknown one falls back to the default)
-  const mo = o.materials;
-  if (mo && typeof mo === "object" && !Array.isArray(mo)) {
-    const picks: Record<string, string> = {};
-    for (const [k, v] of Object.entries(mo as Record<string, unknown>).slice(0, 24))
-      if (/^(inner\.)?[a-z][A-Za-z]{0,15}$/.test(k) && typeof v === "string" && /^M\d{3}$/.test(v) && (inner || !k.startsWith("inner."))) picks[k] = v;
-    if (Object.keys(picks).length) base.materials = picks;
+  // material choices: well-formed keys and fields only; whether a pick suits its part is the
+  // materials module's call (an unknown part or number falls back to the default)
+  const picks = normalizePicks(o.materials, !!inner);
+  if (picks) base.materials = picks;
+  if (Array.isArray(o.extraParts)) {
+    const extras: ExtraPart[] = [];
+    for (const x of o.extraParts.slice(0, 12)) {
+      if (!x || typeof x !== "object") continue;
+      const e = x as Record<string, unknown>;
+      const fields = pickFields(e);
+      const label = text(e.label, 24);
+      if (!fields || !label || typeof e.key !== "string" || !/^x[0-9a-z]{1,8}$/.test(e.key) || !fields.id || fields.id === "none") continue;
+      if (extras.some((y) => y.key === e.key)) continue;
+      extras.push({ ...fields, key: e.key, label, id: fields.id, ...(e.inner === true && inner ? { inner: true } : {}) });
+    }
+    if (extras.length) base.extraParts = extras;
+  }
+  if (o.usage && typeof o.usage === "object") {
+    const u = o.usage as Record<string, unknown>;
+    const usage: PackUsage = {};
+    if (typeof u.courier === "boolean") usage.courier = u.courier;
+    if (typeof u.shoppingBag === "boolean") usage.shoppingBag = u.shoppingBag;
+    if (Object.keys(usage).length) base.usage = usage;
   }
   return base;
 }

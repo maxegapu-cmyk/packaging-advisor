@@ -454,7 +454,9 @@ export function Studio({
     const keep = isOuter(form) && spec.inner ? { inner: spec.inner } : {};
     // picks for the product inside travel with it
     const innerPicks = keep.inner && spec.materials ? Object.fromEntries(Object.entries(spec.materials).filter(([k]) => k.startsWith("inner."))) : null;
-    setSpec({ ...FORM_PRESET[form], finish: spec.finish, ...keep, ...(innerPicks && Object.keys(innerPicks).length ? { materials: innerPicks } : {}) });
+    // so do the parts the seller added
+    const extras = spec.extraParts?.filter((x) => !x.inner || keep.inner);
+    setSpec({ ...FORM_PRESET[form], finish: spec.finish, ...keep, ...(innerPicks && Object.keys(innerPicks).length ? { materials: innerPicks } : {}), ...(extras?.length ? { extraParts: extras } : {}) });
     orbit.tween(REST_ANGLE, 700, 1);
   };
   const changeInner = (form: InnerForm | null) => {

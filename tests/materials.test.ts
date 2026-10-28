@@ -70,10 +70,13 @@ test("the finish decides a printed sheet: coated under film, specialty uncoated,
   assert.ok(!optionsFor(wrap, "paper").includes("M019"));
   assert.deepEqual(optionsFor(wrap, "xuan"), [HANDMADE]);
   assert.deepEqual(optionsFor(wrap, "goldFleck"), [HANDMADE]);
-  // a pick that no longer fits the finish falls back to the default
-  const s = spec({ form: "gift", finish: "matte", materials: { wrap: "M020" } });
+  // the seller's pick stands whatever the finish (the recommendations change, the choice is theirs)
+  const s = spec({ form: "gift", finish: "matte", materials: { wrap: { id: "M020" } } });
   assert.equal(pick(s, "wrap", wrap), "M020");
-  assert.equal(pick({ ...s, finish: "paper" }, "wrap", wrap), optionsFor(wrap, "paper")[0]);
+  assert.equal(pick({ ...s, finish: "paper" }, "wrap", wrap), "M020");
+  // …but a xuan finish with a wrap that is not the handmade paper is flagged
+  const xs = { ...s, finish: "xuan" as const };
+  assert.ok(problemsOf(usesOf(xs, "tea"), xs).some((p) => p.level === "warn" && p.key === "wrap"));
   // a xuan carton is white board faced with the handmade paper; a xuan gift box's wrap is the paper
   const carton = usesOf(spec({ form: "carton", finish: "xuan" }), "tea");
   assert.equal(carton.find((u) => u.key === "body")!.id, "M001");
@@ -85,16 +88,16 @@ test("the finish decides a printed sheet: coated under film, specialty uncoated,
   assert.ok(!usesOf(spec({ form: "tin", w: 86, h: 120, d: 86, finish: "matte" }), "tea").some((u) => u.id === "M053"));
 });
 
-test("picks are validated and kept small: unknown or default picks drop away", () => {
-  const n = normalizePack({ form: "gift", w: 200, h: 80, d: 150, finish: "matte", materials: { wrap: "M020", core: "M999", "bad key": "M001", insert: "nope", "inner.body": "M100" } });
-  assert.deepEqual(n.materials, { wrap: "M020", core: "M999" });
-  // inner picks only with an inner product
+test("choices are validated and kept small: unknown parts, bad fields and defaults drop away", () => {
+  const n = normalizePack({ form: "gift", w: 200, h: 80, d: 150, finish: "matte", materials: { wrap: "M020", core: "M999", "bad key": "M001", insert: "nope", "inner.body": "M100", tray: { id: "M036", color: "red", grade: "x".repeat(80), contact: "inside" } } });
+  assert.deepEqual(n.materials, { wrap: { id: "M020" }, core: { id: "M999" }, tray: { id: "M036", grade: "x".repeat(40) } });
+  // tray is not a part of the gift box, M999 is not on the list
   const p = pruneMaterials(n);
-  assert.deepEqual(p.materials, { wrap: "M020" });
+  assert.deepEqual(p.materials, { wrap: { id: "M020" } });
   const back = withMaterial(p, "wrap", "M019");
   assert.equal(back.materials, undefined);
   const combo = withMaterial(spec({ form: "gift", w: 200, h: 80, d: 150, inner: { form: "tin", count: 2, w: 80, h: 100, d: 80 } }), "inner.body", "M101");
-  assert.deepEqual(combo.materials, { "inner.body": "M101" });
+  assert.deepEqual(combo.materials, { "inner.body": { id: "M101" } });
   assert.equal(usesOf(combo, "tea").find((u) => u.key === "inner.body")!.id, "M101");
 });
 
@@ -163,10 +166,10 @@ test("documents and the print line name each material once", () => {
 
 test("3D looks and pin words follow the picks", () => {
   assert.deepEqual(lookOf(spec({})).board, { inside: "#D9D4C8", edge: "#ECE7DC" });
-  assert.equal(lookOf(spec({ materials: { body: "M002" } })).board!.inside, "#9C988F");
-  assert.equal(lookOf(spec({ form: "brocade", w: 240, h: 96, d: 180, materials: { toggle: "M111" } })).toggle!.color, "#5C3B26");
-  assert.equal(lookOf(spec({ form: "paperTube", w: 80, h: 140, d: 80, materials: { liner: "M094" } })).liner, "paper");
-  const w = materialWords(spec({ form: "gift", w: 200, h: 80, d: 150, finish: "matte", materials: { wrap: "M020" } }), "tea");
+  assert.equal(lookOf(spec({ materials: { body: { id: "M002" } } })).board!.inside, "#9C988F");
+  assert.equal(lookOf(spec({ form: "brocade", w: 240, h: 96, d: 180, materials: { toggle: { id: "M111" } } })).toggle!.color, "#5C3B26");
+  assert.equal(lookOf(spec({ form: "paperTube", w: 80, h: 140, d: 80, materials: { liner: { id: "M094" } } })).liner, "paper");
+  const w = materialWords(spec({ form: "gift", w: 200, h: 80, d: 150, finish: "matte", materials: { wrap: { id: "M020" } } }), "tea");
   assert.equal(w.core.zh, "灰纸板");
   assert.equal(w.wrap.en, "two-side coated paper (C2S)");
   const inner = materialWords(CATEGORY_PACK.tea, "tea", "inner.");
@@ -194,4 +197,53 @@ test("the AI is told the list and held to it: prompts carry every number, boards
   const r = validateBoard(board);
   assert.ok(!r.ok);
   assert.ok(!r.ok && r.errors.some((e) => e.includes("M999")));
+});
+
+test("everything is customizable: any listed material, own fields, contact, processes, extra parts, off-list parts, use", async () => {
+  const { addExtra, colorDrawn, resetChoice, withChoice, withUsage, updateExtra, removeExtra, choiceText } = await import("../src/lib/materials");
+  const gift = spec({ form: "gift", w: 200, h: 80, d: 150, finish: "matte" });
+  // any listed material, even one not recommended for the part; the 3D says it is a sketch
+  const leather = withMaterial(gift, "wrap", "M134");
+  const w = usesOf(leather, "tea").find((u) => u.key === "wrap")!;
+  assert.equal(w.id, "M134");
+  assert.ok(!w.options.includes("M134") && !w.drawn);
+  // own fields go on the print line, and colour shows in 3D where the part is drawn
+  const own = withChoice(gift, "insert", { color: "#7A1F2B", supplier: "某某包装", grade: "2 mm", note: "按样" });
+  const ins = usesOf(own, "tea").find((u) => u.key === "insert")!;
+  assert.equal(ins.grade!.zh, "2 mm");
+  assert.match(materialLine(own, "tea", false).zh, /颜色 #7A1F2B，供应商 某某包装，备注 按样/);
+  assert.match(choiceText(ins, "en"), /supplier 某某包装/);
+  assert.equal(lookOf(own).velvetColor, "#7A1F2B");
+  assert.ok(colorDrawn(own, "insert"));
+  assert.equal(resetChoice(own, "insert").materials, undefined);
+  // the seller says a carton touches the tea: the food rules follow
+  const carton = withChoice(spec({}), "body", { contact: "direct" });
+  const r = ids(rulesFor(carton, "tea"));
+  assert.ok(r.includes("F01") && r.includes("F03"), r.join());
+  // a process material changed or dropped
+  const noFilm = withChoice(gift, "process.film", { id: "none" });
+  assert.ok(!usesOf(noFilm, "tea").some((u) => u.id === "M053"));
+  assert.ok(usesOf(noFilm, "tea", true).some((u) => u.key === "process.film" && u.removed));
+  const glue = withChoice(gift, "process.glue", { id: "M159" });
+  assert.equal(usesOf(glue, "tea").find((u) => u.key === "process.glue")!.id, "M159");
+  // a part of the seller's own
+  let x = addExtra(gift, "封口贴", "M079");
+  assert.equal(x.extraParts!.length, 1);
+  x = updateExtra(x, "x1", { color: "#112233", contact: "direct" });
+  const e = usesOf(x, "snacks").find((u) => u.kind === "extra")!;
+  assert.equal(e.label.zh, "封口贴");
+  assert.equal(e.touches, "food");
+  assert.match(materialLine(x, "snacks", false).zh, /封口贴：PP合成纸 M079/);
+  assert.deepEqual(normalizePack(JSON.parse(JSON.stringify(x))).extraParts, x.extraParts);
+  assert.equal(removeExtra(x, "x1").extraParts, undefined);
+  // an off-list part assigned a listed material leaves the off list and joins the parts
+  const book = withChoice(spec({ form: "bookBox", w: 240, h: 70, d: 180 }), "off.magnets", { id: "M103" });
+  assert.deepEqual(offListOf(book), []);
+  assert.equal(offListOf(book, true).length, 1);
+  assert.ok(usesOf(book, "other").some((u) => u.kind === "off" && u.id === "M103"));
+  // how the pack is used, by hand
+  const shipped = withUsage(spec({}), "courier", true);
+  assert.ok(ids(rulesFor(shipped, "other")).includes("G04"));
+  assert.deepEqual(normalizePack(JSON.parse(JSON.stringify(shipped))).usage, { courier: true });
+  assert.ok(!ids(rulesFor(withUsage(spec({ form: "mailer", w: 260, h: 80, d: 200 }), "courier", false), "apparel")).includes("G04"));
 });

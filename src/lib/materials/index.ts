@@ -1,18 +1,19 @@
 /**
  * Materials from the principal's list (catalog.ts), put to work on a package: which parts each
- * structure has, which listed materials each part can be made of, what the seller has picked
- * (PackSpec.materials, part id → material number), and the compliance rules and supplier
- * documents that follow from those picks, the product category and how the pack is used.
+ * structure has, which listed materials suit each part (recommended, and the default), what the
+ * seller has chosen (PackSpec.materials: any listed material for any part, their own grade,
+ * colour, supplier and note, whether the part touches the contents; process materials changed or
+ * dropped; parts of their own added), and the compliance rules and supplier documents that
+ * follow from those choices, the product category and how the pack is used.
  *
  * Every material named anywhere in the app comes from the list. A part the list does not cover
- * (a book box's magnets, hot-stamping foil) is shown as off the list, for the principal to
- * confirm, never swapped for a guess. The options for a part are only listed materials that the
- * part, as it is drawn in 3D and set out in the print file, can really be made of.
+ * (a book box's magnets, hot-stamping foil) is shown as off the list until the seller assigns a
+ * listed material to it, never swapped for a guess.
  *
  * Client-safe and pure.
  */
 import type { Pair } from "../i18n";
-import { FORM_LABELS, isOuter, type Effect, type Finish, type Form, type Insert, type PackSpec } from "../pack";
+import { FORM_LABELS, isOuter, type Effect, type ExtraPart, type Finish, type Form, type Insert, type MaterialPick, type PackSpec, type PackUsage } from "../pack";
 import { DOCS, FAMILIES, LIST, MATERIALS, NOTES, PATHS, RULES, SOURCES, type Material, type Rule } from "./catalog";
 
 export { DOCS, FAMILIES, LIST, MATERIALS, NOTES, PATHS, RULES, SOURCES, type Material, type Rule };
@@ -51,7 +52,7 @@ export type PrintRole = "stock" | "board";
 export type Slot = {
   id: string;
   label: Pair;
-  /** listed materials this part can be made of; the first is the default */
+  /** listed materials recommended for this part as it is drawn; the first is the default */
   options: string[];
   contact: Contact;
   print?: PrintRole;
@@ -184,14 +185,18 @@ function insertSlot(spec: PackSpec): Slot | null {
 
 /** Parts the list does not cover, by structure and effect: shown, never substituted. */
 export type OffList = { id: string; label: Pair; why: Pair };
-export function offListOf(spec: { form: Form; effects?: Effect[]; inner?: { form: Form } | null }): OffList[] {
+/**
+ * The parts the list does not cover. Those the seller has assigned a listed material to
+ * ("off.magnets" → a pick) are left out unless `all` is asked for.
+ */
+export function offListOf(spec: { form: Form; effects?: Effect[]; inner?: { form: Form } | null; materials?: Record<string, MaterialPick> }, all = false): OffList[] {
   const out: OffList[] = [];
   const fx = spec.effects ?? [];
   if (spec.form === "bookBox") out.push({ id: "magnets", label: P("磁铁", "Magnets"), why: P("书型盒翻边内嵌磁铁；清单中没有磁性材料。", "The book box's flap holds magnets; the list has no magnetic material.") });
   if (spec.form === "bag") out.push({ id: "eyelets", label: P("金属扣眼", "Metal eyelets"), why: P("绳孔的加固扣眼；清单中没有对应的五金件。", "The eyelets that reinforce the rope holes; the list has no such hardware.") });
   if (fx.some((e) => e === "goldFoil" || e === "silverFoil")) out.push({ id: "foil", label: P("烫印电化铝", "Hot-stamping foil"), why: P("烫金、烫银用的电化铝箔不在清单中（M102 铝箔是包装箔，不是烫印箔）。", "The hot-stamping foil for gold and silver is not on the list (M102 is packaging foil, not stamping foil).") });
   if (fx.includes("holo")) out.push({ id: "holo", label: P("镭射烫印膜", "Holographic stamping foil"), why: P("镭射烫印膜不在清单中（M034 全息纸是纸，不是烫印膜）。", "Holographic stamping foil is not on the list (M034 is a paper, not a stamping foil).") });
-  return out;
+  return all ? out : out.filter((o) => !isListed(spec.materials?.[`off.${o.id}`]?.id ?? ""));
 }
 
 /** The product packed in a combination, as a package of its own (sharing the finish and effects). */
@@ -237,11 +242,13 @@ export function optionsFor(slot: Slot, finish: Finish): string[] {
   return keep.length ? keep : slot.options;
 }
 
-/** The material a part is made of: the seller's pick when it is a real option, else the default. */
+/** What the seller has chosen for a part (nothing chosen is an empty choice). */
+export const choiceOf = (spec: PackSpec, key: string): MaterialPick => spec.materials?.[key] ?? {};
+
+/** The material a part is made of: any listed material the seller picked, else the default. */
 export function pick(spec: PackSpec, key: string, slot: Slot): string {
-  const opts = optionsFor(slot, spec.finish);
-  const chosen = spec.materials?.[key];
-  return chosen && opts.includes(chosen) ? chosen : opts[0];
+  const chosen = choiceOf(spec, key).id;
+  return chosen && isListed(chosen) ? chosen : optionsFor(slot, spec.finish)[0];
 }
 
 /** Materials that are not parts of the structure but come with the finish and effects. */
@@ -285,59 +292,175 @@ export function stockNote(spec: PackSpec, id: string): Pair | null {
 
 /* ---------------------------------------------------------------- resolved picks */
 
+export type UseKind = "part" | "process" | "off" | "extra";
+
 export type Use = {
   key: string;
+  kind: UseKind;
   label: Pair;
   id: string;
   m: Material;
   contact: Contact;
+  /** the contact the structure implies, before the seller's say */
+  defaultContact: Contact;
   inner: boolean;
   /** what this part touches: "food", "cosmetics" or nothing regulated */
   touches: "food" | "cosmetics" | null;
+  /** grade and thickness: the seller's, else the structure's */
   grade?: Pair;
   note?: Pair;
+  /** the seller's own fields */
+  choice: MaterialPick;
+  /** recommended materials for the part (the first is the default) */
   options: string[];
+  defaultId: string;
+  /** the 3D model shows this pick's own look (or the part is not drawn differently by material) */
+  drawn: boolean;
+  /** a process material the seller dropped */
+  removed?: true;
   process?: true;
 };
 
-/** Every material in the package, the parts first and then the process materials. */
-export function usesOf(spec: PackSpec, category: string): Use[] {
-  const touches = (contact: Contact) => (contact !== "direct" ? null : isFood(category) ? "food" : isCosmetic(category) ? "cosmetics" : null);
+/** A part's own 3D look by material, where the model draws it (see lookOf). */
+function drawnAs(spec: PackSpec, key: string, id: string, defaultId: string): boolean {
+  if (id === defaultId) return true;
+  if ((spec.form === "carton" || spec.form === "bag") && key === "body") return id in BOARD;
+  if (key === "insert") return id in INSERT_TINT || ["M036", "M129", "M128"].includes(id);
+  if (spec.form === "brocade" && key === "toggle") return id in TOGGLE;
+  if (spec.form === "woodBox" && key === "body") return id in WOOD;
+  if (key === "liner" || key === "inner.liner") return ["M033", "M094", "M102"].includes(id);
+  return false;
+}
+
+const touchesOf = (contact: Contact, category: string) => (contact !== "direct" ? null : isFood(category) ? "food" : isCosmetic(category) ? "cosmetics" : null);
+const gradeOf = (c: MaterialPick, fallback?: Pair): Pair | undefined => (c.grade ? { zh: c.grade, en: c.grade } : fallback);
+
+/**
+ * Every material in the package: the structure's parts, parts off the list the seller assigned a
+ * material to, the seller's own parts, then the process materials. Dropped process materials are
+ * left out unless `all` is asked for (the Materials tab lists them to bring back).
+ */
+export function usesOf(spec: PackSpec, category: string, all = false): Use[] {
   const out: Use[] = [];
   for (const { key, slot, inner } of partsOf(spec)) {
+    const c = choiceOf(spec, key);
     const id = pick(spec, key, slot);
-    const m = material(id)!;
-    out.push({ key, label: slot.label, id, m, contact: slot.contact, inner, touches: touches(slot.contact), grade: slot.grade, note: stockNote(spec, id) ?? undefined, options: optionsFor(slot, spec.finish) });
+    const options = optionsFor(slot, spec.finish);
+    const contact = c.contact ?? slot.contact;
+    out.push({ key, kind: "part", label: slot.label, id, m: material(id)!, contact, defaultContact: slot.contact, inner, touches: touchesOf(contact, category), grade: gradeOf(c, slot.grade), note: stockNote(spec, id) ?? undefined, choice: c, options, defaultId: options[0], drawn: drawnAs(spec, key, id, options[0]) });
   }
-  for (const p of processesOf(spec)) out.push({ key: p.key, label: p.label, id: p.id, m: material(p.id)!, contact: "outer", inner: p.key.startsWith("inner."), touches: null, note: p.note, options: [p.id], process: true });
+  for (const o of offListOf(spec, true)) {
+    const key = `off.${o.id}`;
+    const c = choiceOf(spec, key);
+    if (!c.id || !isListed(c.id)) continue;
+    const contact = c.contact ?? "outer";
+    out.push({ key, kind: "off", label: o.label, id: c.id, m: material(c.id)!, contact, defaultContact: "outer", inner: false, touches: touchesOf(contact, category), grade: gradeOf(c), choice: c, options: [], defaultId: "", drawn: false });
+  }
+  for (const x of spec.extraParts ?? []) {
+    if (!isListed(x.id) || (x.inner && !spec.inner)) continue;
+    const contact = x.contact ?? "outer";
+    const { key: _k, label, id, inner, ...c } = x; // eslint-disable-line @typescript-eslint/no-unused-vars
+    out.push({ key: `extra.${x.key}`, kind: "extra", label: { zh: label, en: label }, id, m: material(id)!, contact, defaultContact: "outer", inner: !!inner, touches: touchesOf(contact, category), grade: gradeOf(c), choice: { ...c, id }, options: [], defaultId: "", drawn: false });
+  }
+  for (const p of processesOf(spec)) {
+    const c = choiceOf(spec, p.key);
+    if (c.id === "none" && !all) continue;
+    const id = c.id && isListed(c.id) ? c.id : p.id;
+    const inner = p.key.startsWith("inner.");
+    out.push({ key: p.key, kind: "process", label: p.label, id, m: material(id)!, contact: c.contact ?? "outer", defaultContact: "outer", inner, touches: touchesOf(c.contact ?? "outer", category), grade: gradeOf(c), note: id === p.id ? p.note : undefined, choice: c, options: [p.id], defaultId: p.id, drawn: true, process: true, ...(c.id === "none" ? { removed: true as const } : {}) });
+  }
   return out;
 }
 
-/** Drops picks that no longer name a part of the package or a real option for it. */
-export function pruneMaterials(spec: PackSpec): PackSpec {
-  if (!spec.materials) return spec;
-  const keep: Record<string, string> = {};
-  for (const { key, slot } of partsOf(spec)) {
-    const v = spec.materials[key];
-    if (v && optionsFor(slot, spec.finish).includes(v) && v !== optionsFor(slot, spec.finish)[0]) keep[key] = v;
-  }
-  const { materials: _drop, ...rest } = spec; // eslint-disable-line @typescript-eslint/no-unused-vars
-  return Object.keys(keep).length ? { ...rest, materials: keep } : rest;
+/** Whether the pack is shipped as a courier box and whether it is a shopping bag: the seller's say, else the structure's. */
+export function usageOf(spec: PackSpec): Required<PackUsage> {
+  return { courier: spec.usage?.courier ?? spec.form === "mailer", shoppingBag: spec.usage?.shoppingBag ?? spec.form === "bag" };
 }
 
-/** Sets one part's material (the default clears the pick). */
-export function withMaterial(spec: PackSpec, key: string, id: string): PackSpec {
-  return pruneMaterials({ ...spec, materials: { ...(spec.materials ?? {}), [key]: id } });
+/** Tidies the seller's choices: drops those for parts the package no longer has, and defaults. */
+export function pruneMaterials(spec: PackSpec): PackSpec {
+  const keep: Record<string, MaterialPick> = {};
+  const defaults = new Map<string, { id: string; contact: Contact; none?: boolean }>();
+  for (const { key, slot } of partsOf(spec)) defaults.set(key, { id: optionsFor(slot, spec.finish)[0], contact: slot.contact });
+  for (const p of processesOf(spec)) defaults.set(p.key, { id: p.id, contact: "outer", none: true });
+  for (const o of offListOf(spec, true)) defaults.set(`off.${o.id}`, { id: "", contact: "outer" });
+  for (const [key, c] of Object.entries(spec.materials ?? {})) {
+    const d = defaults.get(key);
+    if (!d) continue;
+    const next: MaterialPick = { ...c };
+    if (!next.id || next.id === d.id || !(isListed(next.id) || (d.none && next.id === "none"))) delete next.id;
+    if (next.contact === d.contact) delete next.contact;
+    for (const f of ["grade", "color", "supplier", "note"] as const) if (!next[f]) delete next[f];
+    if (Object.keys(next).length) keep[key] = next;
+  }
+  const extras = (spec.extraParts ?? []).filter((x) => !x.inner || spec.inner);
+  const { materials: _m, extraParts: _x, ...rest } = spec; // eslint-disable-line @typescript-eslint/no-unused-vars
+  return { ...rest, ...(Object.keys(keep).length ? { materials: keep } : {}), ...(extras.length ? { extraParts: extras } : {}) };
+}
+
+/** Changes a part's choices (an empty field clears it; the default material clears the pick). */
+export function withChoice(spec: PackSpec, key: string, patch: Partial<MaterialPick>): PackSpec {
+  return pruneMaterials({ ...spec, materials: { ...(spec.materials ?? {}), [key]: { ...choiceOf(spec, key), ...patch } } });
+}
+
+/** Sets one part's material. */
+export const withMaterial = (spec: PackSpec, key: string, id: string): PackSpec => withChoice(spec, key, { id });
+
+/** Back to the structure's own material and contact, with the seller's fields cleared. */
+export function resetChoice(spec: PackSpec, key: string): PackSpec {
+  const { [key]: _drop, ...rest } = spec.materials ?? {}; // eslint-disable-line @typescript-eslint/no-unused-vars
+  return pruneMaterials({ ...spec, materials: rest });
+}
+
+/** Adds a part of the seller's own, made of a listed material. */
+export function addExtra(spec: PackSpec, label: string, id: string, inner = false): PackSpec {
+  const used = new Set((spec.extraParts ?? []).map((x) => x.key));
+  let n = 1;
+  while (used.has(`x${n}`)) n++;
+  const part: ExtraPart = { key: `x${n}`, label: label.trim().slice(0, 24) || "部件", id, ...(inner && spec.inner ? { inner: true } : {}) };
+  return { ...spec, extraParts: [...(spec.extraParts ?? []), part].slice(0, 12) };
+}
+
+export function updateExtra(spec: PackSpec, key: string, patch: Partial<ExtraPart>): PackSpec {
+  const list = (spec.extraParts ?? []).map((x) => {
+    if (x.key !== key) return x;
+    const next: ExtraPart = { ...x, ...patch, key: x.key };
+    for (const f of ["grade", "color", "supplier", "note", "contact"] as const) if (!next[f]) delete next[f];
+    if (!next.label?.trim()) next.label = x.label;
+    return next;
+  });
+  return { ...spec, extraParts: list };
+}
+
+export function removeExtra(spec: PackSpec, key: string): PackSpec {
+  const list = (spec.extraParts ?? []).filter((x) => x.key !== key);
+  const { extraParts: _x, ...rest } = spec; // eslint-disable-line @typescript-eslint/no-unused-vars
+  return list.length ? { ...rest, extraParts: list } : rest;
+}
+
+/** Sets or clears (null) how the pack is used. */
+export function withUsage(spec: PackSpec, k: keyof PackUsage, v: boolean | null): PackSpec {
+  const usage: PackUsage = { ...(spec.usage ?? {}) };
+  if (v === null) delete usage[k];
+  else usage[k] = v;
+  const { usage: _u, ...rest } = spec; // eslint-disable-line @typescript-eslint/no-unused-vars
+  return Object.keys(usage).length ? { ...rest, usage } : rest;
 }
 
 /* ---------------------------------------------------------------- compliance */
 
 export type Problem = { key: string; level: "error" | "warn"; text: Pair };
 
-/** Picks that break the list's own limits: a non-food material on a part that touches food. */
-export function problemsOf(uses: Use[]): Problem[] {
+/**
+ * Choices that break the list's own limits (a non-food material on a part that touches food: an
+ * error) or that disagree with the finish (xuan stock that is not the handmade paper: a warning).
+ */
+export function problemsOf(uses: Use[], spec?: PackSpec): Problem[] {
   const out: Problem[] = [];
   for (const u of uses) {
+    if (u.removed) continue;
+    if (spec && u.kind === "part" && u.options.length === 1 && u.options[0] === HANDMADE && u.id !== HANDMADE && handmadeFinish(spec.finish))
+      out.push({ key: u.key, level: "warn", text: P(`表面工艺是${spec.finish === "xuan" ? "宣纸" : "洒金笺"}，但${u.label.zh}选了 ${u.m.name.zh}（${u.id}）：两者须一致。`, `The finish is ${spec.finish === "xuan" ? "xuan paper" : "gold-flecked paper"}, but the ${u.label.en.toLowerCase()} is ${u.m.name.en} (${u.id}): make them agree.`) });
     if (u.touches === "food" && u.m.noFood) out.push({ key: u.key, level: "error", text: P(`${u.label.zh}直接接触食品，但清单把 ${u.m.name.zh}（${u.id}）限于非食品接触用途。`, `The ${u.label.en.toLowerCase()} touches food, but the list limits ${u.m.name.en} (${u.id}) to non-food-contact uses.`) });
     if (u.touches === "cosmetics" && u.m.noCosmetics) out.push({ key: u.key, level: "error", text: P(`${u.label.zh}直接接触化妆品，但清单写明 ${u.m.name.zh}（${u.id}）不作化妆品接触层。`, `The ${u.label.en.toLowerCase()} touches the cosmetic, but the list rules out ${u.m.name.en} (${u.id}) as a cosmetics contact layer.`) });
   }
@@ -347,8 +470,6 @@ export function problemsOf(uses: Use[]): Problem[] {
 /** Why a rule applies: the parts that bring it, or the package as a whole. */
 export type Applied = { rule: Rule; by: string[]; why: Pair };
 
-const COURIER_FORMS: readonly Form[] = ["mailer"];
-const BAG_FORMS: readonly Form[] = ["bag", "mailer"];
 
 /**
  * The rules that apply to this package, each with the parts that bring it. G01 always; G02 for
@@ -356,7 +477,9 @@ const BAG_FORMS: readonly Form[] = ["bag", "mailer"];
  * shopping bag or courier pack whose materials' paths name it; the F rules for parts that touch
  * food (F01 and each material's own); C01 for parts that touch cosmetics.
  */
-export function rulesFor(spec: PackSpec, category: string, uses = usesOf(spec, category)): Applied[] {
+export function rulesFor(spec: PackSpec, category: string, uses0 = usesOf(spec, category)): Applied[] {
+  const uses = uses0.filter((u) => !u.removed);
+  const use = usageOf(spec);
   const got = new Map<string, Applied>();
   const add = (id: string, by: string | null, why: Pair) => {
     const r = rule(id);
@@ -375,11 +498,11 @@ export function rulesFor(spec: PackSpec, category: string, uses = usesOf(spec, c
     // them (F13, F10, F08), since outer layers can migrate, permeate or set off
     if (u.process && isFood(category) && primary.has(u.inner))
       for (const f of u.m.food) add(f, u.key, P("直接装食品的包装上的油墨、胶和涂层（间接接触也须评估）", "Inks, adhesives and coatings on the pack that holds the food (indirect contact is assessed too)"));
-    if (u.m.courier && COURIER_FORMS.includes(spec.form) && !u.inner) add("G03", u.key, P("作为快递包装寄递", "Shipped as courier packaging"));
-    if (u.m.bag && BAG_FORMS.includes(spec.form) && !u.inner) add("P01", u.key, P(spec.form === "bag" ? "作为购物袋使用" : "作为快递包装寄递", spec.form === "bag" ? "Used as a shopping bag" : "Shipped as courier packaging"));
+    if (u.m.courier && use.courier && !u.inner) add("G03", u.key, P("作为快递包装寄递", "Shipped as courier packaging"));
+    if (u.m.bag && (use.shoppingBag || use.courier) && !u.inner) add("P01", u.key, P(use.shoppingBag ? "作为购物袋使用" : "作为快递包装寄递", use.shoppingBag ? "Used as a shopping bag" : "Shipped as courier packaging"));
   }
   if (isFood(category) || isCosmetic(category)) add("G02", null, P("食品和化妆品的销售包装：层数、空隙率、成本", "Food and cosmetics sales packaging: layers, void ratio, cost"));
-  if (COURIER_FORMS.includes(spec.form)) {
+  if (use.courier) {
     add("G03", null, P("作为快递包装寄递", "Shipped as courier packaging"));
     add("G04", null, P("快递包装：箱体与内件尺寸、层数、胶带用量", "Courier packaging: box-to-contents fit, layers, tape"));
   }
@@ -391,6 +514,7 @@ export function rulesFor(spec: PackSpec, category: string, uses = usesOf(spec, c
 export function documentsFor(uses: Use[]): { docs: Pair; ids: string[] }[] {
   const by = new Map<number, string[]>();
   for (const u of uses) {
+    if (u.removed) continue;
     const ids = by.get(u.m.docs) ?? [];
     if (!ids.includes(u.id)) ids.push(u.id);
     by.set(u.m.docs, ids);
@@ -412,7 +536,18 @@ export type Look = {
   toggle?: { color: string; rough: number; clearcoat: number; transmission?: number };
   wood?: string;
   liner?: "foil" | "paper";
+  /** the seller's colour for a velvet, flock or satin tray or pad */
+  velvetColor?: string;
+  /** the seller's colour for ribbon, rope handles or a loop */
+  rope?: string;
 };
+
+/** Mixes a hex colour toward white (t = share of white). */
+function lighten(hex: string, t: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = (v: number) => Math.round(v + (255 - v) * t).toString(16).padStart(2, "0");
+  return `#${ch((n >> 16) & 255)}${ch((n >> 8) & 255)}${ch(n & 255)}`.toUpperCase();
+}
 
 // the back and cut edge of the board (M001 is the colour the model has always drawn)
 const BOARD: Record<string, { inside: string; edge: string }> = {
@@ -444,21 +579,43 @@ export function lookOf(spec: PackSpec): Look {
     const p = partsOf(spec).find((x) => x.key === key);
     return p ? pick(spec, key, p.slot) : null;
   };
+  const color = (key: string) => choiceOf(spec, key).color;
   const board = spec.form === "carton" || spec.form === "bag" ? get("body") : null;
   if (board && BOARD[board]) look.board = BOARD[board];
+  // the seller's colour for the board: its back, and the cut edge a little lighter
+  if (board && color("body")) look.board = { inside: color("body")!, edge: lighten(color("body")!, 0.25) };
   const ins = get("insert");
   if (ins) {
     const kind = insertKind(spec);
     // satin is smoother and glossier than flock or velvet pile
     if (kind === "velvet") {
       if (ins === "M128") look.velvet = { sheen: 0.55, rough: 0.42 };
-    } else if (INSERT_TINT[ins]) look.insertTint = INSERT_TINT[ins];
+      if (color("insert")) look.velvetColor = color("insert");
+    } else if (color("insert") ?? INSERT_TINT[ins]) look.insertTint = color("insert") ?? INSERT_TINT[ins];
   }
-  if (spec.form === "brocade") look.toggle = TOGGLE[get("toggle") ?? "M069"];
-  if (spec.form === "woodBox") look.wood = WOOD[get("body") ?? "M110"];
+  if (spec.form === "brocade") {
+    const t = TOGGLE[get("toggle") ?? "M069"] ?? TOGGLE.M069!;
+    look.toggle = color("toggle") ? { ...t, color: color("toggle")! } : t;
+  }
+  if (spec.form === "woodBox") look.wood = color("body") ?? WOOD[get("body") ?? "M110"];
+  const rope = spec.form === "drawer" ? color("ribbon") : spec.form === "bag" ? color("handle") : spec.form === "brocade" ? color("loop") : undefined;
+  if (rope) look.rope = rope;
   const liner = spec.form === "paperTube" ? get("liner") : spec.inner?.form === "paperTube" ? get("inner.liner") : null;
   if (liner) look.liner = liner === "M094" ? "paper" : "foil";
   return look;
+}
+
+/** What the 3D model depends on among the choices: the materials and the colours, not the notes. */
+export function lookKey(spec: PackSpec): string {
+  return JSON.stringify([partsOf(spec).map((p) => pick(spec, p.key, p.slot)), lookOf(spec)]);
+}
+
+/** The parts whose colour the 3D model shows (others are recorded for the print file only). */
+export function colorDrawn(spec: PackSpec, key: string): boolean {
+  if (key === "insert") return true;
+  if ((spec.form === "carton" || spec.form === "bag") && key === "body") return true;
+  if (spec.form === "woodBox" && key === "body") return true;
+  return (spec.form === "brocade" && (key === "toggle" || key === "loop")) || (spec.form === "drawer" && key === "ribbon") || (spec.form === "bag" && key === "handle");
 }
 
 /**
@@ -468,7 +625,7 @@ export function lookOf(spec: PackSpec): Look {
 export function materialWords(spec: PackSpec, category: string, prefix = ""): Record<string, Pair> {
   const out: Record<string, Pair> = {};
   for (const u of usesOf(spec, category)) {
-    if (u.process) continue;
+    if (u.kind !== "part") continue;
     if (prefix ? !u.key.startsWith(prefix) : u.inner) continue;
     const key = prefix ? u.key.slice(prefix.length) : u.key;
     out[key] = inlineName(u);
@@ -489,7 +646,17 @@ export function fillWords(text: string, words: Record<string, string>): string {
   return text.replace(/\{([a-z]+)\}/g, (all, k: string) => words[k] ?? all);
 }
 
-/** One line for the print file: "单面铜版纸 M019 128–157 g；灰纸板 M016 1200–1500 g". */
+/** The seller's own fields for a part, for the print file: "白色，供应商 X，备注 Y". */
+export function choiceText(u: Use, lang: "zh" | "en"): string {
+  const c = u.choice;
+  const bits: string[] = [];
+  if (c.color) bits.push(lang === "zh" ? `颜色 ${c.color}` : `colour ${c.color}`);
+  if (c.supplier) bits.push(lang === "zh" ? `供应商 ${c.supplier}` : `supplier ${c.supplier}`);
+  if (c.note) bits.push(lang === "zh" ? `备注 ${c.note}` : `note: ${c.note}`);
+  return bits.join(lang === "zh" ? "，" : ", ");
+}
+
+/** One line for the print file: "裱纸：单面铜版纸 M019，128–157 g；灰板骨架：灰纸板 M016，1200–1500 g". */
 export function materialLine(spec: PackSpec, category: string, inner: boolean): Pair {
   const parts = usesOf(spec, category).filter((u) => !u.process && u.inner === inner);
   const one = (lang: "zh" | "en") =>
@@ -498,7 +665,8 @@ export function materialLine(spec: PackSpec, category: string, inner: boolean): 
         const name = lang === "zh" ? u.m.name.zh : u.m.name.en;
         const note = u.note ? (lang === "zh" ? `（${u.note.zh}）` : ` (${u.note.en})`) : "";
         const grade = u.grade ? (lang === "zh" ? `，${u.grade.zh}` : `, ${u.grade.en}`) : "";
-        return `${lang === "zh" ? u.label.zh : u.label.en}${lang === "zh" ? "：" : ": "}${name}${note} ${u.id}${grade}`;
+        const own = choiceText(u, lang);
+        return `${lang === "zh" ? u.label.zh : u.label.en}${lang === "zh" ? "：" : ": "}${name}${note} ${u.id}${grade}${own ? (lang === "zh" ? `，${own}` : `, ${own}`) : ""}`;
       })
       .join(lang === "zh" ? "；" : "; ");
   return { zh: one("zh"), en: one("en") };

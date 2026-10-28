@@ -92,7 +92,7 @@ export function preflight(a: Artwork, board: Board, spec: PackSpec): Check[] {
 
   // materials: the principal's list
   const uses = usesOf(spec, board.meta.category);
-  for (const p of problemsOf(uses)) out.push(C(`mat-${p.key}`, p.level, p.text.zh, p.text.en));
+  for (const p of problemsOf(uses, spec)) out.push(C(`mat-${p.key}`, p.level, p.text.zh, p.text.en));
   const offList = offListOf(spec);
   if (offList.length) out.push(C("mat-off", "warn", `清单外部件：${offList.map((o) => o.label.zh).join("、")}`, `Off the material list: ${offList.map((o) => o.label.en.toLowerCase()).join(", ")}`, offList.map((o) => o.why.zh).join(" ") + " 请委托方确认或补列后再下单。", offList.map((o) => o.why.en).join(" ") + " Have the principal confirm or add them before ordering."));
   const contact = uses.filter((u) => u.touches);
@@ -101,6 +101,9 @@ export function preflight(a: Artwork, board: Board, spec: PackSpec): Check[] {
     const ids = rulesFor(spec, board.meta.category, uses).filter((r) => r.by.some((k) => contact.some((u) => u.key === k)) && r.rule.id !== "G01").map((r) => r.rule.id);
     out.push(C("mat-contact", "warn", `${contact.length} 个部件直接接触${what[0]}：向供应商取得符合性资料`, `${contact.length} part${contact.length > 1 ? "s" : ""} touch ${what[1]}: get compliance documents from the suppliers`, `${contact.map((u) => `${u.label.zh}（${u.m.name.zh} ${u.id}）`).join("、")}。按 ${ids.join("、")} 取得符合性声明和成品检测，报告须覆盖实际结构与使用条件。`, `${contact.map((u) => `${u.label.en} (${u.m.name.en} ${u.id})`).join(", ")}. Under ${ids.join(", ")}, get declarations of compliance and finished-product tests that cover the actual structure and conditions of use.`));
   }
+  // picks the 3D model draws with the default look: the render is not the product until proofed
+  const sketch = uses.filter((u) => !u.drawn);
+  if (sketch.length) out.push(C("mat-look", "info", `${sketch.length} 处选材在 3D 中按常见外观示意`, `${sketch.length} pick${sketch.length > 1 ? "s" : ""} shown in 3D with the usual look`, `${sketch.map((u) => `${u.label.zh}（${u.m.name.zh} ${u.id}）`).join("、")}。外观以打样为准。`, `${sketch.map((u) => `${u.label.en} (${u.m.name.en} ${u.id})`).join(", ")}. The proof decides how they look.`));
   const listed = new Set(uses.map((u) => u.id)).size;
   out.push(C("mat-list", "ok", `材料均来自委托方清单（${listed} 种）`, `All materials from the principal's list (${listed})`, `清单核对日期 ${LIST.checked}；所需资料见印刷工单第 2 页。`, `List checked ${LIST.checked}; the documents needed are on page 2 of the job sheet.`));
 

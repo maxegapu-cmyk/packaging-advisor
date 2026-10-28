@@ -1,56 +1,147 @@
 "use client";
 
 /**
- * The Materials tab of the 3D space: each part of the package with the listed materials it can
- * be made of, what the list says about the pick (its limits and design points), the rules it
- * brings and the documents to get from the supplier. Every option comes from the principal's
- * material list; parts the list does not cover are named as such.
+ * The Materials tab of the 3D space. Everything about the package's materials can be changed
+ * here, always within the principal's material list: any listed material for any part (the
+ * recommended ones first), the process materials (ink, lamination, glue, coatings) changed or
+ * dropped, each part's grade, colour (shown in 3D where the part is drawn), supplier and note,
+ * whether a part touches the contents, parts of the seller's own, a listed material for a part
+ * the list does not cover, and whether the pack is couriered or used as a shopping bag. What the
+ * list says about each pick, the rules it brings and the documents to get follow the choices.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { Lang, Pair } from "@/lib/i18n";
-import { FORM_LABELS, type PackSpec } from "@/lib/pack";
-import { documentsFor, LIST, material, offListOf, pathText, problemsOf, rulesFor, usesOf, withMaterial, type Use } from "@/lib/materials";
+import { FORM_LABELS, type MaterialPick, type PackSpec } from "@/lib/pack";
+import {
+  addExtra,
+  colorDrawn,
+  documentsFor,
+  FAMILIES,
+  LIST,
+  material,
+  MATERIALS,
+  offListOf,
+  pathText,
+  problemsOf,
+  removeExtra,
+  resetChoice,
+  rulesFor,
+  updateExtra,
+  usageOf,
+  usesOf,
+  withChoice,
+  withUsage,
+  type Use,
+} from "@/lib/materials";
 
 const T = {
-  lead: { zh: "材料只从委托方的材料清单里选。每个部件只列出能做成这个结构的清单材料，3D 和印刷文件随选择更新。", en: "Materials come only from the principal's material list. Each part lists only the listed materials it can be made of; the 3D model and print file follow your picks." },
+  lead: { zh: "所有材料都可以改：每个部件可选清单里任一材料（推荐的排在前面），可填规格、颜色、供应商和备注，也可以新增部件。只能选委托方材料清单里的材料。", en: "Everything here can be changed: any listed material for any part (recommended ones first), with your own grade, colour, supplier and note, and parts of your own. Only materials on the principal's list can be chosen." },
+  use: { zh: "用途", en: "Use" },
+  courier: { zh: "作为快递包装寄递", en: "Shipped as a courier box" },
+  bag: { zh: "作为购物袋使用", en: "Used as a shopping bag" },
+  auto: { zh: "按盒型自动判断", en: "set by the structure" },
+  manual: { zh: "已手动设置 · 恢复自动", en: "set by hand · back to automatic" },
   outer: { zh: "外包装", en: "Outer pack" },
-  process: { zh: "随表面工艺", en: "With the finish and effects" },
-  processNote: { zh: "由表面工艺和附加工艺决定，在「外观」里改。", en: "Set by the finish and effects; change them under Look." },
+  process: { zh: "工艺用料", en: "Process materials" },
+  processNote: { zh: "随表面工艺和附加工艺而来，可换成清单里其他材料，或不使用。", en: "They come with the finish and effects; change them to other listed materials, or drop them." },
   touches: { food: { zh: "直接接触食品", en: "Touches the food" }, cosmetics: { zh: "直接接触化妆品", en: "Touches the cosmetic" } },
+  contact: { zh: "直接接触内容物", en: "Touches the contents" },
   boundary: { zh: "使用边界", en: "Limits of use" },
   design: { zh: "设计与加工要点", en: "Design and processing" },
   path: { zh: "合规路径", en: "Compliance path" },
   trade: { zh: "采购常用名称", en: "Trade names" },
   source: { zh: "资料来源", en: "Source" },
-  only: { zh: "清单中只有这一种适合这个部件", en: "The only listed material for this part" },
+  recommended: { zh: "推荐用于这个部件", en: "Recommended for this part" },
+  usual: { zh: "默认", en: "Default" },
+  none: { zh: "不使用", en: "Don't use" },
+  removed: { zh: "已不使用：不计入规则、资料和印刷文件。", en: "Not used: left out of the rules, documents and print file." },
+  notRecommended: { zh: "不在这个部件的推荐范围：请与印厂确认结构和工艺可行。", en: "Not among the recommended materials for this part: check with your printer that the structure and process work." },
+  sketch: { zh: "3D 中按这个部件的常见外观示意，实际外观以打样为准。", en: "The 3D model shows this part's usual look; the proof decides the real one." },
+  spec: { zh: "规格与采购", en: "Spec and purchasing" },
+  grade: { zh: "规格 / 克重 / 厚度", en: "Grade, grammage or thickness" },
+  color: { zh: "颜色", en: "Colour" },
+  color3d: { zh: "3D 同步显示", en: "shown in 3D" },
+  colorPrint: { zh: "写入印刷工单", en: "on the job sheet" },
+  clearColor: { zh: "清除颜色", en: "Clear colour" },
+  supplier: { zh: "供应商", en: "Supplier" },
+  note: { zh: "备注", en: "Note" },
+  reset: { zh: "恢复默认", en: "Reset" },
+  remove: { zh: "删除这个部件", en: "Remove this part" },
+  name: { zh: "部件名称", en: "Part name" },
+  more: { zh: "清单中的更多信息", en: "More from the list" },
   offList: { zh: "清单外部件", en: "Parts off the list" },
-  offListNote: { zh: "这些部件在清单里没有对应材料，未作替换：请委托方确认或补列。", en: "The list has no material for these parts, and none has been substituted: ask the principal to confirm or add one." },
+  offListNote: { zh: "这些部件在清单里没有对应材料，未作替换。可以请委托方补列，或指定一种清单材料代替。", en: "The list has no material for these parts, and none has been substituted. Ask the principal to add one, or assign a listed material." },
+  keepOff: { zh: "保持清单外（待委托方确认）", en: "Keep off the list (for the principal to confirm)" },
+  assign: { zh: "指定清单材料", en: "Assign a listed material" },
+  add: { zh: "新增部件", en: "Add a part" },
+  addNote: { zh: "包装上还有别的东西（贴纸、丝带、干燥剂袋、说明卡……），在这里加上，选它用的清单材料。", en: "Anything else in the pack (a sticker, a ribbon, a desiccant sachet, an insert card…): add it here with the listed material it is made of." },
+  addBtn: { zh: "加上", en: "Add" },
+  onInner: { zh: "属于内装产品", en: "Part of the product inside" },
   rules: { zh: "适用规则", en: "Rules that apply" },
-  rulesNote: { zh: "规则按品类、部件是否直接接触内容物、是否寄递或作购物袋自动判断。不构成合规审查，以现行法规与成品检测为准。", en: "Chosen from the category, whether a part touches the contents, and whether the pack is shipped by courier or used as a shopping bag. Not a compliance review: current law and finished-product tests decide." },
+  rulesNote: { zh: "规则按品类、部件是否直接接触内容物和包装用途自动列出，会随上面的设置变化。不构成合规审查，以现行法规与成品检测为准。", en: "Listed from the category, whether parts touch the contents, and how the pack is used; they follow the settings above. Not a compliance review: current law and finished-product tests decide." },
   by: { zh: "涉及", en: "For" },
   pack: { zh: "整个包装", en: "the whole pack" },
   needs: { zh: "需满足", en: "Must meet" },
   get: { zh: "应取得", en: "Obtain" },
   status: { zh: "状态", en: "Status" },
+  standard: { zh: "标准或法规", en: "Standard" },
   docs: { zh: "向供应商索取", en: "Ask suppliers for" },
   checked: { zh: `清单核对日期 ${LIST.checked}。标准换版、法规调整或用途变化时须重新核验。`, en: `List checked ${LIST.checked}. Re-verify when standards or regulations change, or the use does.` },
 } satisfies Record<string, Pair | Record<string, Pair>>;
 
 const one = (p: Pair, lang: Lang) => (lang === "en" ? p.en : p.zh);
 
-export function MaterialPanel({ spec, category, lang, onChange }: { spec: PackSpec; category: string; lang: Lang; onChange: (s: PackSpec) => void }) {
-  const uses = useMemo(() => usesOf(spec, category), [spec, category]);
-  const rules = useMemo(() => rulesFor(spec, category, uses), [spec, category, uses]);
-  const problems = useMemo(() => problemsOf(uses), [uses]);
-  const off = offListOf(spec);
-  const docs = documentsFor(uses);
-  const labelOf = (key: string) => uses.find((u) => u.key === key)?.label;
+/** The whole list as option groups: the given ids first, then every family. */
+function MaterialOptions({ first, firstLabel, lang, none }: { first: string[]; firstLabel: Pair; lang: Lang; none?: boolean }) {
+  const rest = useMemo(() => FAMILIES.map((f) => ({ f, items: MATERIALS.filter((m) => m.family === f.id && !first.includes(m.id)) })).filter((g) => g.items.length), [first]);
+  const label = (id: string) => {
+    const m = material(id);
+    return m ? `${one(m.name, lang)}  ${id}` : id;
+  };
+  return (
+    <>
+      {none ? <option value="none">{one(T.none, lang)}</option> : null}
+      {first.length ? (
+        <optgroup label={one(firstLabel, lang)}>
+          {first.map((id) => (
+            <option key={id} value={id}>
+              {label(id)}
+            </option>
+          ))}
+        </optgroup>
+      ) : null}
+      {rest.map((g) => (
+        <optgroup key={g.f.id} label={one(g.f.label, lang)}>
+          {g.items.map((m) => (
+            <option key={m.id} value={m.id}>
+              {label(m.id)}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </>
+  );
+}
 
-  const groups: { title: Pair; items: Use[]; process?: boolean }[] = [
-    { title: { zh: `${T.outer.zh} · ${FORM_LABELS[spec.form].zh}`, en: `${T.outer.en}: ${FORM_LABELS[spec.form].en}` }, items: uses.filter((u) => !u.inner && !u.process) },
-  ];
-  if (spec.inner) groups.push({ title: { zh: `内装 · ${FORM_LABELS[spec.inner.form].zh}`, en: `Inside: ${FORM_LABELS[spec.inner.form].en}` }, items: uses.filter((u) => u.inner && !u.process) });
-  groups.push({ title: T.process, items: uses.filter((u) => u.process), process: true });
+export function MaterialPanel({ spec, category, lang, onChange }: { spec: PackSpec; category: string; lang: Lang; onChange: (s: PackSpec) => void }) {
+  const all = useMemo(() => usesOf(spec, category, true), [spec, category]);
+  const uses = useMemo(() => all.filter((u) => !u.removed), [all]);
+  const rules = useMemo(() => rulesFor(spec, category, uses), [spec, category, uses]);
+  const problems = useMemo(() => problemsOf(uses, spec), [uses, spec]);
+  const offAll = offListOf(spec, true);
+  const docs = documentsFor(uses);
+  const usage = usageOf(spec);
+  const labelOf = (key: string) => all.find((u) => u.key === key)?.label;
+
+  const parts = all.filter((u) => !u.process);
+  const groups: { title: Pair; items: Use[]; process?: boolean }[] = [{ title: { zh: `${T.outer.zh} · ${FORM_LABELS[spec.form].zh}`, en: `${T.outer.en}: ${FORM_LABELS[spec.form].en}` }, items: parts.filter((u) => !u.inner) }];
+  if (spec.inner) groups.push({ title: { zh: `内装 · ${FORM_LABELS[spec.inner.form].zh}`, en: `Inside: ${FORM_LABELS[spec.inner.form].en}` }, items: parts.filter((u) => u.inner) });
+  groups.push({ title: T.process, items: all.filter((u) => u.process), process: true });
+
+  const toggleUse = (k: "courier" | "shoppingBag", v: boolean) => {
+    const auto = k === "courier" ? spec.form === "mailer" : spec.form === "bag";
+    onChange(withUsage(spec, k, v === auto ? null : v));
+  };
 
   return (
     <div className="st-tabpanel mat-panel" role="tabpanel">
@@ -59,10 +150,34 @@ export function MaterialPanel({ spec, category, lang, onChange }: { spec: PackSp
         {problems.length ? (
           <ul className="mat-problems" role="alert">
             {problems.map((p) => (
-              <li key={p.key}>{one(p.text, lang)}</li>
+              <li key={p.key + p.level} className={p.level === "warn" ? "is-warn" : undefined}>
+                {one(p.text, lang)}
+              </li>
             ))}
           </ul>
         ) : null}
+        <div className="mat-usage" role="group" aria-label={one(T.use, lang)}>
+          {(
+            [
+              ["courier", T.courier, usage.courier],
+              ["shoppingBag", T.bag, usage.shoppingBag],
+            ] as const
+          ).map(([k, label, on]) => (
+            <label key={k} className="mat-check">
+              <input type="checkbox" checked={on} onChange={(e) => toggleUse(k, e.currentTarget.checked)} />
+              <span>
+                {one(label, lang)}
+                {spec.usage?.[k] !== undefined ? (
+                  <button type="button" className="st-link" onClick={() => onChange(withUsage(spec, k, null))}>
+                    {one(T.manual, lang)}
+                  </button>
+                ) : (
+                  <small>{one(T.auto, lang)}</small>
+                )}
+              </span>
+            </label>
+          ))}
+        </div>
       </section>
 
       {groups.map((g) => (
@@ -71,26 +186,39 @@ export function MaterialPanel({ spec, category, lang, onChange }: { spec: PackSp
           {g.process ? <span className="st-small">{one(T.processNote, lang)}</span> : null}
           <div className="mat-list">
             {g.items.map((u) => (
-              <MaterialRow key={u.key} u={u} lang={lang} rules={rules.filter((r) => r.by.includes(u.key)).map((r) => r.rule.id)} onPick={g.process ? undefined : (id) => onChange(withMaterial(spec, u.key, id))} />
+              <MaterialRow key={u.key} u={u} spec={spec} lang={lang} rules={rules.filter((r) => r.by.includes(u.key)).map((r) => r.rule.id)} onChange={onChange} />
             ))}
           </div>
         </section>
       ))}
 
-      {off.length ? (
+      {offAll.length ? (
         <section className="st-sec">
           <span className="st-label">{one(T.offList, lang)}</span>
           <span className="st-small">{one(T.offListNote, lang)}</span>
           <ul className="mat-off">
-            {off.map((x) => (
-              <li key={x.id}>
-                <strong>{one(x.label, lang)}</strong>
-                <span>{one(x.why, lang)}</span>
-              </li>
-            ))}
+            {offAll.map((x) => {
+              const key = `off.${x.id}`;
+              const assigned = spec.materials?.[key]?.id ?? "";
+              return (
+                <li key={x.id} className={assigned ? "is-assigned" : undefined}>
+                  <strong>{one(x.label, lang)}</strong>
+                  <span>{one(x.why, lang)}</span>
+                  <label className="mat-field">
+                    <span>{one(T.assign, lang)}</span>
+                    <select className="mat-select" value={material(assigned) ? assigned : ""} onChange={(e) => onChange(e.currentTarget.value ? withChoice(spec, key, { id: e.currentTarget.value }) : resetChoice(spec, key))}>
+                      <option value="">{one(T.keepOff, lang)}</option>
+                      <MaterialOptions first={[]} firstLabel={T.recommended} lang={lang} />
+                    </select>
+                  </label>
+                </li>
+              );
+            })}
           </ul>
         </section>
       ) : null}
+
+      <AddPart spec={spec} lang={lang} onChange={onChange} />
 
       <section className="st-sec">
         <span className="st-label">{one(T.rules, lang)}</span>
@@ -108,7 +236,7 @@ export function MaterialPanel({ spec, category, lang, onChange }: { spec: PackSp
                   <dd>{a.by.length ? a.by.map((k) => one(labelOf(k) ?? { zh: k, en: k }, lang)).join(lang === "en" ? ", " : "、") : one(T.pack, lang)}</dd>
                 </div>
                 <div>
-                  <dt>{lang === "en" ? "Standard" : "标准或法规"}</dt>
+                  <dt>{one(T.standard, lang)}</dt>
                   <dd>{one(a.rule.standard, lang)}</dd>
                 </div>
                 <div>
@@ -154,80 +282,185 @@ export function MaterialPanel({ spec, category, lang, onChange }: { spec: PackSp
   );
 }
 
-function MaterialRow({ u, lang, rules, onPick }: { u: Use; lang: Lang; rules: string[]; onPick?: (id: string) => void }) {
+function MaterialRow({ u, spec, lang, rules, onChange }: { u: Use; spec: PackSpec; lang: Lang; rules: string[]; onChange: (s: PackSpec) => void }) {
   const id = `mat-${u.key.replace(/\./g, "-")}`;
-  const name = (m: { name: Pair }, mid: string) => `${one(m.name, lang)} ${mid}`;
+  const extraKey = u.kind === "extra" ? u.key.slice("extra.".length) : null;
+  // a change to one of this part's own fields
+  const set = (patch: Partial<MaterialPick> & { label?: string }) => {
+    if (extraKey) onChange(updateExtra(spec, extraKey, patch));
+    else onChange(withChoice(spec, u.key, patch));
+  };
   const touch = u.touches ? T.touches[u.touches] : null;
+  const custom = !extraKey && (u.choice.id !== undefined || u.choice.contact !== undefined || !!(u.choice.grade || u.choice.color || u.choice.supplier || u.choice.note));
+  const hasFields = !!(u.choice.grade || u.choice.color || u.choice.supplier || u.choice.note);
+  const recommended = u.kind === "part" ? u.options.includes(u.id) : true;
+  const value = u.removed ? "none" : u.id;
   return (
-    <div className={`mat-row${u.m.noFood && u.touches === "food" ? " is-bad" : ""}`}>
+    <div className={`mat-row${u.removed ? " is-removed" : ""}${u.m.noFood && u.touches === "food" && !u.removed ? " is-bad" : ""}`}>
       <div className="mat-head">
-        <label htmlFor={id} className="mat-part">
-          {one(u.label, lang)}
-          {u.grade ? <small>{one(u.grade, lang)}</small> : null}
-        </label>
-        {touch ? <span className="mat-touch">{one(touch, lang)}</span> : null}
+        {extraKey ? (
+          <input className="mat-name" aria-label={one(T.name, lang)} value={u.label.zh} maxLength={24} onChange={(e) => set({ label: e.currentTarget.value })} />
+        ) : (
+          <label htmlFor={id} className="mat-part">
+            {one(u.label, lang)}
+            {u.grade && !u.choice.grade ? <small>{one(u.grade, lang)}</small> : null}
+          </label>
+        )}
+        {touch && !u.removed ? <span className="mat-touch">{one(touch, lang)}</span> : null}
       </div>
-      {onPick && u.options.length > 1 ? (
-        <select id={id} className="mat-select" value={u.id} onChange={(e) => onPick(e.currentTarget.value)}>
-          {u.options.map((o) => (
-            <OptionOf key={o} id={o} lang={lang} />
-          ))}
-        </select>
-      ) : (
-        <p id={id} className="mat-fixed">
-          <strong>
-            {name(u.m, u.id)}
-            {u.note ? <em>{lang === "en" ? ` (${u.note.en})` : `（${u.note.zh}）`}</em> : null}
-          </strong>
-          {onPick ? <small>{one(T.only, lang)}</small> : null}
-        </p>
-      )}
-      {u.note && onPick && u.options.length > 1 ? <p className="mat-meta">{lang === "en" ? `As ${u.note.en}` : `即${u.note.zh}`}</p> : null}
-      <p className="mat-meta">
-        <span>{one(T.boundary, lang)}</span>
-        {one(u.m.boundary, lang)}
-      </p>
-      <details className="mat-more">
-        <summary>{lang === "en" ? "More from the list" : "清单中的更多信息"}</summary>
-        <dl>
-          <div>
-            <dt>{one(T.design, lang)}</dt>
-            <dd>{one(u.m.notes, lang)}</dd>
-          </div>
-          <div>
-            <dt>{one(T.trade, lang)}</dt>
-            <dd>{u.m.trade}</dd>
-          </div>
-          <div>
-            <dt>{one(T.path, lang)}</dt>
-            <dd>{one(pathText(u.m), lang)}</dd>
-          </div>
-          {u.m.url ? (
-            <div>
-              <dt>{one(T.source, lang)}</dt>
-              <dd>
-                <a href={u.m.url} target="_blank" rel="noreferrer noopener">
-                  {new URL(u.m.url).hostname}
-                </a>
-              </dd>
+      <select
+        id={id}
+        className="mat-select"
+        value={value}
+        aria-label={extraKey ? u.label.zh : undefined}
+        onChange={(e) => {
+          const v = e.currentTarget.value;
+          if (extraKey) onChange(updateExtra(spec, extraKey, { id: v }));
+          else onChange(withChoice(spec, u.key, { id: v }));
+        }}
+      >
+        <MaterialOptions first={u.kind === "part" ? u.options : u.process ? [u.defaultId] : []} firstLabel={u.process ? T.usual : T.recommended} lang={lang} none={!!u.process} />
+      </select>
+      {u.removed ? <p className="mat-hint">{one(T.removed, lang)}</p> : null}
+      {u.note && !u.removed ? <p className="mat-meta">{lang === "en" ? `As ${u.note.en}` : `即${u.note.zh}`}</p> : null}
+      {!recommended ? <p className="mat-hint">{one(T.notRecommended, lang)}</p> : null}
+      {!u.drawn && !u.removed ? <p className="mat-hint">{one(T.sketch, lang)}</p> : null}
+      {!u.removed ? (
+        <>
+          <p className="mat-meta">
+            <span>{one(T.boundary, lang)}</span>
+            {one(u.m.boundary, lang)}
+          </p>
+          <label className="mat-check mat-contact">
+            <input type="checkbox" checked={u.contact === "direct"} onChange={(e) => set({ contact: e.currentTarget.checked ? "direct" : "outer" })} />
+            <span>{one(T.contact, lang)}</span>
+          </label>
+          <details className="mat-more" open={hasFields || undefined}>
+            <summary>{one(T.spec, lang)}</summary>
+            <div className="mat-fields">
+              <label className="mat-field">
+                <span>{one(T.grade, lang)}</span>
+                <input value={u.choice.grade ?? ""} placeholder={u.grade && !u.choice.grade ? one(u.grade, lang) : ""} maxLength={40} onChange={(e) => set({ grade: e.currentTarget.value || undefined })} />
+              </label>
+              <div className="mat-field">
+                <span>
+                  {one(T.color, lang)}
+                  <small>{one(colorDrawn(spec, u.key) ? T.color3d : T.colorPrint, lang)}</small>
+                </span>
+                <span className="mat-color">
+                  <input type="color" aria-label={one(T.color, lang)} value={u.choice.color ?? "#ffffff"} onChange={(e) => set({ color: e.currentTarget.value.toUpperCase() })} />
+                  <code>{u.choice.color ?? "—"}</code>
+                  {u.choice.color ? (
+                    <button type="button" className="st-link" onClick={() => set({ color: undefined })}>
+                      {one(T.clearColor, lang)}
+                    </button>
+                  ) : null}
+                </span>
+              </div>
+              <label className="mat-field">
+                <span>{one(T.supplier, lang)}</span>
+                <input value={u.choice.supplier ?? ""} maxLength={60} onChange={(e) => set({ supplier: e.currentTarget.value || undefined })} />
+              </label>
+              <label className="mat-field">
+                <span>{one(T.note, lang)}</span>
+                <textarea rows={2} value={u.choice.note ?? ""} maxLength={160} onChange={(e) => set({ note: e.currentTarget.value || undefined })} />
+              </label>
             </div>
+          </details>
+          <details className="mat-more">
+            <summary>{one(T.more, lang)}</summary>
+            <dl>
+              <div>
+                <dt>{one(T.design, lang)}</dt>
+                <dd>{one(u.m.notes, lang)}</dd>
+              </div>
+              <div>
+                <dt>{one(T.trade, lang)}</dt>
+                <dd>{u.m.trade}</dd>
+              </div>
+              <div>
+                <dt>{one(T.path, lang)}</dt>
+                <dd>{one(pathText(u.m), lang)}</dd>
+              </div>
+              {u.m.url ? (
+                <div>
+                  <dt>{one(T.source, lang)}</dt>
+                  <dd>
+                    <a href={u.m.url} target="_blank" rel="noreferrer noopener">
+                      {new URL(u.m.url).hostname}
+                    </a>
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          </details>
+          {rules.length ? (
+            <p className="mat-chips" aria-label={one(T.rules, lang)}>
+              {rules.map((r) => (
+                <span key={r} className={`mat-chip mat-chip-${r[0]}`}>
+                  {r}
+                </span>
+              ))}
+            </p>
           ) : null}
-        </dl>
-      </details>
-      {rules.length ? (
-        <p className="mat-chips" aria-label={one(T.rules, lang)}>
-          {rules.map((r) => (
-            <span key={r} className={`mat-chip mat-chip-${r[0]}`}>
-              {r}
-            </span>
-          ))}
+        </>
+      ) : null}
+      {custom || extraKey ? (
+        <p className="mat-actions">
+          {custom ? (
+            <button type="button" className="st-link" onClick={() => onChange(resetChoice(spec, u.key))}>
+              {one(T.reset, lang)}
+            </button>
+          ) : null}
+          {extraKey ? (
+            <button type="button" className="st-link" onClick={() => onChange(removeExtra(spec, extraKey))}>
+              {one(T.remove, lang)}
+            </button>
+          ) : null}
         </p>
       ) : null}
     </div>
   );
 }
 
-function OptionOf({ id, lang }: { id: string; lang: Lang }) {
-  const m = material(id);
-  return <option value={id}>{m ? `${one(m.name, lang)}  ${id}` : id}</option>;
+function AddPart({ spec, lang, onChange }: { spec: PackSpec; lang: Lang; onChange: (s: PackSpec) => void }) {
+  const [name, setName] = useState("");
+  const [mid, setMid] = useState("M021");
+  const [inner, setInner] = useState(false);
+  const full = (spec.extraParts?.length ?? 0) >= 12;
+  return (
+    <section className="st-sec">
+      <span className="st-label">{one(T.add, lang)}</span>
+      <span className="st-small">{one(T.addNote, lang)}</span>
+      <form
+        className="mat-add"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!name.trim() || full) return;
+          onChange(addExtra(spec, name, mid, inner));
+          setName("");
+        }}
+      >
+        <label className="mat-field">
+          <span>{one(T.name, lang)}</span>
+          <input value={name} maxLength={24} placeholder={lang === "en" ? "e.g. Seal sticker" : "例如：封口贴"} onChange={(e) => setName(e.currentTarget.value)} />
+        </label>
+        <label className="mat-field">
+          <span>{lang === "en" ? "Material" : "材料"}</span>
+          <select className="mat-select" value={mid} onChange={(e) => setMid(e.currentTarget.value)}>
+            <MaterialOptions first={[]} firstLabel={T.recommended} lang={lang} />
+          </select>
+        </label>
+        {spec.inner ? (
+          <label className="mat-check">
+            <input type="checkbox" checked={inner} onChange={(e) => setInner(e.currentTarget.checked)} />
+            <span>{one(T.onInner, lang)}</span>
+          </label>
+        ) : null}
+        <button type="submit" className="btn btn-ghost btn-small mat-add-btn" disabled={!name.trim() || full}>
+          {one(T.addBtn, lang)}
+        </button>
+      </form>
+    </section>
+  );
 }

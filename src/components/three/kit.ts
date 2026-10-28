@@ -594,10 +594,10 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
   const inside = new THREE.MeshStandardMaterial({ color: look.board?.inside ?? "#D9D4C8", roughness: 0.92, normalMap: insideFiber, normalScale: nScale(0.3) });
   const lining = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(roles.ground).lerp(new THREE.Color("#ffffff"), 0.15), roughness: 0.85, normalMap: insideFiber, normalScale: nScale(0.18), sheen: 0.3 });
   // flock and velvet pile (satin, when picked, is smoother and glossier)
-  const velvet = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(roles.ink).lerp(new THREE.Color(roles.key), 0.35), roughness: look.velvet?.rough ?? 1, sheen: look.velvet?.sheen ?? 1, sheenRoughness: 0.55, sheenColor: new THREE.Color(roles.key).lerp(new THREE.Color("#ffffff"), 0.4), clearcoat: look.velvet ? 0.25 : 0, clearcoatRoughness: 0.35 });
+  const velvet = new THREE.MeshPhysicalMaterial({ color: look.velvetColor ? new THREE.Color(look.velvetColor) : new THREE.Color(roles.ink).lerp(new THREE.Color(roles.key), 0.35), roughness: look.velvet?.rough ?? 1, sheen: look.velvet?.sheen ?? 1, sheenRoughness: 0.55, sheenColor: new THREE.Color(roles.key).lerp(new THREE.Color("#ffffff"), 0.4), clearcoat: look.velvet ? 0.25 : 0, clearcoatRoughness: 0.35 });
   const bareMetal = new THREE.MeshPhysicalMaterial({ color: "#D7D9D8", metalness: 1, roughness: 0.22 });
   const kraft = new THREE.MeshStandardMaterial({ color: "#B7905E", roughness: 0.93, normalMap: insideFiber, normalScale: nScale(0.45) });
-  const rope = new THREE.MeshStandardMaterial({ color: new THREE.Color(roles.ink).lerp(new THREE.Color(roles.key), 0.3), roughness: 0.95 });
+  const rope = new THREE.MeshStandardMaterial({ color: look.rope ? new THREE.Color(look.rope) : new THREE.Color(roles.ink).lerp(new THREE.Color(roles.key), 0.3), roughness: 0.95 });
   const cork = new THREE.MeshStandardMaterial({ map: canvasTex(noiseCanvas("#B98D5C", 0.35, 128, 900), true, true), roughness: 0.95 });
   for (const m of [edge, inside, lining, velvet, bareMetal, kraft, rope, cork]) live(m);
 

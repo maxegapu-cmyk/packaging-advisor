@@ -18,7 +18,7 @@ import { BLEED, type PrintLayout, type Sheet } from "@/lib/print/layout";
 import type { Check } from "@/lib/print/preflight";
 import { handTextOf, rolesOf, type ArtInput } from "../three/art";
 import { loadInscription } from "@/lib/fonts";
-import { documentsFor, LIST, offListOf, rulesFor, usesOf } from "@/lib/materials";
+import { choiceText, documentsFor, LIST, offListOf, rulesFor, usesOf } from "@/lib/materials";
 import { baseColor, drawSheetPreview, panelArt, panelPpm } from "./render";
 
 const PT = 72 / 25.4;
@@ -315,7 +315,7 @@ function materialSheet(inp: PdfInput): HTMLCanvasElement {
       text(name, 52, y, 2.9, 600);
       const touch = u.touches === "food" ? (en ? "touches food" : "直接接触食品") : u.touches === "cosmetics" ? (en ? "touches the cosmetic" : "直接接触化妆品") : "";
       if (touch) text(touch, 170, y, 2.5, 600, "#A3392B");
-      const extra = [u.grade ? one(u.grade) : "", one(u.m.boundary)].filter(Boolean).join(en ? " · " : "；");
+      const extra = [u.grade ? one(u.grade) : "", choiceText(u, en ? "en" : "zh"), one(u.m.boundary)].filter(Boolean).join(en ? " · " : "；");
       y = para(ctx, extra, 52, y + 4.3, 2.5, 144, mm, "#555");
       const ids = rules.filter((r) => r.by.includes(u.key)).map((r) => r.rule.id);
       if (ids.length) {
