@@ -10,6 +10,7 @@
  * product photographer's cove, with the gentle falloff real lights give.
  */
 import * as THREE from "three";
+import { GALLERY_TONES, type Gallery } from "@/lib/gallery";
 
 type Panel = { c: THREE.Vector3; w: number; h: number; i: number; warm?: number };
 
@@ -138,12 +139,13 @@ export function sweepGeometry(): THREE.BufferGeometry {
   return g;
 }
 
-export type Backdrop = "studio" | "white" | "brand" | "dark";
+/** The three display galleries (素白, 天青, 墨), a marketplace white, and the brand's own colour. */
+export type Backdrop = Gallery | "white" | "brand";
 
 /** Sweep paper color and how much it glows (a white seamless is lit to near white). */
 export function backdropLook(b: Backdrop, brandHex: string): { color: THREE.Color; glow: number } {
   if (b === "white") return { color: new THREE.Color("#ffffff"), glow: 0.55 };
-  if (b === "dark") return { color: new THREE.Color("#2a2a2a"), glow: 0 };
   if (b === "brand") return { color: new THREE.Color(brandHex), glow: 0.08 };
-  return { color: new THREE.Color("#e4e4e0"), glow: 0.12 };
+  const t = GALLERY_TONES[b] ?? GALLERY_TONES.paper;
+  return { color: new THREE.Color(t.sweep), glow: t.dark ? 0 : b === "celadon" ? 0.08 : 0.12 };
 }

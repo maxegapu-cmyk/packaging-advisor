@@ -39,6 +39,10 @@ export type Kit = {
   engraved: (kind: FaceKind, wMm: number, hMm: number) => THREE.MeshPhysicalMaterial;
   rope: THREE.MeshStandardMaterial;
   cork: THREE.MeshStandardMaterial;
+  /** Song brocade covering a box, `wMm` × `hMm` of it. */
+  brocade: (wMm: number, hMm: number) => THREE.MeshPhysicalMaterial;
+  /** Polished bone, for a clasp. */
+  bone: THREE.MeshPhysicalMaterial;
   dispose: () => void;
 };
 
@@ -55,10 +59,19 @@ const FINISH = {
   gloss: { rough: 0.42, bump: 0.04, clearcoat: 1, ccRough: 0.04, sheen: 0, film: 0.18 },
   softTouch: { rough: 0.9, bump: 0.05, clearcoat: 0, ccRough: 0.1, sheen: 0.6, film: 0.72 },
   paper: { rough: 0.9, bump: 0.38, clearcoat: 0, ccRough: 0.1, sheen: 0.35, film: 0.62 },
+  // 宣纸: long soft fibres, a dry surface that drinks the ink
+  xuan: { rough: 0.96, bump: 0.55, clearcoat: 0, ccRough: 0.1, sheen: 0.28, film: 0.62 },
+  // 洒金笺: a sized paper with flakes of gold leaf in it (the flakes are added per face)
+  goldFleck: { rough: 0.88, bump: 0.3, clearcoat: 0, ccRough: 0.1, sheen: 0.3, film: 0.62 },
 } as const;
 
-/** Tangent-space normal map of a raised mask (emboss): white areas stand up, edges slope. */
-function embossNormal(mask: HTMLCanvasElement, strength = 3): HTMLCanvasElement {
+/**
+ * Tangent-space normal map of a pressed mask. Positive `strength` raises the white areas
+ * (emboss), negative presses them in (deboss, letterpress). `bevelPx` is the width of the slope
+ * at the mask's own resolution, so the shoulder is the same in millimetres on any face: a die
+ * leaves a rounded shoulder about 0.3 mm wide, a letterpress plate a sharper one.
+ */
+function embossNormal(mask: HTMLCanvasElement, strength = 3, bevelPx?: number): HTMLCanvasElement {
   const k = Math.min(1, 1024 / Math.max(mask.width, mask.height));
   const W = Math.max(4, Math.round(mask.width * k));
   const H = Math.max(4, Math.round(mask.height * k));
@@ -66,7 +79,7 @@ function embossNormal(mask: HTMLCanvasElement, strength = 3): HTMLCanvasElement 
   b.width = W;
   b.height = H;
   const bx = b.getContext("2d", { willReadFrequently: true })!;
-  bx.filter = `blur(${Math.max(1, W / 512).toFixed(1)}px)`;
+  bx.filter = `blur(${Math.max(0.6, bevelPx !== undefined ? bevelPx * k : W / 512).toFixed(2)}px)`;
   bx.drawImage(mask, 0, 0, W, H);
   const h = bx.getImageData(0, 0, W, H).data;
   const c = document.createElement("canvas");
@@ -87,6 +100,238 @@ function embossNormal(mask: HTMLCanvasElement, strength = 3): HTMLCanvasElement 
       out.data[o + 3] = 255;
     }
   ctx.putImageData(out, 0, 0);
+  return c;
+}
+
+/**
+ * Gold flecks for 洒金笺: irregular flakes of leaf, 0.4–2 mm, about 2% of the sheet, seeded per
+ * face. Returns the print with the flakes laid in (shown most where the print is light, as leaf
+ * under thin ink is) and a roughness / metalness map maker that marks them as metal.
+ */
+/**
+ * 宣纸 seen close: long soft fibres lying in the sheet, some a shade lighter, some darker, and a
+ * faint cloudiness where the pulp lay thicker. Printed over, so it shows most in light areas.
+ */
+function xuanCloud(color: HTMLCanvasElement, ppm: number, key: string) {
+  const W = color.width;
+  const H = color.height;
+  let h = 2166136261;
+  for (const ch of key) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  let seed = (h >>> 0) % 2147483646 || 1;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const out = document.createElement("canvas");
+  out.width = W;
+  out.height = H;
+  const o = out.getContext("2d")!;
+  o.drawImage(color, 0, 0);
+  // the cloud: broad soft patches where the pulp lay thicker or thinner
+  const area = (W * H) / (ppm * ppm);
+  o.globalCompositeOperation = "multiply";
+  for (let i = 0, n = Math.min(90, Math.round(area / 260)); i < n; i++) {
+    const x = rnd() * W;
+    const y = rnd() * H;
+    const r = (8 + rnd() * 26) * ppm;
+    const g = o.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(196,188,170,${(0.06 + rnd() * 0.07).toFixed(3)})`);
+    g.addColorStop(1, "rgba(196,188,170,0)");
+    o.fillStyle = g;
+    o.fillRect(x - r, y - r, 2 * r, 2 * r);
+  }
+  // the fibres: long, thin, gently curved
+  o.lineCap = "round";
+  const count = Math.min(3200, Math.round(area * 0.05));
+  for (let i = 0; i < count; i++) {
+    const dark = rnd() < 0.45;
+    o.globalCompositeOperation = dark ? "multiply" : "screen";
+    o.strokeStyle = dark ? `rgba(150,140,120,${(0.1 + rnd() * 0.14).toFixed(3)})` : `rgba(255,255,255,${(0.12 + rnd() * 0.2).toFixed(3)})`;
+    o.lineWidth = Math.max(0.6, (0.04 + rnd() * 0.09) * ppm);
+    const x = rnd() * W;
+    const y = rnd() * H;
+    const len = (2 + rnd() * rnd() * 9) * ppm;
+    const a = rnd() * Math.PI * 2;
+    const bend = (rnd() - 0.5) * len * 0.5;
+    const ex = x + Math.cos(a) * len;
+    const ey = y + Math.sin(a) * len;
+    o.beginPath();
+    o.moveTo(x, y);
+    o.quadraticCurveTo((x + ex) / 2 - Math.sin(a) * bend, (y + ey) / 2 + Math.cos(a) * bend, ex, ey);
+    o.stroke();
+  }
+  o.globalCompositeOperation = "source-over";
+  return out;
+}
+
+function goldFlecks(color: HTMLCanvasElement, ppm: number, key: string) {
+  const W = color.width;
+  const H = color.height;
+  let h = 2166136261;
+  for (const ch of key) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  let seed = (h >>> 0) % 2147483646 || 1;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const flakes: [number, number][][] = [];
+  const area = (W * H) / (ppm * ppm);
+  const count = Math.min(2600, Math.round(area * 0.012));
+  for (let i = 0; i < count; i++) {
+    const cx = rnd() * W;
+    const cy = rnd() * H;
+    const r = (0.2 + rnd() * rnd() * 0.85) * ppm;
+    const n = 5 + Math.floor(rnd() * 4);
+    const pts: [number, number][] = [];
+    for (let j = 0; j < n; j++) {
+      const a = (j / n) * Math.PI * 2 + rnd() * 0.6;
+      const rr = r * (0.45 + rnd() * 0.75);
+      pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr * (0.6 + rnd() * 0.5)]);
+    }
+    flakes.push(pts);
+  }
+  const trace = (ctx: CanvasRenderingContext2D) => {
+    ctx.beginPath();
+    for (const f of flakes) {
+      f.forEach(([x, y], j) => (j ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.closePath();
+    }
+  };
+  const out = document.createElement("canvas");
+  out.width = W;
+  out.height = H;
+  const o = out.getContext("2d")!;
+  o.drawImage(color, 0, 0);
+  // the leaf shows through light print and is mostly hidden under dark ink
+  const leaf = document.createElement("canvas");
+  leaf.width = W;
+  leaf.height = H;
+  const l = leaf.getContext("2d")!;
+  l.fillStyle = "#D2AE58";
+  trace(l);
+  l.fill();
+  l.globalCompositeOperation = "destination-in";
+  l.drawImage(color, 0, 0);
+  const id = l.getImageData(0, 0, W, H);
+  const src = o.getImageData(0, 0, W, H).data;
+  for (let i = 0; i < id.data.length; i += 4) {
+    if (!id.data[i + 3]) continue;
+    const lum = (0.3 * src[i] + 0.59 * src[i + 1] + 0.11 * src[i + 2]) / 255;
+    id.data[i] = 0xd2;
+    id.data[i + 1] = 0xae;
+    id.data[i + 2] = 0x58;
+    id.data[i + 3] = Math.round(255 * Math.max(0.12, Math.min(0.92, (lum - 0.25) * 1.3)));
+  }
+  l.putImageData(id, 0, 0);
+  o.drawImage(leaf, 0, 0);
+  return {
+    color: out,
+    roughMetal: (paperRough: number, base: HTMLCanvasElement | null) => {
+      const c = document.createElement("canvas");
+      c.width = W;
+      c.height = H;
+      const x = c.getContext("2d")!;
+      if (base) x.drawImage(base, 0, 0, W, H);
+      else {
+        x.fillStyle = `rgb(255,${Math.round(paperRough * 255)},0)`;
+        x.fillRect(0, 0, W, H);
+      }
+      x.globalAlpha = 0.9;
+      x.fillStyle = "rgb(255,70,255)";
+      trace(x);
+      x.fill();
+      return c;
+    },
+  };
+}
+
+/**
+ * One repeat of Song brocade (宋锦) in the palette: a tortoise-shell lattice (龟背纹) in the
+ * accent colour on the key colour, a four-petal flower in each cell, a small lozenge at each
+ * node. Drawn to tile seamlessly.
+ */
+function brocadeCanvasRaw(base: string, line: string, flower: string): HTMLCanvasElement {
+  const S = 512;
+  const c = document.createElement("canvas");
+  c.width = S;
+  c.height = S;
+  const x = c.getContext("2d")!;
+  x.fillStyle = base;
+  x.fillRect(0, 0, S, S);
+  // hexagons on a grid that tiles: two columns and two rows per tile
+  const r = S / 4 / Math.cos(Math.PI / 6) / 1.0;
+  const dx = S / 2;
+  const dy = S / 2;
+  const hex = (cx: number, cy: number, rr: number) => {
+    x.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI / 3) * i + Math.PI / 6;
+      const px = cx + Math.cos(a) * rr;
+      const py = cy + Math.sin(a) * rr * 1.0;
+      if (i) x.lineTo(px, py);
+      else x.moveTo(px, py);
+    }
+    x.closePath();
+  };
+  const centres: [number, number][] = [];
+  for (let row = -1; row <= 2; row++)
+    for (let col = -1; col <= 2; col++) centres.push([col * dx + (row % 2 ? dx / 2 : 0), row * dy]);
+  x.strokeStyle = line;
+  x.lineWidth = S * 0.018;
+  x.globalAlpha = 0.85;
+  for (const [cx, cy] of centres) {
+    hex(cx, cy, r * 0.98);
+    x.stroke();
+  }
+  x.lineWidth = S * 0.006;
+  x.globalAlpha = 0.55;
+  for (const [cx, cy] of centres) {
+    hex(cx, cy, r * 0.82);
+    x.stroke();
+  }
+  // a four-petal flower in each cell
+  x.globalAlpha = 0.9;
+  for (const [cx, cy] of centres) {
+    x.fillStyle = flower;
+    for (let i = 0; i < 4; i++) {
+      x.save();
+      x.translate(cx, cy);
+      x.rotate((Math.PI / 2) * i + Math.PI / 4);
+      x.beginPath();
+      x.ellipse(0, -r * 0.2, r * 0.1, r * 0.2, 0, 0, Math.PI * 2);
+      x.fill();
+      x.restore();
+    }
+    x.fillStyle = line;
+    x.beginPath();
+    x.arc(cx, cy, r * 0.06, 0, Math.PI * 2);
+    x.fill();
+  }
+  x.globalAlpha = 1;
+  // the woven look: fine warp lines
+  x.globalAlpha = 0.07;
+  x.fillStyle = "#000";
+  for (let i = 0; i < S; i += 3) x.fillRect(i, 0, 1, S);
+  x.globalAlpha = 1;
+  return c;
+}
+
+/** A tiny warp-and-weft normal map: alternating floats, as silk weave catches the light. */
+function weaveNormalRaw(): HTMLCanvasElement {
+  const S = 16;
+  const c = document.createElement("canvas");
+  c.width = S;
+  c.height = S;
+  const x = c.getContext("2d")!;
+  const img = x.createImageData(S, S);
+  for (let y = 0; y < S; y++)
+    for (let i = 0; i < S; i++) {
+      const warp = ((Math.floor(i / 4) + Math.floor(y / 4)) & 1) === 0;
+      const t = warp ? Math.sin(((i % 4) / 4) * Math.PI * 2) : Math.sin(((y % 4) / 4) * Math.PI * 2);
+      const nx = warp ? t * 0.5 : 0;
+      const ny = warp ? 0 : t * 0.5;
+      const l = Math.hypot(nx, ny, 1);
+      const o = (y * S + i) * 4;
+      img.data[o] = Math.round(((nx / l) * 0.5 + 0.5) * 255);
+      img.data[o + 1] = Math.round(((ny / l) * 0.5 + 0.5) * 255);
+      img.data[o + 2] = Math.round(((1 / l) * 0.5 + 0.5) * 255);
+      img.data[o + 3] = 255;
+    }
+  x.putImageData(img, 0, 0);
   return c;
 }
 
@@ -197,6 +442,8 @@ const once = <A extends unknown[]>(name: string, f: (...a: A) => HTMLCanvasEleme
   return c;
 };
 const noiseCanvas = once("noise", noiseCanvasRaw);
+const brocadeCanvas = once("brocade", brocadeCanvasRaw);
+const weaveNormal = once("weave", weaveNormalRaw);
 const woodCanvas = once("wood", woodCanvasRaw);
 const fluteCanvas = once("flute", fluteCanvasRaw);
 
@@ -245,24 +492,31 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
   const tex = (kind: FaceKind, wMm: number, hMm: number, surface: Surface = "board", arc?: number) => {
     const ppm = Math.min(16, maxTex / Math.max(wMm, hMm));
     // effects need the drawn masks now; plain print can wait
-    const lazy = !!opts.defer && !(a.effects ?? []).length;
+    // (洒金 needs the print too: its flakes change the roughness and metalness maps)
+    const lazy = !!opts.defer && !(a.effects ?? []).length && a.finish !== "goldFleck";
     const art = lazy ? null : drawFace(kind, wMm, hMm, ppm, a, { arc });
     const board = surface === "board";
     let fib: THREE.Texture | null = null;
     if (board) {
       fib = fiber.clone();
-      fib.repeat.set(wMm / 40, hMm / 40);
+      // xuan's fibres are long: the same fibre map, drawn larger
+      const fl = a.finish === "xuan" ? 72 : 40;
+      fib.repeat.set(wMm / fl, hMm / fl);
       fib.needsUpdate = true;
       disposables.push(fib);
     }
     // printed tinplate is lacquered; film is laminated (gloss or matte by finish); moulded
     // plastic is printed directly, satin
     const rough = surface === "metal" ? 0.34 : surface === "film" ? f.film : surface === "plastic" ? 0.38 : surface === "glaze" ? 0.1 : f.rough;
-    const map = canvasTex(art ? art.color : blank(), true);
+    // 洒金: flakes of gold leaf in the paper itself (not printed: they sit under thin ink and
+    // show most where the print is light)
+    const flecks = board && a.finish === "goldFleck" && art ? goldFlecks(art.color, ppm, kind + wMm + "x" + hMm) : null;
+    const paper = (c: HTMLCanvasElement) => (board && a.finish === "xuan" ? xuanCloud(c, ppm, kind + wMm + "x" + hMm) : c);
+    const map = canvasTex(flecks ? flecks.color : art ? paper(art.color) : blank(), true);
     if (lazy)
       opts.defer!(() => {
         // the same texture object, so every clone of the material sees the print
-        map.image = drawFace(kind, wMm, hMm, ppm, a, { arc }).color;
+        map.image = paper(drawFace(kind, wMm, hMm, ppm, a, { arc }).color);
         map.needsUpdate = true;
       });
     const m = new THREE.MeshPhysicalMaterial({
@@ -278,9 +532,17 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
       sheenColor: new THREE.Color(1, 1, 1),
     });
     const fx = a.effects ?? [];
+    if (flecks) {
+      const rmc = art?.foil && fx.some((e) => e === "goldFoil" || e === "silverFoil" || e === "holo") ? foilRoughMetal(art.foil, rough, 0.3) : null;
+      const rm = canvasTex(flecks.roughMetal(rough, rmc), false);
+      m.roughness = 1;
+      m.metalness = 1;
+      m.roughnessMap = rm;
+      m.metalnessMap = rm;
+    }
     if (art?.foil) {
       const foil = fx.find((e) => e === "goldFoil" || e === "silverFoil" || e === "holo");
-      if (foil) {
+      if (foil && !flecks) {
         // stamped foil: metal where the mask is white
         const rm = canvasTex(foilRoughMetal(art.foil, rough, foil === "holo" ? 0.18 : 0.3), false);
         m.roughness = 1;
@@ -301,10 +563,16 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
         m.clearcoatMap = canvasTex(art.foil, false);
         m.clearcoatRoughness = 0.03;
       }
-      if (fx.includes("emboss")) {
-        m.normalMap = canvasTex(embossNormal(art.foil), false);
-        m.normalScale = nScale(1.6);
+      // a die raises (击凸) or presses in (压凹) the accent elements, with a 0.3 mm shoulder
+      if (fx.includes("emboss") || fx.includes("deboss")) {
+        m.normalMap = canvasTex(embossNormal(art.foil, fx.includes("deboss") ? -2.6 : 2.6, 0.3 * ppm), false);
+        m.normalScale = nScale(1.5);
       }
+    }
+    if (art?.press && fx.includes("letterpress")) {
+      // a relief plate presses every word into the sheet: a crisp, shallow bite
+      m.normalMap = canvasTex(embossNormal(art.press, -1.8, 0.14 * ppm), false);
+      m.normalScale = nScale(1.2);
     }
     return live(m);
   };
@@ -322,6 +590,23 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
   const rope = new THREE.MeshStandardMaterial({ color: new THREE.Color(roles.ink).lerp(new THREE.Color(roles.key), 0.3), roughness: 0.95 });
   const cork = new THREE.MeshStandardMaterial({ map: canvasTex(noiseCanvas("#B98D5C", 0.35, 128, 900), true, true), roughness: 0.95 });
   for (const m of [edge, inside, lining, velvet, bareMetal, kraft, rope, cork]) live(m);
+
+  // 宋锦: the brocade a Song box is covered in, woven in the palette; the pattern repeats every
+  // 28 mm, with a fine warp-and-weft and the sheen of silk
+  const brocadeTile = canvasTex(brocadeCanvas(roles.key, roles.accent, roles.ground), true, true);
+  const weave = canvasTex(weaveNormal(), false, true);
+  const brocade = (wMm: number, hMm: number) => {
+    const t = brocadeTile.clone();
+    t.repeat.set(wMm / 28, hMm / 28);
+    t.needsUpdate = true;
+    const n = weave.clone();
+    n.repeat.set(wMm / 1.2, hMm / 1.2);
+    n.needsUpdate = true;
+    disposables.push(t, n);
+    return live(new THREE.MeshPhysicalMaterial({ map: t, roughness: 0.62, sheen: 1, sheenRoughness: 0.42, sheenColor: new THREE.Color(roles.accent).lerp(new THREE.Color("#ffffff"), 0.55), normalMap: n, normalScale: nScale(0.35) }));
+  };
+  // bone (骨扣): warm ivory, polished
+  const bone = live(new THREE.MeshPhysicalMaterial({ color: "#EDE3CF", roughness: 0.32, clearcoat: 0.4, clearcoatRoughness: 0.25, sheen: 0.2 }));
 
   const fluteBase = canvasTex(fluteCanvas(), true, true);
   const flute = (lengthMm: number, vertical = false) => {
@@ -417,5 +702,5 @@ export function makeKit(renderer: THREE.WebGLRenderer, a: ArtInput, maxTex: numb
     return m;
   };
 
-  return { tex, edge, inside, lining, velvet, bareMetal, kraft, flute, plastic, anodised, glass, fill, insert: (kind) => inserts[kind], ceramic, plain, wood, engraved, rope, cork, dispose: () => disposables.forEach((x) => x.dispose()) };
+  return { tex, edge, inside, lining, velvet, bareMetal, kraft, flute, plastic, anodised, glass, fill, insert: (kind) => inserts[kind], ceramic, plain, wood, engraved, rope, cork, brocade, bone, dispose: () => disposables.forEach((x) => x.dispose()) };
 }

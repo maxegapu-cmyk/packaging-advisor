@@ -15,6 +15,8 @@ const FINISH_TEXT: Record<PackSpec["finish"], Pair> = {
   gloss: { zh: "亮面覆膜，高光柔和连续、形状干净，不出现杂乱热点", en: "gloss laminate, soft continuous highlights with clean shapes, no random hot spots" },
   softTouch: { zh: "触感膜，丝绒般细腻的柔光，几乎没有高光", en: "soft-touch laminate, a fine velvety sheen with almost no highlight" },
   paper: { zh: "特种纹理纸，近看可见细微纸纤维，整体仍然干净", en: "textured specialty paper, fine fibres visible up close, still clean overall" },
+  xuan: { zh: "宣纸，长纤维柔软可见，微微透光，墨色温润不反光", en: "xuan paper: long soft fibres visible, faintly translucent, ink warm and without shine" },
+  goldFleck: { zh: "洒金笺，纸面散落细碎金箔，侧光下点点闪烁", en: "gold-flecked paper: small flakes of gold leaf scattered in the sheet, glinting under side light" },
 };
 
 const EFFECT_TEXT: Record<Effect, Pair> = {
@@ -23,6 +25,8 @@ const EFFECT_TEXT: Record<Effect, Pair> = {
   holo: { zh: "品名与重点图形镭射烫印，随角度出现彩虹色", en: "holographic foil on the name and key graphic, rainbow shifts with the angle" },
   spotUV: { zh: "品名与重点图形局部 UV 亮油，与周围哑面形成反差", en: "spot-UV gloss on the name and key graphic against the surrounding surface" },
   emboss: { zh: "品名与重点图形击凸，侧光下可见浮雕阴影", en: "embossed name and key graphic, relief visible under side light" },
+  deboss: { zh: "品名与重点图形压凹，压痕边缘在侧光下形成细阴影", en: "debossed name and key graphic, the pressed edges catching a fine shadow under side light" },
+  letterpress: { zh: "文字凸版压印，字压入纸面，墨色饱满边缘略深", en: "letterpressed type, pressed into the paper, ink full with slightly darker edges" },
 };
 
 const FORM_TEXT: Record<PackSpec["form"], Pair> = {
@@ -44,6 +48,7 @@ const FORM_TEXT: Record<PackSpec["form"], Pair> = {
   blister: { zh: "泡罩卡：印刷背卡带欧式挂孔，透明 PET 泡罩内装产品", en: "blister card: a printed backing card with a euro hang slot and the product in a clear PET blister" },
   aseptic: { zh: "无菌砖形纸盒，顶部封边折平，两侧折耳，带旋盖", en: "aseptic brick carton with the top seal folded flat, ears folded onto the sides and a screw cap" },
   woodBox: { zh: "松木抽盖木箱，盖面激光烙印", en: "pine crate with a sliding lid, laser-engraved on top" },
+  brocade: { zh: "宋锦翻盖锦盒，盖上贴竖长题签，正面骨扣丝绳扣合", en: "Song brocade box with a hinged lid, a tall title slip on the lid and a bone clasp with a silk loop at the front" },
 };
 
 /** Surface notes for forms whose outside is not printed paper. */
@@ -57,6 +62,7 @@ const SURFACE_TEXT: Partial<Record<PackSpec["form"], Pair>> = {
   blister: { zh: "泡罩清透，边缘有细窄高光，不发雾", en: "a clear blister with thin edge highlights, not hazy" },
   aseptic: { zh: "表面是 PE 淋膜，柔和光泽", en: "PE-coated board with a soft sheen" },
   woodBox: { zh: "松木纹理自然，烙印处颜色深、边缘略焦", en: "natural pine grain; the engraving dark with slightly scorched edges" },
+  brocade: { zh: "宋锦织面有细密经纬与丝光，纹样随角度微微反光；题签是纸，骨扣温润", en: "Song brocade with a fine warp-and-weft and silk sheen, the pattern glinting with the angle; the slip is paper, the clasp smooth bone" },
 };
 
 const role = (d: Direction, r: string) => d.palette.find((s) => s.role === r);

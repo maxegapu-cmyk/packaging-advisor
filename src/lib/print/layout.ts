@@ -12,7 +12,7 @@ import type { Pair } from "../i18n";
 import type { Effect, Finish, Form, PackSpec } from "../pack";
 import { flatOf, foldsFor, type FoldPiece } from "./folds";
 
-export type FaceKind = "front" | "back" | "left" | "right" | "top" | "bottom" | "flap" | "band" | "bandPlain" | "baseSide" | "tinWrap" | "tinCap" | "inner" | "manual";
+export type FaceKind = "front" | "back" | "left" | "right" | "top" | "bottom" | "flap" | "band" | "bandPlain" | "baseSide" | "tinWrap" | "tinCap" | "inner" | "manual" | "slip";
 
 /** rot: clockwise quarter turns applied to the upright artwork. arc: degrees the panel wraps round a curved body. */
 export type Panel = { kind: FaceKind; x: number; y: number; w: number; h: number; rot: 0 | 90 | 180 | 270; info?: boolean; arc?: number };
@@ -264,6 +264,7 @@ const MAT: Record<Form, Pair> = {
   can: P("两片铝罐，罐身曲面印刷", "Two-piece aluminium can, printed on the body"),
   ceramic: P("陶瓷贴花纸，烤花", "Ceramic decal, fired on"),
   woodBox: P("松木，盖面激光雕刻", "Pine, laser-engraved lid"),
+  brocade: P("1500 g 灰板裱宋锦；题签 120 g 宣纸或仿古纸，骨扣丝绳", "1500 gsm greyboard covered in Song brocade; title slip on 120 gsm xuan or antique paper; bone clasp and silk loop"),
 };
 
 export const FINISH_NOTE: Record<Finish, Pair> = {
@@ -271,6 +272,8 @@ export const FINISH_NOTE: Record<Finish, Pair> = {
   gloss: P("表面处理：覆亮膜或过光油", "Finish: gloss lamination or varnish"),
   softTouch: P("表面处理：覆触感膜（丝绒膜）", "Finish: soft-touch (velvet) lamination"),
   paper: P("表面处理：特种纸，不覆膜", "Finish: textured paper, no lamination"),
+  xuan: P("承印物：宣纸（或仿宣特种纸），不覆膜；吸墨，深色大面积宜减墨量", "Stock: xuan paper (or a xuan-like specialty paper), unlaminated; absorbent, so cut ink density on large dark areas"),
+  goldFleck: P("承印物：洒金笺（纸中含金箔碎片），不覆膜；金片为纸张本身所有，不在印版上", "Stock: gold-flecked paper (flakes of gold leaf in the sheet), unlaminated; the flecks are the paper's, not on any plate"),
 };
 
 /** Each extra effect gets its own plate in the print file. */
@@ -280,6 +283,8 @@ export const EFFECT_NOTE: Record<Effect, Pair> = {
   holo: P("镭射膜烫印：品名与重点图形，镭射版单独一页", "Holographic foil on the name and key graphics; plate on its own page"),
   spotUV: P("局部 UV：品名与重点图形上亮油，UV 版单独一页", "Spot UV gloss on the name and key graphics; UV plate on its own page"),
   emboss: P("击凸：品名与重点图形凸起，击凸版单独一页，印厂据此做阴阳模", "Emboss on the name and key graphics; the emboss plate is on its own page for the printer's male and female dies"),
+  deboss: P("压凹：品名与重点图形压入纸面，压凹版单独一页，宜用 300 g 以上厚纸或灰板裱纸", "Deboss on the name and key graphics, pressed into the sheet; plate on its own page; use 300 gsm or heavier, or wrapped board"),
+  letterpress: P("凸版压印：全部文字用凸版印刷并压入纸面，凸版单独一页；宜用棉浆纸、宣纸等松厚纸", "Letterpress: all the type printed from a relief plate and pressed into the sheet; plate on its own page; suits bulky cotton or xuan papers"),
 };
 
 const DIE = P("刀线和压痕为标准结构，开模前请以印厂刀模为准。", "Cut and crease lines are a standard structure; use your printer's die line before cutting.");
@@ -348,6 +353,12 @@ function sheetsFor(form: Form, w: number, h: number, d: number, finish: Finish, 
         return l;
       };
       return [sheet(id("card"), nm(P("泡罩卡纸", "Blister card")), [card("front"), card("back")], mat, [...notes, P("挂孔位置和吸塑泡壳由吸塑厂按产品开模。", "The hang hole and blister are tooled by the blister maker to fit the product.")], qty)];
+    }
+    case "brocade": {
+      // the same rule as the 3D box (forms-song.ts slipSize), kept inside the lid
+      const sw = Math.round(Math.min(w * 0.18, 44));
+      const sh = Math.round(Math.min(Math.max(40, d * 0.66), d - 16));
+      return [sheet(id("slip"), nm(P("宋锦盒题签", "Brocade box title slip")), [rectPiece("slip", P("题签", "Title slip"), sw, sh, [{ kind: "slip", x: 0, y: 0, w: sw, h: sh, rot: 0 }])], mat, [...notes, P("锦面为织物，不印刷：按色卡选宋锦，主色与纹样色见色彩卡。", "The brocade is woven, not printed: choose a Song brocade from the mill's swatches to the colour card's key and pattern colours."), P("题签贴于盒盖左侧，距左边与上下边相等。", "Paste the slip on the left of the lid, the same distance from the left edge as from top and bottom.")], qty)];
     }
     case "woodBox":
       return [sheet(id("engrave"), nm(P("盖面激光雕刻", "Lid engraving")), [rectPiece("lid", P("盖面", "Lid"), w, d, [{ kind: "front", x: 0, y: 0, w, h: d, rot: 0 }], [], [], "none")], mat, [P("黑色部分为雕刻区域。", "Black areas are engraved."), P("标签信息请另做不干胶贴在箱底。", "Put label information on a sticker on the base.")], qty, "engrave")];

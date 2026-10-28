@@ -19,6 +19,7 @@ import { PackBar } from "./PackBar";
 import { FormGlyph } from "./pack/FormGlyph";
 import { HowVignette } from "./HowVignettes";
 import { SpaceShowcase } from "./SpaceShowcase";
+import { FretCorner, InkHills, SealStamp, useUnroll } from "./SongMarks";
 
 const UPLOAD_HREF = "/login?next=/new";
 
@@ -62,8 +63,8 @@ const C = {
   spaceKicker: { zh: "第 3 步", en: "Step 3" },
   spaceH: { zh: "像拿在手里一样看包装。", en: "See the packaging as if it were in your hand." },
   spaceSub: {
-    zh: "纸盒、礼盒、飞机盒、利乐砖、自立袋、按压瓶、泡罩卡、玻璃罐、易拉罐、瓷罐、木箱……都按你的尺寸画出来，还能把产品装进外盒看组合效果。",
-    en: "Cartons, gift boxes, mailers, aseptic bricks, pouches, pump bottles, blister cards, glass jars, cans, porcelain caddies, crates, all drawn at your size, and products can be packed into an outer box.",
+    zh: "纸盒、礼盒、飞机盒、利乐砖、自立袋、按压瓶、泡罩卡、玻璃罐、易拉罐、瓷罐、木箱、宋锦盒……都按你的尺寸画出来，还能把产品装进外盒看组合效果。",
+    en: "Cartons, gift boxes, mailers, aseptic bricks, pouches, pump bottles, blister cards, glass jars, cans, porcelain caddies, crates, Song brocade boxes, all drawn at your size, and products can be packed into an outer box.",
   },
   spacePoints: [
     { t: { zh: "任意翻转", en: "Turn it any way" }, d: { zh: "鼠标拖动或单指滑动，上下左右整圈翻转；双指缩放。", en: "Drag or swipe to turn it all the way round; pinch to zoom." } },
@@ -79,7 +80,7 @@ const C = {
     { t: { zh: "包装文案", en: "Packaging copy" }, d: { zh: "品名行、正面主张和说明书步骤，只依据你提供的事实。", en: "Name line, front promise and manual steps, from your facts only." } },
     { t: { zh: "措辞核查", en: "Wording check" }, d: { zh: "标出“医用级”“降三高”这类有风险的说法，并给出替代写法。", en: "Flags risky claims like “medical grade” and suggests safer wording." } },
     { t: { zh: "印刷文件", en: "Print file" }, d: { zh: "1:1 刀模展开图、3 mm 出血、裁切与压痕专色、印刷工单，印厂直接可用。", en: "1:1 die lines and artwork, 3 mm bleed, cut and crease spot colors and a job sheet a printer can use." } },
-    { t: { zh: "电商图片", en: "Listing images" }, d: { zh: "白底主图、正背面、打开、细节、尺寸图，从 3D 直接渲染。", en: "White main image, front, back, opened, close-up and dimensions, rendered from the 3D." } },
+    { t: { zh: "电商图片", en: "Listing images" }, d: { zh: "白底主图、正背面、打开、细节、尺寸图和陈列图，从 3D 直接渲染。", en: "White main image, front, back, opened, close-up, dimensions and a gallery shot, rendered from the 3D." } },
     { t: { zh: "印前检查", en: "Pre-press checks" }, d: { zh: "标签必标项、条码、对比度、字号和措辞，下载前逐项核对。", en: "Mandatory label items, barcode, contrast, text size and wording, checked before you download." } },
   ] as { t: Pair; d: Pair }[],
 
@@ -139,45 +140,59 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
   const tea = SAMPLES[0].board;
   const teaRec = tea.directions.find((d) => d.id === tea.recommendation.pick) ?? tea.directions[0];
   const sampleIds = new Set(SAMPLES.map((s) => s.id));
+  const [scrollRef, roll] = useUnroll<HTMLDivElement>();
 
   return (
     <div className={lang === "en" ? "landing is-en" : "landing is-zh"}>
       <Topbar lang={lang} langSwitch={langSwitch} />
 
-      <SymbiosisHero samples={SAMPLES} lang={lang}>
-        {/* In Chinese the headline is an inscription: two columns written top to bottom, without punctuation, sealed below. */}
-        <h1 className={lang === "en" ? "hero-h" : "hero-h hero-v"}>
-          <span className="hero-line">{lang === "en" ? C.heroA.en : C.heroA.zh.replace(/[，。]/g, "")}</span>
-          <span className="hero-line">{lang === "en" ? C.heroB.en : C.heroB.zh.replace(/[，。]/g, "")}</span>
-        </h1>
-        <Bi p={C.heroSub} lang={lang} as="p" className="hero-sub" />
-        <div className="hero-ctas">
-          <a className="btn btn-primary btn-large" href={UPLOAD_HREF}>
-            <Bi p={C.ctaUpload} lang={lang} />
-          </a>
-          <a className="btn btn-large btn-icon sym-ghost" href="/space/demo">
-            <SpaceIcon />
-            <Bi p={C.ctaSpace} lang={lang} />
-          </a>
-        </div>
-        <Bi p={C.testNote} lang={lang} as="p" className="hero-note" />
-      </SymbiosisHero>
+      {/* the hero is mounted like a painting; two collectors' seals straddle its mount */}
+      <div className="hero-mount">
+        <SymbiosisHero samples={SAMPLES} lang={lang}>
+          {/* In Chinese the headline is an inscription: two columns written top to bottom, without punctuation, sealed below. */}
+          <h1 className={lang === "en" ? "hero-h" : "hero-h hero-v"}>
+            <span className="hero-line">{lang === "en" ? C.heroA.en : C.heroA.zh.replace(/[，。]/g, "")}</span>
+            <span className="hero-line">{lang === "en" ? C.heroB.en : C.heroB.zh.replace(/[，。]/g, "")}</span>
+          </h1>
+          <Bi p={C.heroSub} lang={lang} as="p" className="hero-sub" />
+          <div className="hero-ctas">
+            <a className="btn btn-primary btn-large" href={UPLOAD_HREF}>
+              <Bi p={C.ctaUpload} lang={lang} />
+            </a>
+            <a className="btn btn-large btn-icon sym-ghost" href="/space/demo">
+              <SpaceIcon />
+              <Bi p={C.ctaSpace} lang={lang} />
+            </a>
+          </div>
+          <Bi p={C.testNote} lang={lang} as="p" className="hero-note" />
+        </SymbiosisHero>
+        <SealStamp text="真尺" kind="zhu" size={26} tilt={-2} className="seal-straddle seal-at-foot" />
+        <SealStamp text="可印" kind="bai" size={24} tilt={1.5} className="seal-straddle seal-at-side" />
+      </div>
 
       <section id="how" className="band band-how">
         <Bi p={C.howH} lang={lang} as="h2" className="band-h" />
         <div className="band-body">
-          <ol className="how">
-            {C.steps.map((s, i) => (
-              <li key={i}>
-                <HowVignette n={i} sample={SAMPLES[0]} lang={lang} />
-                <span className="how-n" aria-hidden="true">
-                  {lang === "en" ? i + 1 : "壹贰叁肆"[i]}
-                </span>
-                <Bi p={s.t} lang={lang} as="h3" />
-                <Bi p={s.d} lang={lang} as="p" />
-              </li>
-            ))}
-          </ol>
+          {/* the four steps on a handscroll: a stick at the start, the roll at the end, a silk
+              divider (隔水) between steps; it unrolls once when it first comes into view */}
+          <div className="handscroll" ref={scrollRef} data-roll={roll}>
+            <span className="hs-stick" aria-hidden="true" />
+            <div className="hs-paper">
+              <ol className="how">
+                {C.steps.map((s, i) => (
+                  <li key={i}>
+                    <HowVignette n={i} sample={SAMPLES[0]} lang={lang} />
+                    <span className="how-n" aria-hidden="true">
+                      {lang === "en" ? i + 1 : "壹贰叁肆"[i]}
+                    </span>
+                    <Bi p={s.t} lang={lang} as="h3" />
+                    <Bi p={s.d} lang={lang} as="p" />
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <span className="hs-rod" aria-hidden="true" />
+          </div>
         </div>
       </section>
 
@@ -326,7 +341,16 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
         </div>
       </section>
 
+      {/* the closing call is set like a Song-printed cover: a thick-and-thin frame with key-fret
+          corners and distant hills inside it, everything on the centre line */}
       <section className="end">
+        <span className="end-frame" aria-hidden="true">
+          <InkHills className="end-hills" />
+          <FretCorner className="fret-tl" />
+          <FretCorner className="fret-tr" />
+          <FretCorner className="fret-bl" />
+          <FretCorner className="fret-br" />
+        </span>
         <Bi p={C.endH} lang={lang} as="h2" className="end-h" />
         <Bi p={C.endSub} lang={lang} as="p" />
         <a className="btn btn-primary btn-large" href={UPLOAD_HREF}>

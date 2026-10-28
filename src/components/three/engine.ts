@@ -211,7 +211,7 @@ export class PackScene {
   private sweep: THREE.Mesh | null = null;
   private sweepMat: THREE.MeshPhysicalMaterial | null = null;
   private sweepMap: THREE.DataTexture | null = null;
-  private backdrop: Backdrop = "studio";
+  private backdrop: Backdrop = "paper";
   private built: Built | null = null;
   /** An everyday object at real size next to the package (null = none). */
   private ref: { kind: Reference; root: THREE.Group; size: THREE.Vector3; dispose: () => void } | null = null;
@@ -300,7 +300,7 @@ export class PackScene {
     this.sweep = new THREE.Mesh(geo, this.sweepMat);
     this.sweep.position.y = -0.0005;
     this.scene.add(this.sweep);
-    this.setBackdrop("studio");
+    this.setBackdrop("paper");
   }
 
   /** Backdrop of the studio sweep. */
@@ -310,7 +310,7 @@ export class PackScene {
     const look = backdropLook(b, this.input ? rolesOf(this.input.d).ground : "#e4e4e0");
     this.sweepMat.color.copy(look.color);
     this.sweepMat.emissive.copy(look.color).multiplyScalar(look.glow);
-    this.scene.background = look.color.clone().multiplyScalar(b === "dark" ? 0.6 : 0.8);
+    this.scene.background = look.color.clone().multiplyScalar(b === "ink" ? 0.6 : 0.8);
     this.sweepMat.needsUpdate = true;
     this.invalidate();
   }

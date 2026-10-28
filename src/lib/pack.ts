@@ -7,23 +7,29 @@
 import type { Pair } from "./i18n";
 import { isCategory, type Category } from "./categories";
 
-export const FORMS = ["carton", "gift", "bookBox", "mailer", "drawer", "paperTube", "bag", "aseptic", "pouch", "bottle", "tube", "blister", "jar", "glassBottle", "tin", "can", "ceramic", "woodBox"] as const;
+export const FORMS = ["carton", "gift", "bookBox", "mailer", "drawer", "paperTube", "bag", "aseptic", "pouch", "bottle", "tube", "blister", "jar", "glassBottle", "tin", "can", "ceramic", "woodBox", "brocade"] as const;
 export type Form = (typeof FORMS)[number];
 
-/** The base surface: one per package (lamination or the bare stock). */
-export const FINISHES = ["matte", "gloss", "softTouch", "paper"] as const;
+/**
+ * The base surface: one per package (lamination or the bare stock). xuan (宣纸) and goldFleck
+ * (洒金笺) are papers in their own right, chosen for their fibres and flecks.
+ */
+export const FINISHES = ["matte", "gloss", "softTouch", "paper", "xuan", "goldFleck"] as const;
 export type Finish = (typeof FINISHES)[number];
 
 /**
- * Extra print effects on top of the base, applied to the brand name and key graphics.
- * Any combination, except that a package takes one foil (gold, silver or holographic).
+ * Extra print effects on top of the base, applied to the brand name and key graphics (letterpress
+ * to all the type). Any combination, except that a package takes one foil (gold, silver or
+ * holographic) and one pressing (emboss raises, deboss presses in, letterpress presses the inked
+ * type in as the old relief presses did).
  */
-export const EFFECTS = ["goldFoil", "silverFoil", "holo", "spotUV", "emboss"] as const;
+export const EFFECTS = ["goldFoil", "silverFoil", "holo", "spotUV", "emboss", "deboss", "letterpress"] as const;
 export type Effect = (typeof EFFECTS)[number];
 export const FOILS: readonly Effect[] = ["goldFoil", "silverFoil", "holo"];
+export const PRESSES: readonly Effect[] = ["emboss", "deboss", "letterpress"];
 
 /** Forms that can hold products (combinations). */
-export const OUTER_FORMS = ["carton", "gift", "bookBox", "mailer", "drawer", "woodBox", "bag"] as const;
+export const OUTER_FORMS = ["carton", "gift", "bookBox", "mailer", "drawer", "woodBox", "bag", "brocade"] as const;
 export type OuterForm = (typeof OUTER_FORMS)[number];
 /** Forms that go inside another (the product's own container). */
 export const INNER_FORMS = ["bottle", "tube", "jar", "glassBottle", "tin", "can", "ceramic", "paperTube", "aseptic", "pouch"] as const;
@@ -32,7 +38,7 @@ export type InnerForm = (typeof INNER_FORMS)[number];
 /** Round forms: `w` is the diameter and `d` equals it. */
 export const ROUND_FORMS: readonly Form[] = ["tin", "can", "paperTube", "bottle", "tube", "jar", "glassBottle", "ceramic"];
 /** Forms with an open motion (unfold, lid off, tray out, stopper out). */
-export const CAN_OPEN: readonly Form[] = ["carton", "gift", "bookBox", "mailer", "drawer", "woodBox", "paperTube", "aseptic", "tin", "can", "jar", "glassBottle", "ceramic"];
+export const CAN_OPEN: readonly Form[] = ["carton", "gift", "bookBox", "mailer", "drawer", "woodBox", "paperTube", "aseptic", "tin", "can", "jar", "glassBottle", "ceramic", "brocade"];
 
 /** What the products sit in, inside a combination (the cushioning families in use today). */
 export const INSERTS = ["velvet", "pulp", "foam", "card"] as const;
@@ -47,11 +53,12 @@ export const INSERT_LABELS: Record<Insert, Pair> = {
 export type InnerSpec = { form: InnerForm; count: 1 | 2; w: number; h: number; d: number; insert?: Insert };
 export type PackSpec = { form: Form; w: number; h: number; d: number; finish: Finish; effects?: Effect[]; inner?: InnerSpec | null };
 
-/** Turns an effect on or off, keeping a single foil. */
+/** Turns an effect on or off, keeping a single foil and a single pressing. */
 export function withEffect(spec: PackSpec, e: Effect, on: boolean): PackSpec {
   let list = (spec.effects ?? []).filter((x) => x !== e);
   if (on) {
     if (FOILS.includes(e)) list = list.filter((x) => !FOILS.includes(x));
+    if (PRESSES.includes(e)) list = list.filter((x) => !PRESSES.includes(x));
     list.push(e);
   }
   return { ...spec, effects: EFFECTS.filter((x) => list.includes(x)) };
@@ -72,6 +79,7 @@ export const MATERIAL_GROUPS: { id: string; label: Pair; forms: readonly Form[] 
   { id: "metal", label: { zh: "金属", en: "Metal" }, forms: ["tin", "can"] },
   { id: "ceramic", label: { zh: "陶瓷", en: "Ceramic" }, forms: ["ceramic"] },
   { id: "wood", label: { zh: "木材", en: "Wood" }, forms: ["woodBox"] },
+  { id: "fabric", label: { zh: "织物", en: "Fabric" }, forms: ["brocade"] },
 ];
 
 export const FORM_LABELS: Record<Form, Pair> = {
@@ -93,6 +101,7 @@ export const FORM_LABELS: Record<Form, Pair> = {
   glassBottle: { zh: "玻璃瓶", en: "Glass bottle" },
   tin: { zh: "马口铁罐", en: "Round tin" },
   ceramic: { zh: "瓷茶叶罐", en: "Porcelain caddy" },
+  brocade: { zh: "宋锦盒", en: "Song brocade box" },
 };
 
 export const FORM_NOTES: Record<Form, Pair> = {
@@ -114,6 +123,7 @@ export const FORM_NOTES: Record<Form, Pair> = {
   glassBottle: { zh: "玻璃瓶配瓶塞，酒、油、饮品常用。", en: "A glass bottle with a stopper, for spirits, oils and drinks." },
   tin: { zh: "茶叶、糖果常用的金属圆罐，标签环绕一周。", en: "Metal tin for tea and sweets, with a wrap-around print." },
   ceramic: { zh: "上釉的瓷罐配瓷盖，茶叶和土特产常用，可重复使用。", en: "A glazed porcelain jar with a porcelain lid, for tea and specialties; reusable." },
+  brocade: { zh: "灰板裱宋锦的翻盖锦盒，盖上贴一张印刷题签，骨扣丝绳扣合，茶器、名茶、文房与珍品常用。", en: "A hinged box of greyboard covered in Song brocade, with a printed title slip on the lid and a bone clasp with a silk loop; for tea ware, fine tea, scholar's objects and treasures." },
 };
 
 export const FINISH_LABELS: Record<Finish, Pair> = {
@@ -121,6 +131,8 @@ export const FINISH_LABELS: Record<Finish, Pair> = {
   gloss: { zh: "亮膜", en: "Gloss" },
   softTouch: { zh: "触感膜", en: "Soft-touch" },
   paper: { zh: "不覆膜纸感", en: "Uncoated paper" },
+  xuan: { zh: "宣纸", en: "Xuan paper" },
+  goldFleck: { zh: "洒金笺", en: "Gold-flecked paper" },
 };
 
 export const FINISH_HINTS: Record<Finish, Pair> = {
@@ -128,6 +140,8 @@ export const FINISH_HINTS: Record<Finish, Pair> = {
   gloss: { zh: "高光亮，颜色更艳", en: "Bright highlights, vivid color" },
   softTouch: { zh: "丝绒手感，略带柔光", en: "Velvety feel, a soft sheen" },
   paper: { zh: "纸纹可见，自然质朴", en: "Visible paper texture, natural" },
+  xuan: { zh: "长纤维柔软微透，墨色温润", en: "Long soft fibres, faintly translucent; ink sits warm" },
+  goldFleck: { zh: "纸中散落金箔碎片，随光闪烁", en: "Flakes of gold leaf in the sheet, catching the light" },
 };
 
 export const EFFECT_LABELS: Record<Effect, Pair> = {
@@ -136,6 +150,8 @@ export const EFFECT_LABELS: Record<Effect, Pair> = {
   holo: { zh: "镭射", en: "Holographic foil" },
   spotUV: { zh: "局部 UV", en: "Spot UV" },
   emboss: { zh: "击凸", en: "Emboss" },
+  deboss: { zh: "压凹", en: "Deboss" },
+  letterpress: { zh: "凸版压印", en: "Letterpress" },
 };
 
 /** Short wording of a finish with its effects, e.g. "哑膜 + 烫金 + 击凸". */
@@ -201,6 +217,7 @@ export const FORM_PRESET: Record<Form, { form: Form; w: number; h: number; d: nu
   glassBottle: { form: "glassBottle", w: 72, h: 230, d: 72 },
   tin: { form: "tin", w: 86, h: 120, d: 86 },
   ceramic: { form: "ceramic", w: 90, h: 120, d: 90 },
+  brocade: { form: "brocade", w: 240, h: 96, d: 180 },
 };
 
 export const isRound = (f: Form) => ROUND_FORMS.includes(f);
@@ -236,9 +253,10 @@ export function normalizePack(v: unknown, fallback: PackSpec = DEFAULT_PACK): Pa
   const legacyFoil = o.finish === "foil";
   const finish = legacyFoil ? "matte" : (FINISHES as readonly string[]).includes(o.finish as string) ? (o.finish as Finish) : fallback.finish;
   const rawFx = Array.isArray(o.effects) ? o.effects : o.effects === undefined ? (legacyFoil ? ["goldFoil"] : (fallback.effects ?? [])) : [];
-  // one foil: the first one asked for
+  // one foil and one pressing (a die can't raise and press in the same place): the first asked for
   const firstFoil = (rawFx as unknown[]).find((e) => FOILS.includes(e as Effect)) as Effect | undefined;
-  const effects: Effect[] = EFFECTS.filter((e) => rawFx.includes(e) && (!FOILS.includes(e) || e === firstFoil));
+  const firstPress = (rawFx as unknown[]).find((e) => PRESSES.includes(e as Effect)) as Effect | undefined;
+  const effects: Effect[] = EFFECTS.filter((e) => rawFx.includes(e) && (!FOILS.includes(e) || e === firstFoil) && (!PRESSES.includes(e) || e === firstPress));
   const w = clampDim(o.w, fallback.w);
   const h = clampDim(o.h, fallback.h);
   const d = isRound(form) ? w : clampDim(o.d, fallback.d);
@@ -265,7 +283,7 @@ export function comboLayout(spec: PackSpec) {
   const inner = spec.inner;
   if (!inner) return null;
   const n = inner.count;
-  const lyingOk = spec.form === "gift" || spec.form === "bookBox" || spec.form === "mailer" || spec.form === "drawer" || spec.form === "woodBox";
+  const lyingOk = spec.form === "gift" || spec.form === "bookBox" || spec.form === "mailer" || spec.form === "drawer" || spec.form === "woodBox" || spec.form === "brocade";
   const lying = lyingOk && inner.h > inner.w * 1.4;
   const foot = lying ? { w: inner.h, d: inner.w, h: inner.d } : { w: inner.w, d: inner.d, h: inner.h };
   const c = (x: number) => Math.round(Math.max(DIM_RANGE.min, Math.min(DIM_RANGE.max, x)));
@@ -280,6 +298,11 @@ export function comboLayout(spec: PackSpec) {
     case "bookBox":
       gap = 22;
       outer = { w: c(n * foot.w + (n + 1) * gap), h: c(foot.h + 26), d: c(foot.d + 56) };
+      break;
+    case "brocade":
+      // 2 mm brocade-covered walls and a hinged lid about a third of the height
+      gap = 22;
+      outer = { w: c(n * foot.w + (n + 1) * gap), h: c(foot.h + 34), d: c(foot.d + 56) };
       break;
     case "woodBox":
       // 10 mm pine walls each side, a 6 mm floor and a sliding lid

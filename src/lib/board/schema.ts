@@ -10,7 +10,12 @@
 
 export type Bi = { zh: string; en: string };
 
-export const LAYOUTS = ["offset", "stripe", "split"] as const;
+/**
+ * Front compositions. offset / stripe / split are modern; scroll (a mounted hanging scroll or
+ * handscroll), seal (one large carved seal) and symmetric (a Song book cover on its centre line)
+ * come from Song painting, seal carving and printing.
+ */
+export const LAYOUTS = ["offset", "stripe", "split", "scroll", "seal", "symmetric"] as const;
 export type Layout = (typeof LAYOUTS)[number];
 
 export const ROLES = ["background", "text", "brand", "accent", "support"] as const;

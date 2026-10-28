@@ -63,7 +63,7 @@ const T = {
   pdfDesc: { zh: "1:1 刀模与展开图、3 mm 出血、裁切与压痕专色、印刷工单", en: "1:1 dielines and artwork, 3 mm bleed, cut and crease spot colors, job sheet" },
   pdfAnyway: { zh: "有 {n} 项需要修改，仍然下载", en: "{n} issue(s) to fix; download anyway" },
   images: { zh: "电商图片 ZIP", en: "Listing images (ZIP)" },
-  imagesDesc: { zh: "白底主图、正背面、打开、细节、尺寸图、品牌色背景，1600 × 1600", en: "White main image, front, back, opened, close-up, dimensions, brand background; 1600 × 1600" },
+  imagesDesc: { zh: "白底主图、正背面、打开、细节、尺寸图、品牌色背景、陈列图，1600 × 1600", en: "White main image, front, back, opened, close-up, dimensions, brand background, gallery shot; 1600 × 1600" },
   working: { zh: "正在生成…", en: "Working…" },
   saved: { zh: "已保存", en: "Saved" },
   saving: { zh: "保存中…", en: "Saving…" },

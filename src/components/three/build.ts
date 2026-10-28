@@ -12,11 +12,12 @@ import { buildBag, buildBookBox, buildDrawer, buildMailer, buildPaperTube } from
 import { buildBottle, buildCeramic, buildGlassBottle, buildJar, buildPouch, buildTube } from "./forms-round";
 import { buildAseptic, buildBlister, buildCan, buildWoodBox } from "./forms-more";
 import type { InsertKind, Kit } from "./kit";
+import { buildBrocade } from "./forms-song";
 
 export type BuildCtx = { spec: PackSpec; kit: Kit; art: ArtInput; maxTex: number; own: { dispose: () => void }[]; category: string };
 
 /** Outer packs that hold their products in an insert (the rest show them beside). */
-const SLOTTED = new Set(["gift", "bookBox", "mailer", "drawer", "woodBox"]);
+const SLOTTED = new Set(["gift", "bookBox", "mailer", "drawer", "woodBox", "brocade"]);
 
 function single(spec: PackSpec, c: BuildCtx, holds?: Holds, insert?: InsertKind): Built {
   const k = c.kit;
@@ -57,6 +58,8 @@ function single(spec: PackSpec, c: BuildCtx, holds?: Holds, insert?: InsertKind)
       return buildAseptic(spec, k, c.art);
     case "woodBox":
       return buildWoodBox(spec, k, holds, insert);
+    case "brocade":
+      return buildBrocade(spec, k, holds, insert);
   }
 }
 

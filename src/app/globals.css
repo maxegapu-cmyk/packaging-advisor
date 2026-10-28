@@ -61,7 +61,6 @@
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='s' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.03 0.85' numOctaves='2' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.16 0 0 0 0 0.27 0 0 0 0 0.23 0.075 0 0 0 -0.02'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url%28%23s%29'/%3E%3C/svg%3E");
   --seal-img: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='0.5' y='0.5' width='31' height='31' rx='1.6' fill='%23a3392b'/%3E%3Ctext x='23.2' y='14.2' fill='%23f6efe6' text-anchor='middle' style='font-family:Kaiti SC,STKaiti,KaiTi,BiauKai,Songti SC,STSong,Noto Serif CJK SC,serif%3Bfont-weight:700%3Bfont-size:12.6px'%3E%E5%8C%85%3C/text%3E%3Ctext x='23.2' y='28.2' fill='%23f6efe6' text-anchor='middle' style='font-family:Kaiti SC,STKaiti,KaiTi,BiauKai,Songti SC,STSong,Noto Serif CJK SC,serif%3Bfont-weight:700%3Bfont-size:12.6px'%3E%E8%A3%85%3C/text%3E%3Ctext x='8.8' y='14.2' fill='%23f6efe6' text-anchor='middle' style='font-family:Kaiti SC,STKaiti,KaiTi,BiauKai,Songti SC,STSong,Noto Serif CJK SC,serif%3Bfont-weight:700%3Bfont-size:12.6px'%3E%E9%A1%BE%3C/text%3E%3Ctext x='8.8' y='28.2' fill='%23f6efe6' text-anchor='middle' style='font-family:Kaiti SC,STKaiti,KaiTi,BiauKai,Songti SC,STSong,Noto Serif CJK SC,serif%3Bfont-weight:700%3Bfont-size:12.6px'%3E%E9%97%AE%3C/text%3E%3C/svg%3E");
   --fishtail: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 12'%3E%3Cpath d='M0 0H16V12L8 6.6L0 12Z' fill='%231e2320'/%3E%3C/svg%3E");
-  --crackle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cg fill='none' stroke='rgba%2847,85,76,0.11%29' stroke-linejoin='round'%3E%3Cpath stroke-width='1.1' d='M81.2 194.5 L97.0 106.5 L123.5 84.6 L168.8 91.5 L116.8 196.0Z M240.4 63.5 L273.1 97.7 L274.4 182.2 L245.8 196.1 L188.0 92.0Z M116.8 196.0 L168.8 91.5 L177.4 91.8 L157.7 194.2 L143.0 202.9Z M36.7 115.1 L58.6 105.7 L97.0 106.5 L81.2 194.5 L77.6 197.3 L17.1 178.3Z M143.0 202.9 L157.7 194.2 L241.6 205.6 L241.2 214.2 L225.4 246.6 L167.5 261.4 L157.3 257.5Z M58.6 105.7 L36.7 115.1 L-6.9 97.7 L-39.6 63.5 L-31.9 51.6 L7.7 38.5 L16.9 40.6Z M338.6 105.7 L316.7 115.1 L273.1 97.7 L240.4 63.5 L248.1 51.6 L287.7 38.5 L296.9 40.6Z M-34.2 196.1 L-5.6 182.2 L17.1 178.3 L77.6 197.3 L73.3 242.9 L24.9 258.7 L-38.8 214.2 L-38.4 205.6Z M245.8 196.1 L274.4 182.2 L297.1 178.3 L357.6 197.3 L353.3 242.9 L304.9 258.7 L241.2 214.2 L241.6 205.6Z M167.5 -18.6 L225.4 -33.4 L248.1 51.6 L240.4 63.5 L188.0 92.0 L179.3 91.4Z M167.5 261.4 L225.4 246.6 L248.1 331.6 L240.4 343.5 L188.0 372.0 L179.3 371.4Z M7.7 38.5 L-31.9 51.6 L-54.6 -33.4 L-38.8 -65.8 L24.9 -21.3Z M7.7 318.5 L-31.9 331.6 L-54.6 246.6 L-38.8 214.2 L24.9 258.7Z M287.7 38.5 L248.1 51.6 L225.4 -33.4 L241.2 -65.8 L304.9 -21.3Z M287.7 318.5 L248.1 331.6 L225.4 246.6 L241.2 214.2 L304.9 258.7Z M157.7 194.2 L177.4 91.8 L179.3 91.4 L188.0 92.0 L245.8 196.1 L241.6 205.6Z M97.0 1.9 L93.7 29.5 L16.9 40.6 L7.7 38.5 L24.9 -21.3 L73.3 -37.1Z M97.0 281.9 L93.7 309.5 L16.9 320.6 L7.7 318.5 L24.9 258.7 L73.3 242.9Z M168.8 91.5 L123.5 84.6 L93.7 29.5 L97.0 1.9 L157.3 -22.5 L167.5 -18.6 L179.3 91.4 L177.4 91.8Z M168.8 371.5 L123.5 364.6 L93.7 309.5 L97.0 281.9 L157.3 257.5 L167.5 261.4 L179.3 371.4 L177.4 371.8Z M123.5 84.6 L97.0 106.5 L58.6 105.7 L16.9 40.6 L93.7 29.5Z M36.7 115.1 L17.1 178.3 L-5.6 182.2 L-6.9 97.7Z M316.7 115.1 L297.1 178.3 L274.4 182.2 L273.1 97.7Z M73.3 -37.1 L77.6 -82.7 L81.2 -85.5 L116.8 -84.0 L143.0 -77.1 L157.3 -22.5 L97.0 1.9Z M73.3 242.9 L77.6 197.3 L81.2 194.5 L116.8 196.0 L143.0 202.9 L157.3 257.5 L97.0 281.9Z'/%3E%3Cpath stroke-width='0.6' d='M145.4 179.3 L133.2 179.9 L121.6 183.8 L109.9 180.5 M278.8 235.3 L273.8 227.8 L267.1 221.9 L258.4 220.0 M214.6 112.1 L223.3 108.2 L233.0 108.2 L240.9 102.8 M58.7 254.9 L44.3 259.5 L34.0 270.7 L22.2 280.1 M218.0 75.5 L222.1 83.7 L223.5 92.7 L228.8 100.1 M69.0 28.3 L82.4 28.1 L95.8 29.0 L109.3 28.9 M53.4 204.9 L64.6 209.2 L76.2 212.4 L88.2 211.4 M75.5 271.9 L81.9 265.7 L85.7 257.7 L88.5 249.3 M239.2 179.7 L253.8 184.0 L269.1 183.9 L283.5 188.8 M92.1 83.0 L97.9 86.6 L104.5 88.3 L110.9 90.8'/%3E%3C/g%3E%3C/svg%3E");
   /* type */
   --sans: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif;
   /* the packaging art's serif (unchanged, it is part of the designs) */
@@ -116,7 +115,6 @@
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='s' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.03 0.85' numOctaves='2' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.8 0 0 0 0 0.9 0 0 0 0 0.86 0.065 0 0 0 -0.02'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url%28%23s%29'/%3E%3C/svg%3E");
   --seal-img: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='0.5' y='0.5' width='31' height='31' rx='1.6' fill='%23b8473a'/%3E%3Ctext x='23.2' y='14.2' fill='%23f6efe6' text-anchor='middle' style='font-family:Kaiti SC,STKaiti,KaiTi,BiauKai,Songti SC,STSong,Noto Serif CJK SC,serif%3Bfont-weight:700%3Bfont-size:12.6px'%3E%E5%8C%85%3C/text%3E%3Ctext x='23.2' y='28.2' fill='%23f6efe6' text-anchor='middle' style='font-family:Kaiti SC,STKaiti,KaiTi,BiauKai,Songti SC,STSong,Noto Serif CJK SC,serif%3Bfont-weight:700%3Bfont-size:12.6px'%3E%E8%A3%85%3C/text%3E%3Ctext x='8.8' y='14.2' fill='%23f6efe6' text-anchor='middle' style='font-family:Kaiti SC,STKaiti,KaiTi,BiauKai,Songti SC,STSong,Noto Serif CJK SC,serif%3Bfont-weight:700%3Bfont-size:12.6px'%3E%E9%A1%BE%3C/text%3E%3Ctext x='8.8' y='28.2' fill='%23f6efe6' text-anchor='middle' style='font-family:Kaiti SC,STKaiti,KaiTi,BiauKai,Songti SC,STSong,Noto Serif CJK SC,serif%3Bfont-weight:700%3Bfont-size:12.6px'%3E%E9%97%AE%3C/text%3E%3C/svg%3E");
   --fishtail: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 12'%3E%3Cpath d='M0 0H16V12L8 6.6L0 12Z' fill='%23c0cbc4'/%3E%3C/svg%3E");
-  --crackle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cg fill='none' stroke='rgba%28170,210,198,0.09%29' stroke-linejoin='round'%3E%3Cpath stroke-width='1.1' d='M81.2 194.5 L97.0 106.5 L123.5 84.6 L168.8 91.5 L116.8 196.0Z M240.4 63.5 L273.1 97.7 L274.4 182.2 L245.8 196.1 L188.0 92.0Z M116.8 196.0 L168.8 91.5 L177.4 91.8 L157.7 194.2 L143.0 202.9Z M36.7 115.1 L58.6 105.7 L97.0 106.5 L81.2 194.5 L77.6 197.3 L17.1 178.3Z M143.0 202.9 L157.7 194.2 L241.6 205.6 L241.2 214.2 L225.4 246.6 L167.5 261.4 L157.3 257.5Z M58.6 105.7 L36.7 115.1 L-6.9 97.7 L-39.6 63.5 L-31.9 51.6 L7.7 38.5 L16.9 40.6Z M338.6 105.7 L316.7 115.1 L273.1 97.7 L240.4 63.5 L248.1 51.6 L287.7 38.5 L296.9 40.6Z M-34.2 196.1 L-5.6 182.2 L17.1 178.3 L77.6 197.3 L73.3 242.9 L24.9 258.7 L-38.8 214.2 L-38.4 205.6Z M245.8 196.1 L274.4 182.2 L297.1 178.3 L357.6 197.3 L353.3 242.9 L304.9 258.7 L241.2 214.2 L241.6 205.6Z M167.5 -18.6 L225.4 -33.4 L248.1 51.6 L240.4 63.5 L188.0 92.0 L179.3 91.4Z M167.5 261.4 L225.4 246.6 L248.1 331.6 L240.4 343.5 L188.0 372.0 L179.3 371.4Z M7.7 38.5 L-31.9 51.6 L-54.6 -33.4 L-38.8 -65.8 L24.9 -21.3Z M7.7 318.5 L-31.9 331.6 L-54.6 246.6 L-38.8 214.2 L24.9 258.7Z M287.7 38.5 L248.1 51.6 L225.4 -33.4 L241.2 -65.8 L304.9 -21.3Z M287.7 318.5 L248.1 331.6 L225.4 246.6 L241.2 214.2 L304.9 258.7Z M157.7 194.2 L177.4 91.8 L179.3 91.4 L188.0 92.0 L245.8 196.1 L241.6 205.6Z M97.0 1.9 L93.7 29.5 L16.9 40.6 L7.7 38.5 L24.9 -21.3 L73.3 -37.1Z M97.0 281.9 L93.7 309.5 L16.9 320.6 L7.7 318.5 L24.9 258.7 L73.3 242.9Z M168.8 91.5 L123.5 84.6 L93.7 29.5 L97.0 1.9 L157.3 -22.5 L167.5 -18.6 L179.3 91.4 L177.4 91.8Z M168.8 371.5 L123.5 364.6 L93.7 309.5 L97.0 281.9 L157.3 257.5 L167.5 261.4 L179.3 371.4 L177.4 371.8Z M123.5 84.6 L97.0 106.5 L58.6 105.7 L16.9 40.6 L93.7 29.5Z M36.7 115.1 L17.1 178.3 L-5.6 182.2 L-6.9 97.7Z M316.7 115.1 L297.1 178.3 L274.4 182.2 L273.1 97.7Z M73.3 -37.1 L77.6 -82.7 L81.2 -85.5 L116.8 -84.0 L143.0 -77.1 L157.3 -22.5 L97.0 1.9Z M73.3 242.9 L77.6 197.3 L81.2 194.5 L116.8 196.0 L143.0 202.9 L157.3 257.5 L97.0 281.9Z'/%3E%3Cpath stroke-width='0.6' d='M145.4 179.3 L133.2 179.9 L121.6 183.8 L109.9 180.5 M278.8 235.3 L273.8 227.8 L267.1 221.9 L258.4 220.0 M214.6 112.1 L223.3 108.2 L233.0 108.2 L240.9 102.8 M58.7 254.9 L44.3 259.5 L34.0 270.7 L22.2 280.1 M218.0 75.5 L222.1 83.7 L223.5 92.7 L228.8 100.1 M69.0 28.3 L82.4 28.1 L95.8 29.0 L109.3 28.9 M53.4 204.9 L64.6 209.2 L76.2 212.4 L88.2 211.4 M75.5 271.9 L81.9 265.7 L85.7 257.7 L88.5 249.3 M239.2 179.7 L253.8 184.0 L269.1 183.9 L283.5 188.8 M92.1 83.0 L97.9 86.6 L104.5 88.3 L110.9 90.8'/%3E%3C/g%3E%3C/svg%3E");
   color-scheme: dark;
 }
 /* switching theme: colours ease across instead of snapping */
@@ -287,13 +285,14 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 .band-headrow { display: grid; gap: 12px; margin-bottom: clamp(24px, 3vw, 36px); }
 .band-sub { color: var(--ink-2); max-width: 44em; }
 /* Chinese, wide screens: each section title becomes a 题签, the title slip pasted on a book's cover,
-   written top to bottom beside the section and kept in view while the section scrolls by */
+   written top to bottom in 楷 (as a calligrapher wrote the slips) beside the section, and kept in
+   view while the section scrolls by */
 @media (min-width: 1101px) {
   .is-zh .band { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: clamp(36px, 4vw, 72px); align-items: start; }
   .is-zh .band > .band-h {
     position: sticky; top: 96px; margin: 0; writing-mode: vertical-rl;
     min-height: 11em; padding: 48px 15px 26px;
-    font-size: clamp(22px, 1.75vw, 27px); line-height: 1.3; letter-spacing: 0.2em; font-weight: 600;
+    font-family: var(--kai); font-size: clamp(23px, 1.85vw, 28px); line-height: 1.3; letter-spacing: 0.2em; font-weight: 500;
     background: var(--surface) var(--fishtail) no-repeat center 18px / 15px 11px;
     border: 1px solid var(--ink-2); box-shadow: inset 0 0 0 3px var(--surface), inset 0 0 0 4px var(--rule-strong);
   }
@@ -342,8 +341,8 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 .nots { list-style: none; margin: 0; padding: 0; display: grid; }
 .nots li { padding: 14px 0; border-bottom: 1px solid var(--rule); font-size: 16px; }
 .nots li:first-child { border-top: 1px solid var(--rule); }
-/* the closing call: a 天青 field crazed like Ru-ware glaze (开片), sealed */
-.end { position: relative; text-align: center; padding: clamp(72px, 10vw, 144px) var(--gutter); display: grid; gap: 16px; justify-items: center; background: var(--crackle), var(--accent-wash); background-size: 280px 280px, auto; color: var(--ink); border-top: 1px solid var(--rule); }
+/* the closing call: a 天青 field, sealed (the cover frame and hills are below, with the Song marks) */
+.end { position: relative; text-align: center; padding: clamp(72px, 10vw, 144px) var(--gutter); display: grid; gap: 16px; justify-items: center; background: var(--accent-wash); color: var(--ink); border-top: 1px solid var(--rule); }
 .end::before { content: ""; width: 44px; height: 44px; background: var(--seal-img) no-repeat center / contain; margin-bottom: 10px; }
 .end-h { font-size: clamp(30px, 4vw, 56px); }
 .end p { color: var(--ink-2); }
@@ -630,10 +629,12 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 .studio { --st-fg: #161616; --st-muted: rgb(0 0 0 / 0.56); --st-glass: rgb(255 255 255 / 0.78); --st-line: rgb(0 0 0 / 0.09); --st-active: #161616; --st-active-fg: #fff;
   position: fixed; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr) 392px; grid-template-rows: 60px 6px minmax(0, 1fr); color: var(--st-fg); overflow: hidden;
   transition: background 0.6s, --h-ground 0.8s ease, --h-ink 0.8s ease, --h-key 0.8s ease; }
-.studio.bd-studio { background: radial-gradient(120% 95% at 42% 34%, #ffffff 0%, #f2f2f0 42%, #d9d9d5 100%); }
+/* the three display galleries: 素白 off-white, 天青 celadon, 墨 ink */
+.studio.bd-paper { background: radial-gradient(120% 95% at 42% 34%, #fbf9f4 0%, #ece8df 46%, #d6d0c2 100%); }
+.studio.bd-celadon { background: radial-gradient(120% 95% at 42% 34%, #e7eee9 0%, #ccd8d0 46%, #a7b8ae 100%); }
 .studio.bd-white { background: #fff; }
 .studio.bd-brand { background: radial-gradient(110% 95% at 42% 36%, color-mix(in srgb, var(--sg) 55%, #fff) 0%, var(--sg) 52%, color-mix(in srgb, var(--sg) 72%, #000) 100%); }
-.studio.bd-dark { --st-fg: #f2f2f2; --st-muted: rgb(255 255 255 / 0.62); --st-glass: rgb(26 26 26 / 0.66); --st-line: rgb(255 255 255 / 0.13); --st-active: #fff; --st-active-fg: #161616;
+.studio.bd-ink { background: radial-gradient(120% 95% at 42% 34%, #3c3f3d 0%, #242625 46%, #121313 100%); --st-fg: #f2f2f2; --st-muted: rgb(255 255 255 / 0.62); --st-glass: rgb(26 26 26 / 0.66); --st-line: rgb(255 255 255 / 0.13); --st-active: #fff; --st-active-fg: #161616;
   background: radial-gradient(110% 95% at 42% 36%, #3b3b3b 0%, #171717 58%, #0a0a0a 100%); }
 @keyframes st-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes st-sway { 0%, 100% { transform: translateX(-4px); } 50% { transform: translateX(4px); } }
@@ -661,7 +662,7 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 .st-stage > .rm-bl { bottom: 14px; left: 14px; } .st-stage > .rm-br { bottom: 14px; right: 14px; }
 .st-canvas { position: absolute; inset: 0; }
 .st-canvas .pk-shadow { background: radial-gradient(closest-side, rgb(0 0 0 / 0.34), rgb(0 0 0 / 0.14) 55%, transparent); }
-.bd-dark .st-canvas .pk-shadow { background: radial-gradient(closest-side, rgb(0 0 0 / 0.7), rgb(0 0 0 / 0.3) 55%, transparent); }
+.bd-ink .st-canvas .pk-shadow { background: radial-gradient(closest-side, rgb(0 0 0 / 0.7), rgb(0 0 0 / 0.3) 55%, transparent); }
 .st-dock, .st-card, .st-hint, .st-chip, .st-views, .st-progress { -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4); }
 
 .st-label { font-size: 13px; font-weight: 700; letter-spacing: 0.02em; color: var(--ink); }
@@ -691,18 +692,18 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 
 /* dock: one row of actions; the photo render is the strong one */
 .st-dock { position: absolute; left: 50%; bottom: 22px; z-index: 4; transform: translateX(-50%); display: flex; align-items: center; gap: 2px; padding: 5px; border-radius: var(--r-pill); background: rgb(22 22 22 / 0.86); color: #f4f4f2; box-shadow: 0 16px 44px rgb(0 0 0 / 0.22); max-width: calc(100% - 32px); overflow-x: auto; scrollbar-width: none; }
-.bd-dark .st-dock { background: rgb(250 250 248 / 0.92); color: #161616; }
+.bd-ink .st-dock { background: rgb(250 250 248 / 0.92); color: #161616; }
 .st-dock::-webkit-scrollbar { display: none; }
 .st-dock-btn { display: inline-flex; align-items: center; gap: 7px; height: 42px; padding: 0 14px; border: 0; border-radius: var(--r-pill); background: transparent; color: inherit; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; transition: background-color 0.2s, color 0.2s; }
 .st-dock-btn:hover { background: rgb(255 255 255 / 0.12); }
-.bd-dark .st-dock-btn:hover { background: rgb(0 0 0 / 0.07); }
+.bd-ink .st-dock-btn:hover { background: rgb(0 0 0 / 0.07); }
 .st-dock-btn.is-active { background: #f4f4f2; color: #161616; }
-.bd-dark .st-dock-btn.is-active { background: #161616; color: #f4f4f2; }
+.bd-ink .st-dock-btn.is-active { background: #161616; color: #f4f4f2; }
 .st-dock-btn svg { width: 18px; height: 18px; flex: none; }
 .st-dock-btn:disabled { opacity: 0.5; cursor: progress; }
-.st-dock-strong, .bd-dark .st-dock-strong { background: #3d6e68; color: #f7f5ef; }
-.st-dock-strong:hover, .bd-dark .st-dock-strong:hover { background: #2c5550; }
-.st-dock-strong.is-active, .bd-dark .st-dock-strong.is-active { background: #2c5550; color: #f7f5ef; }
+.st-dock-strong, .bd-ink .st-dock-strong { background: #3d6e68; color: #f7f5ef; }
+.st-dock-strong:hover, .bd-ink .st-dock-strong:hover { background: #2c5550; }
+.st-dock-strong.is-active, .bd-ink .st-dock-strong.is-active { background: #2c5550; color: #f7f5ef; }
 .st-sep { width: 1px; height: 22px; margin: 0 4px; background: currentColor; opacity: 0.2; flex: none; }
 .st-adjust { display: none; }
 .st-views { position: absolute; left: 50%; bottom: 84px; z-index: 5; transform: translateX(-50%); display: flex; gap: 2px; padding: 4px; border-radius: var(--r-pill); background: var(--st-glass); border: 1px solid var(--st-line); box-shadow: 0 12px 30px rgb(0 0 0 / 0.12); animation: st-in 0.25s ease both; }
@@ -718,7 +719,7 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 .st-part-list li { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; align-items: start; padding: 8px 6px; border-radius: var(--r-card); cursor: default; }
 .st-part-list li:hover { background: var(--st-line); }
 .st-pin-n { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #161616; color: #fff; font-size: 11px; font-weight: 700; margin-top: 1px; }
-.bd-dark .st-pin-n, .bd-dark .st-pin { background: #fff; color: #161616; }
+.bd-ink .st-pin-n, .bd-ink .st-pin { background: #fff; color: #161616; }
 .st-part-name { font-weight: 700; font-size: 14px; }
 .st-part-detail { display: flex; flex-direction: column; font-size: 12.5px; line-height: 1.55; color: var(--st-muted); margin-top: 2px; }
 
@@ -788,18 +789,23 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 .st-size span { color: var(--muted); }
 
 .st-finishes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.st-finish { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 12px 0 8px; border: 1px solid var(--rule); border-radius: var(--r-card); background: var(--surface); transition: border-color 0.25s, box-shadow 0.25s, color 0.25s; font: inherit; font-size: 13px; color: var(--ink-2); cursor: pointer; text-align: left; }
+.st-finish { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 6px 12px 6px 8px; border: 1px solid var(--rule); border-radius: var(--r-card); background: var(--surface); transition: border-color 0.25s, box-shadow 0.25s, color 0.25s; font: inherit; font-size: 13px; color: var(--ink-2); cursor: pointer; text-align: left; }
 .st-finish:hover { border-color: var(--ink); }
 .st-finish.is-active { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); color: var(--ink); }
 .st-finish i { width: 34px; height: 34px; flex: none; border-radius: var(--r-card); box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.1); }
 .st-finish-matte i { background: var(--sg); }
 .st-finish-gloss i { background: linear-gradient(135deg, color-mix(in srgb, var(--sg) 70%, #fff) 0%, var(--sg) 38%, color-mix(in srgb, var(--sg) 84%, #000) 100%); }
 .st-finish-paper i { background: repeating-linear-gradient(115deg, rgb(0 0 0 / 0.05) 0 1px, transparent 1px 4px), var(--sg); }
+/* 宣纸: long soft fibres; 洒金笺: flakes of gold leaf */
+.st-finish-xuan i { background: repeating-linear-gradient(8deg, rgb(0 0 0 / 0.045) 0 1px, transparent 1px 6px), repeating-linear-gradient(-14deg, rgb(255 255 255 / 0.25) 0 1px, transparent 1px 9px), var(--sg); }
+.st-finish-goldFleck i { background: radial-gradient(circle at 22% 30%, #d2ae58 0 1.4px, transparent 1.6px), radial-gradient(circle at 68% 22%, #d2ae58 0 1px, transparent 1.2px), radial-gradient(circle at 54% 70%, #d2ae58 0 1.6px, transparent 1.8px), radial-gradient(circle at 30% 78%, #d2ae58 0 0.9px, transparent 1.1px), radial-gradient(circle at 82% 60%, #d2ae58 0 1.2px, transparent 1.4px), var(--sg); }
 .st-finish-foil i { background: linear-gradient(120deg, #a8823a, #f3dc96 45%, #b48a3c 70%, #e9cf86); }
-.st-bd-studio i { background: radial-gradient(circle at 40% 35%, #fff, #d7d7d3); }
+.st-bd-paper i { background: radial-gradient(circle at 40% 35%, #fbf9f4, #d6d0c2); }
+.st-bd-celadon i { background: radial-gradient(circle at 40% 35%, #e7eee9, #a7b8ae); }
 .st-bd-white i { background: #fff; }
 .st-bd-brand i { background: var(--sg); }
-.st-bd-dark i { background: radial-gradient(circle at 40% 35%, #444, #0b0b0b); }
+.st-bd-ink i { background: radial-gradient(circle at 40% 35%, #3c3f3d, #121313); }
+.st-rec { font-style: normal; font-size: 10.5px; line-height: 1.6; padding: 0 5px; border-radius: 2px; background: var(--st-active, #161616); color: var(--st-active-fg, #fff); vertical-align: 1px; }
 
 .st-listing-body { display: grid; grid-template-columns: 132px 1fr; gap: 14px; align-items: start; }
 .lt-main { width: 132px; height: 132px; background: #fff; border-radius: var(--r-card); box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08); overflow: hidden; }
@@ -1344,7 +1350,10 @@ textarea.short { min-height: 72px; }
 /* ---------- Finishes and effects (3D space) ---------- */
 .st-finish-softTouch i { background: radial-gradient(120% 90% at 30% 25%, color-mix(in srgb, var(--sg) 86%, #fff), var(--sg) 60%, color-mix(in srgb, var(--sg) 92%, #000)); box-shadow: inset 0 0 6px rgb(255 255 255 / 0.5); }
 .st-finish-t { display: grid; gap: 1px; text-align: left; }
-.st-finish-t small { font-size: 11px; color: var(--st-mute, #8a8a85); font-weight: 400; }
+.st-finish-t small { font-size: 11px; line-height: 1.45; color: var(--st-mute, #8a8a85); font-weight: 400; }
+.st-finish-n { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+/* the galleries carry a line on what each suits: one per row */
+.st-backdrops { grid-template-columns: minmax(0, 1fr); }
 .st-effects .st-finish { position: relative; }
 .st-check { position: absolute; top: 8px; right: 8px; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid currentColor; opacity: 0.35; }
 .st-finish.is-active .st-check { opacity: 1; background: currentColor; box-shadow: inset 0 0 0 3px var(--surface); }
@@ -1353,6 +1362,8 @@ textarea.short { min-height: 72px; }
 .st-fx-holo i { background: linear-gradient(120deg, #c9d6ff, #f6c8f0 30%, #c8f6e6 55%, #fff1b8 75%, #c9d6ff); }
 .st-fx-spotUV i { background: linear-gradient(135deg, var(--sg) 0 40%, color-mix(in srgb, var(--sg) 50%, #fff) 50%, var(--sg) 60%); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.6); }
 .st-fx-emboss i { background: var(--sg); box-shadow: inset 2px 2px 3px rgb(255 255 255 / 0.7), inset -2px -2px 3px rgb(0 0 0 / 0.22); }
+.st-fx-deboss i { background: var(--sg); box-shadow: inset 2px 2px 3px rgb(0 0 0 / 0.24), inset -2px -2px 3px rgb(255 255 255 / 0.6); }
+.st-fx-letterpress i { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--sg) 30%, #1a1a1a) 0 26%, transparent 28%), var(--sg); box-shadow: inset 1px 1px 2px rgb(0 0 0 / 0.25), inset -1px -1px 2px rgb(255 255 255 / 0.5); }
 .fx-silverFoil [data-n] { --foil: linear-gradient(115deg, #6f757b 0%, #c9ced3 calc(var(--gl, 50) * 1% - 14%), #ffffff calc(var(--gl, 50) * 1%), #a3aab0 calc(var(--gl, 50) * 1% + 14%), #6f757b 100%); }
 .fx-holo [data-n] { --foil: linear-gradient(115deg, #9fb4ff 0%, #f3b6e8 calc(var(--gl, 50) * 1% - 14%), #c4f3e3 calc(var(--gl, 50) * 1%), #ffe9a6 calc(var(--gl, 50) * 1% + 14%), #9fb4ff 100%); }
 
@@ -1427,3 +1438,94 @@ textarea.short { min-height: 72px; }
   .sym { background: var(--canvas); }
 }
 .st-finish:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ---------- Face art: the Song layouts (scroll, seal, symmetric), as the 3D draws them ---------- */
+.fa-seal { display: inline-grid; place-items: center; writing-mode: vertical-rl; font-family: var(--serif); font-weight: 900; line-height: 1; letter-spacing: 0; color: var(--ground); background: var(--p-seal); padding: 0.12em; border-radius: 0.06em; text-orientation: upright; }
+.fa-seal-n4, .fa-seal-n3 { height: 2.3em; }
+.fa-seal-zhu { color: var(--p-seal); background: transparent; box-shadow: inset 0 0 0 0.07em var(--p-seal); }
+.face-scroll { background: color-mix(in srgb, var(--ground) 84%, var(--key)); }
+.fa-mount { position: absolute; inset: 0; background: linear-gradient(var(--key) 0 17%, transparent 17% 90%, var(--key) 90%); }
+.fa-mount::before, .fa-mount::after { content: ""; position: absolute; top: 0; height: 17%; width: 2.8%; background: var(--ground); opacity: 0.72; }
+.fa-mount::before { left: 36.6%; }
+.fa-mount::after { left: 60.6%; }
+.fa-painting { position: absolute; left: 10%; right: 10%; top: 22%; bottom: 14%; background: var(--ground); box-shadow: 0 0 0 0.4cqmin color-mix(in srgb, var(--p-ink) 30%, transparent); overflow: hidden; }
+.fa-hills { position: absolute; left: 0; right: 0; bottom: 0; height: 58%; background: linear-gradient(transparent, color-mix(in srgb, var(--p-hill) 45%, transparent)); clip-path: polygon(0 40%, 14% 18%, 26% 34%, 40% 6%, 55% 30%, 68% 14%, 82% 36%, 100% 20%, 100% 100%, 0 100%); opacity: 0.8; }
+.fa-inscription { position: absolute; right: 7%; top: 6%; display: flex; flex-direction: row-reverse; gap: 2cqmin; writing-mode: vertical-rl; }
+.fa-inscription strong { font-family: var(--kai, var(--serif)); font-weight: 400; font-size: 14cqmin; letter-spacing: 0.1em; }
+.fa-inscription small { font-family: var(--kai, var(--serif)); font-size: 4.6cqmin; margin-top: 3cqmin; letter-spacing: 0.1em; }
+.face-scroll .fa-seal-small { position: absolute; right: 9%; bottom: 10%; font-size: 6cqmin; }
+.face-seal .fa-seal-big { position: absolute; right: 8%; top: 7%; font-size: 19cqmin; transform: rotate(-1.5deg); }
+.face-seal .fa-name { left: 8.5cqmin; right: 8.5cqmin; bottom: 14cqmin; }
+.face-seal .fa-name strong { font-weight: 900; font-size: 20cqmin; }
+.fa-frame { position: absolute; inset: 4.5cqmin; border: 1.2cqmin solid var(--key); box-shadow: inset 0 0 0 1.4cqmin var(--ground), inset 0 0 0 1.8cqmin var(--key); }
+.face-symmetric { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4cqmin; text-align: center; }
+.face-symmetric .fa-brand { position: static; letter-spacing: 0.35em; font-size: 5cqmin; }
+.fa-slip { writing-mode: vertical-rl; text-orientation: upright; padding: 3cqmin 2.6cqmin; background: var(--key); color: var(--ground); font-family: var(--serif); font-weight: 700; font-size: 12cqmin; letter-spacing: 0.15em; box-shadow: inset 0 0 0 1cqmin var(--key), inset 0 0 0 1.3cqmin color-mix(in srgb, var(--ground) 55%, transparent); }
+.fa-detail { font-size: 5cqmin; font-weight: 600; letter-spacing: 0.18em; }
+.face-symmetric .fa-seal-small { font-size: 5cqmin; }
+.side-scroll { background: linear-gradient(var(--key) 0 17%, color-mix(in srgb, var(--ground) 84%, var(--key)) 17% 90%, var(--key) 90%); }
+.side-right.side-scroll::before, .side-right.side-seal::before, .side-right.side-symmetric::before { height: 0; }
+.side-symmetric { box-shadow: inset 0 0 0 4cqmin var(--ground), inset 0 0 0 5cqmin var(--key); }
+
+/* ---------- Song marks on the page ---------- */
+/* carved seals: 白文 (characters left in the paper colour) and 朱文 (characters in cinnabar) */
+.seal-stamp { display: block; flex: none; transform: rotate(var(--tilt, 0deg)); }
+.seal-stamp text { font-family: var(--kai); font-weight: 700; text-anchor: middle; }
+.seal-bai .ss-field { fill: var(--seal); }
+.seal-bai text { fill: var(--on-seal); }
+.seal-zhu .ss-rim { fill: none; stroke: var(--seal); stroke-width: 2.2; }
+.seal-zhu text { fill: var(--seal); }
+:root:not([data-theme="dark"]) .seal-straddle { mix-blend-mode: multiply; }
+/* collectors' seals pressed across the hero's mount, half on the painting, half on the mount */
+.hero-mount { position: relative; }
+.seal-straddle { position: absolute; z-index: 2; pointer-events: none; opacity: 0.92; }
+.seal-at-foot { left: calc(var(--mount) + 21%); bottom: -3px; transform: translate(-50%, 50%) rotate(var(--tilt, 0deg)); }
+.seal-at-side { right: calc(var(--mount) - 3px); top: 61%; transform: translate(50%, -50%) rotate(var(--tilt, 0deg)); }
+
+/* the steps on a handscroll (wide screens): a stick (天杆) at the start, the paper with a silk
+   divider (隔水) between steps, and the roll with its knobs (轴头) at the end */
+.handscroll { --hs-silk: color-mix(in srgb, var(--accent) 30%, var(--surface)); --hs-paper: #f4f3ec; --hs-gap: clamp(28px, 3vw, 48px); position: relative; }
+[data-theme="dark"] .handscroll { --hs-silk: color-mix(in srgb, var(--accent) 22%, var(--surface)); --hs-paper: #1c2421; }
+.hs-stick, .hs-rod { display: none; }
+@media (min-width: 1101px) {
+  .handscroll { padding: 0 26px 0 14px; }
+  .hs-paper { position: relative; background: var(--hs-paper) var(--grain); border-block: 7px solid var(--hs-silk); box-shadow: 0 1px 0 var(--rule-strong), 0 -1px 0 var(--rule-strong), 0 14px 28px -22px var(--shadow); padding: 34px clamp(24px, 2.6vw, 40px) 32px; }
+  .handscroll .how { gap: var(--hs-gap); }
+  .handscroll .how li { position: relative; border-top: 0; padding-top: 0; }
+  .handscroll .how li + li::before { content: ""; position: absolute; top: -34px; bottom: -32px; left: calc(var(--hs-gap) / -2 - 5px); width: 10px; background: var(--hs-silk); box-shadow: inset 1px 0 0 var(--rule-strong), inset -1px 0 0 var(--rule-strong); }
+  /* the stick the scroll starts from */
+  .hs-stick { display: block; position: absolute; left: 6px; top: -4px; bottom: -4px; width: 9px; border-radius: 2px; background: linear-gradient(90deg, #5a3f2a, #8a6646 45%, #4a3322); box-shadow: 0 1px 2px var(--shadow); }
+  /* the roll: the scroll's outer silk wound round a rod, its knobs showing top and bottom */
+  .hs-rod { display: block; position: absolute; left: calc(100% - 26px); top: -2px; bottom: -2px; width: 22px; border-radius: 4px; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 70%, #000) 0%, var(--hs-silk) 38%, color-mix(in srgb, var(--accent) 45%, var(--surface)) 62%, color-mix(in srgb, var(--accent) 75%, #000) 100%); box-shadow: 0 2px 6px var(--shadow); }
+  .hs-rod::before, .hs-rod::after { content: ""; position: absolute; left: 50%; width: 14px; height: 11px; transform: translateX(-50%); background: linear-gradient(90deg, #cdbf9f, #f1e8d2 45%, #b9a983); border-radius: 3px; box-shadow: 0 1px 1px var(--shadow); }
+  .hs-rod::before { top: -10px; border-radius: 4px 4px 2px 2px; }
+  .hs-rod::after { bottom: -10px; border-radius: 2px 2px 4px 4px; }
+  /* the one unrolling */
+  .handscroll[data-roll="rolled"] .hs-paper { clip-path: inset(-40px 100% -40px 0); }
+  .handscroll[data-roll="rolled"] .hs-rod { left: 14px; }
+  .handscroll[data-roll="unrolling"] .hs-paper { animation: hs-unroll 1.6s cubic-bezier(0.45, 0.05, 0.25, 1) both; }
+  .handscroll[data-roll="unrolling"] .hs-rod { animation: hs-roll 1.6s cubic-bezier(0.45, 0.05, 0.25, 1) both; }
+}
+@keyframes hs-unroll { from { clip-path: inset(-40px 100% -40px 0); } to { clip-path: inset(-40px 0 -40px 0); } }
+@keyframes hs-roll { from { left: 14px; } to { left: calc(100% - 26px); } }
+@media (prefers-reduced-motion: reduce) {
+  .handscroll .hs-paper, .handscroll .hs-rod { animation: none !important; clip-path: none !important; }
+  .handscroll .hs-rod { left: calc(100% - 26px) !important; }
+}
+
+/* the closing call as a Song-printed cover: a thick-and-thin frame, key-fret corners, hills */
+.end { overflow: hidden; isolation: isolate; }
+.end > * { position: relative; z-index: 1; }
+.end-frame { position: absolute !important; z-index: 0 !important; inset: clamp(12px, 2vw, 24px); overflow: hidden; border: 2px solid var(--rule-strong); box-shadow: inset 0 0 0 4px transparent, inset 0 0 0 5px var(--rule-strong); pointer-events: none; }
+.end .fret { position: absolute; width: clamp(26px, 3vw, 38px); height: auto; stroke: var(--rule-strong); stroke-width: 2; }
+.fret-tl { top: 11px; left: 11px; }
+.fret-tr { top: 11px; right: 11px; transform: scaleX(-1); }
+.fret-bl { bottom: 11px; left: 11px; transform: scaleY(-1); }
+.fret-br { bottom: 11px; right: 11px; transform: scale(-1); }
+.end-hills { position: absolute; left: 5px; right: 5px; bottom: 5px; width: calc(100% - 10px); height: 64%; color: var(--accent); }
+.end::before { position: relative; z-index: 1; }
+.end { padding-inline: calc(var(--gutter) + clamp(20px, 3vw, 40px)); }
+@media (max-width: 860px) {
+  /* on a phone the side seal would hang past the screen edge */
+  .seal-at-side { display: none; }
+}

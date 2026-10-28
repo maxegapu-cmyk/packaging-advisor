@@ -19,7 +19,7 @@ export const WINE: Board = {
   },
   directions: [
     dir({
-      id: "A", route: "safe", name: p("山居白", "Hill-house white"), tagline: p("白底细线，酒色就是主角。", "White ground and hairlines; the wine's color is the hero."), layout: "offset",
+      id: "A", route: "safe", name: p("山居白", "Hill-house white"), tagline: p("像一本宋版书的封面，端正，酒色就是主角。", "Like the cover of a Song-printed book: upright, with the wine's color as the hero."), layout: "symmetric",
       palette: [
         { name: p("米白", "Rice white"), role: "background", hex: "#F4F1EA", share: 62 },
         { name: p("墨黑", "Ink black"), role: "text", hex: "#1E1B1B", share: 22 },
@@ -27,9 +27,9 @@ export const WINE: Board = {
         { name: p("青山绿", "Hill green"), role: "accent", hex: "#4E6B4A", share: 4 },
       ],
       mockup: { headline: "梅屿", detail: "仙居杨梅酒", innerLabel: "500ml", manualTitle: "饮用建议", manualStep: "冰镇后饮用" },
-      carriers: { outerFront: p("礼盒正面左上品名，右下一枚杨梅红圆。", "Name top-left on the box, one bayberry-red disc bottom-right."), outerBack: p("产地故事、[酒精度]、[配料] 三段。", "Origin story, [ABV] and [ingredients] in three blocks."), inner: p("瓶标窄条，只写品名与容量。", "A narrow bottle label with the name and volume only."), manual: p("一张饮用卡，三种喝法。", "One serving card with three ways to drink it.") },
-      anchor: p("一枚杨梅红圆，从礼盒到瓶塞封签。", "One bayberry-red disc, from the box to the cork seal."),
-      styleDna: { typography: p("宋体品名 + 细黑体信息。", "Song-style name with light sans-serif details."), imagery: p("不用照片，只用一个圆。", "No photography, just one disc."), graphics: p("细线与大量留白。", "Hairlines and generous white space."), finish: p("特种纸压纹（视觉建议）。", "Embossed textured paper (visual suggestion).") },
+      carriers: { outerFront: p("中轴对称：杨梅红文武边栏、四角回纹，品名竖写在中间的题签里，下方一枚朱文小印。", "Symmetric about the centre: a bayberry-red thick-and-thin frame with key-fret corners, the name on a title slip down the middle, a small seal beneath."), outerBack: p("产地故事、[酒精度]、[配料] 三段。", "Origin story, [ABV] and [ingredients] in three blocks."), inner: p("瓶标窄条，同样的双线边框，只写品名与容量。", "A narrow bottle label in the same double frame, with the name and volume only."), manual: p("一张饮用卡，三种喝法。", "One serving card with three ways to drink it.") },
+      anchor: p("文武边栏与中间的题签，从礼盒到瓶标。", "The thick-and-thin frame and the central title slip, from the box to the bottle label."),
+      styleDna: { typography: p("宋体品名 + 细黑体信息。", "Song-style name with light sans-serif details."), imagery: p("不用照片。", "No photography."), graphics: p("双线边框、回纹角、题签与一枚小印，左右对称。", "Double frame, key-fret corners, a title slip and one small seal, mirrored left to right."), finish: p("特种纸，边框压凹（视觉建议）。", "Textured paper with the frame debossed (visual suggestion).") },
       suitable: p("送长辈、商务礼品。", "Gifts for elders and business."), risk: p("与普通白酒礼盒区分度有限。", "Not very different from ordinary spirits boxes."),
     }),
     dir({
@@ -294,7 +294,7 @@ export const HAM: Board = {
   },
   directions: [
     dir({
-      id: "A", route: "safe", name: p("老字号", "Old house"), tagline: p("印章加竖排品名，稳重。", "A seal and a vertical name; steady."), layout: "offset",
+      id: "A", route: "safe", name: p("老字号", "Old house"), tagline: p("一方大印，稳重。", "One large seal; steady."), layout: "seal",
       palette: [
         { name: p("松木", "Pine"), role: "background", hex: "#E8D3B0", share: 70 },
         { name: p("焦褐", "Char brown"), role: "text", hex: "#3A2414", share: 20 },
@@ -302,7 +302,7 @@ export const HAM: Board = {
         { name: p("麻绳", "Hemp"), role: "accent", hex: "#B89B6E", share: 2 },
       ],
       mockup: { headline: "金府", detail: "金华火腿", innerLabel: "2.5kg", manualTitle: "食用方法", manualStep: "切片蒸制" },
-      carriers: { outerFront: p("盖面左上品名，右下印章。", "Name top-left on the lid, seal bottom-right."), outerBack: p("箱底贴纸：配料、[生产许可]、[产地]。", "Base sticker: ingredients, [licence], [origin]."), inner: p("油纸包裹。", "Wrapped in waxed paper."), manual: p("一张切法卡。", "One cutting card.") },
+      carriers: { outerFront: p("盖面右上烙一方白文大印“金府”，左下宋体品名。", "One large seal reading 金府 burnt into the lid, top right; the name in Song type bottom left."), outerBack: p("箱底贴纸：配料、[生产许可]、[产地]。", "Base sticker: ingredients, [licence], [origin]."), inner: p("油纸包裹。", "Wrapped in waxed paper."), manual: p("一张切法卡。", "One cutting card.") },
       anchor: p("方形印章。", "The square seal."),
       styleDna: { typography: p("宋体。", "Song-style type."), imagery: p("无。", "None."), graphics: p("印章。", "A seal."), finish: p("激光烙印（视觉建议）。", "Laser engraving (visual suggestion).") },
       suitable: p("长辈和商务送礼。", "Gifts for elders and business."), risk: p("和其他火腿礼盒相似。", "Looks like other ham gifts."),

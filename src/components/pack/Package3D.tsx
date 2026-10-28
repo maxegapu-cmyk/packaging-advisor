@@ -31,7 +31,7 @@ export function Package3D({
   onReady,
   stage = "transparent",
   photoreal = false,
-  backdrop = "studio",
+  backdrop = "paper",
   anatomy = false,
   onProgress,
   onPins,

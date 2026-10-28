@@ -91,7 +91,7 @@ mockup 中的字段是印在样张上的短文字，只写一种语言（按卖�
     {
       "id": "A", "route": "safe|distinctive|bold",
       "name": {"zh","en"}, "tagline": {"zh","en"},
-      "layout": "offset|stripe|split",     // offset 不对称海报；stripe 竖向索引色带；split 左右分栏
+      "layout": "offset|stripe|split|scroll|seal|symmetric",  // offset 不对称海报；stripe 竖向索引色带；split 左右分栏；scroll 立轴/手卷装裱（天头地头、远山、竖排题款加印）；seal 一方大印为主角；symmetric 宋版书封面式中轴对称（文武边栏、回纹角、题签）
       "palette": [{"name": {"zh","en"}, "role": "background|text|brand|accent|support", "hex": "#RRGGBB", "share": 60}],  // 3–5 色，按背景、文字、识别、点缀排列；share 为可见面积百分比，合计约 100
       "mockup": {"headline": "品牌或主字", "detail": "品名", "innerLabel": "内包装标签", "manualTitle": "说明书标题", "manualStep": "第一步"},
       "carriers": {"outerFront": {"zh","en"}, "outerBack": {"zh","en"}, "inner": {"zh","en"}, "manual": {"zh","en"}},  // 每项一句、四十字以内

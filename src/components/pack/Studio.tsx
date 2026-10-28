@@ -37,6 +37,8 @@ import { paletteVars } from "../BoxFaces";
 import { Package3D } from "./Package3D";
 import type { PackScene, PinOnScreen } from "../three/engine";
 import type { Backdrop } from "../three/studio";
+import { GALLERIES, GALLERY_HINTS, GALLERY_LABELS, GALLERY_TONES, galleryFor, type Gallery } from "@/lib/gallery";
+import { rolesOf } from "@/lib/artwork";
 import { Orbit, REST_ANGLE, reducedMotion, VIEWS, type Angle } from "./orbit";
 import { Stage3D } from "./Stage3D";
 import { FormGlyph } from "./FormGlyph";
@@ -51,7 +53,7 @@ const S = {
   structure: { zh: "盒型与尺寸", en: "Structure and size" },
   effects: { zh: "附加工艺", en: "Extra effects" },
   effectsWood: { zh: "松木箱盖面是激光雕刻，不做烫金、UV 或击凸。箱里装了带标签的产品时，标签可以加这些工艺。", en: "The pine crate's lid is laser-engraved, so it takes no foil, UV or embossing. When it holds labelled products, their labels can." },
-  effectsNote: { zh: "可多选，作用在品名和重点图形上；烫金、烫银、镭射三选一。", en: "Combine freely; they apply to the name and key graphics. Gold, silver and holographic foil are one-of." },
+  effectsNote: { zh: "可多选，作用在品名和重点图形上（凸版压印作用于全部文字）；烫金、烫银、镭射三选一，击凸、压凹、凸版压印三选一。", en: "Combine freely; they apply to the name and key graphics (letterpress to all the type). Gold, silver and holographic foil are one-of; so are emboss, deboss and letterpress." },
   finish: { zh: "表面工艺", en: "Finish" },
   backdrop: { zh: "背景", en: "Backdrop" },
   views: { zh: "视角", en: "Views" },
@@ -121,11 +123,11 @@ const S = {
   disclaimer: { zh: "立体示意用于比较方向，不是印刷效果；颜色以打样为准。", en: "A 3D sketch for comparing directions, not a print proof; confirm colors with a proof." },
 } satisfies Record<string, Pair>;
 
-const BACKDROPS: { id: string; label: Pair }[] = [
-  { id: "studio", label: { zh: "棚拍", en: "Studio" } },
-  { id: "white", label: { zh: "白底", en: "White" } },
-  { id: "brand", label: { zh: "品牌色", en: "Brand" } },
-  { id: "dark", label: { zh: "暗场", en: "Dark" } },
+/** The three display galleries first (素白, 天青, 墨), then a marketplace white and the brand's colour. */
+const BACKDROPS: { id: Backdrop; label: Pair; hint: Pair }[] = [
+  ...GALLERIES.map((g) => ({ id: g as Backdrop, label: GALLERY_LABELS[g], hint: GALLERY_HINTS[g] })),
+  { id: "white", label: { zh: "白底", en: "White" }, hint: { zh: "电商主图要求的纯白", en: "The pure white marketplaces ask for" } },
+  { id: "brand", label: { zh: "品牌色", en: "Brand" }, hint: { zh: "包装的主色", en: "The pack's key colour" } },
 ];
 
 type PanelTab = "pack" | "look" | "check";
@@ -141,7 +143,7 @@ function detailsFor(form: Form): Detail[] {
   const type = (d: Direction) => d.styleDna.typography;
   const finish = (d: Direction) => d.styleDna.finish;
   const canOpen = CAN_OPEN.includes(form);
-  if (form === "gift" || form === "bookBox" || form === "mailer" || form === "woodBox")
+  if (form === "gift" || form === "bookBox" || form === "mailer" || form === "woodBox" || form === "brocade")
     return [
       { id: "lid", label: { zh: "盖面主视觉", en: "Lid artwork" }, angle: { x: -64, y: -8 }, zoom: 1.16, text: front },
       { id: "band", label: { zh: "侧边与字体", en: "Sides and type" }, angle: { x: -10, y: -22 }, zoom: 1.31, text: type },
@@ -322,7 +324,9 @@ export function Studio({
   const [orbit] = useState(() => new Orbit({ x: 0, y: 0 }, 0.7, { free: true }));
   const [open, setOpen] = useState(spec.form === "carton");
   const [spinning, setSpinning] = useState(false);
-  const [backdrop, setBackdrop] = useState("studio");
+  // the gallery this package shows best on (素白 / 天青 / 墨), until the seller picks another
+  const recommendedGallery: Gallery = galleryFor(board.meta.category, rolesOf(d), initialPack.form);
+  const [backdrop, setBackdrop] = useState<Backdrop>(recommendedGallery);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [hint, setHint] = useState(true);
   const [panel, setPanel] = useState(false);
@@ -366,8 +370,8 @@ export function Studio({
           return;
         }
         const g = ctx.createRadialGradient(w * 0.42, h * 0.34, 0, w * 0.42, h * 0.34, Math.max(w, h) * 0.95);
-        const stops: [number, string][] =
-          backdrop === "dark" ? [[0, "#3b3b3b"], [0.58, "#171717"], [1, "#0a0a0a"]] : backdrop === "brand" ? [[0, mix(ground, "#ffffff", 0.45)], [0.52, ground], [1, mix(ground, "#000000", 0.28)]] : [[0, "#ffffff"], [0.42, "#f2f2f0"], [1, "#d9d9d5"]];
+        const t = backdrop === "brand" ? null : GALLERY_TONES[backdrop];
+        const stops: [number, string][] = t ? [[0, t.hi], [0.46, t.mid], [1, t.lo]] : [[0, mix(ground, "#ffffff", 0.45)], [0.52, ground], [1, mix(ground, "#000000", 0.28)]];
         for (const [o, c] of stops) g.addColorStop(o, c);
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, w, h);
@@ -883,11 +887,17 @@ export function Studio({
             </section>
             <section className="st-sec">
               <L p={S.backdrop} lang={lang} className="st-label" />
-              <div className="st-finishes">
+              <div className="st-finishes st-backdrops">
                 {BACKDROPS.map((b) => (
                   <button key={b.id} type="button" className={backdrop === b.id ? `st-finish st-bd-${b.id} is-active` : `st-finish st-bd-${b.id}`} aria-pressed={backdrop === b.id} onClick={() => setBackdrop(b.id)}>
                     <i aria-hidden="true" />
-                    {one(b.label, lang)}
+                    <span className="st-finish-t">
+                      <span className="st-finish-n">
+                        {one(b.label, lang)}
+                        {b.id === recommendedGallery ? <em className="st-rec">{one(S.recommended, lang)}</em> : null}
+                      </span>
+                      <small>{one(b.hint, lang)}</small>
+                    </span>
                   </button>
                 ))}
               </div>

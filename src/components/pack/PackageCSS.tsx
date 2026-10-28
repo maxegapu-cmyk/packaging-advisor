@@ -18,7 +18,7 @@ const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayout
 /** The CSS version draws three shapes; every other form is shown as the nearest of them. */
 function cssSpec(spec: PackSpec): PackSpec {
   const o = outerSize(spec);
-  const form: Form = isRound(spec.form) ? "tin" : spec.form === "gift" || spec.form === "bookBox" || spec.form === "mailer" || spec.form === "drawer" || spec.form === "woodBox" ? "gift" : "carton";
+  const form: Form = isRound(spec.form) ? "tin" : spec.form === "gift" || spec.form === "bookBox" || spec.form === "mailer" || spec.form === "drawer" || spec.form === "woodBox" || spec.form === "brocade" ? "gift" : "carton";
   return { form, w: o.w, h: o.h, d: form === "tin" ? o.w : o.d, finish: spec.finish, effects: spec.effects };
 }
 

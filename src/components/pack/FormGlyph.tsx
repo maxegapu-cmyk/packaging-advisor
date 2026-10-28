@@ -149,6 +149,17 @@ export function FormGlyph({ form }: { form: Form }) {
           <path d="M6 16.5l7 2.7M6 20l7 2.7M19 19.2l7-2.7M19 22.7l7-2.7" opacity="0.55" />
         </svg>
       );
+    case "brocade":
+      // a lidded box with a tall title slip on the lid and a toggle at the front
+      return (
+        <svg {...P}>
+          <path d="M3 12l13-5 13 5-13 5z" />
+          <path d="M3 12v10l13 5 13-5V12" />
+          <path d="M3 15.5l13 5 13-5" opacity="0.6" />
+          <path d="M8.5 10.6l3.4-1.3 4.8 1.8-3.4 1.3z" />
+          <path d="M12 20.4v3.2" strokeWidth="2.2" />
+        </svg>
+      );
     default:
       return (
         <svg {...P}>

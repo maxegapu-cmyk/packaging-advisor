@@ -1,7 +1,8 @@
 /**
  * E-commerce images rendered from the 3D: the white-background main image the marketplaces
  * ask for, the other angles for the image carousel, an opened view, a close-up, a dimensions
- * image, and a brand-colored hero. 1600 × 1600 px PNG, zipped.
+ * image, a brand-colored hero, and a gallery shot on the ground that suits the product (素白,
+ * 天青 or 墨). 1600 × 1600 px PNG, zipped.
  */
 import type { Direction } from "@/lib/board/schema";
 import type { Lang } from "@/lib/i18n";
@@ -9,8 +10,9 @@ import type { PackSpec } from "@/lib/pack";
 import { CAN_OPEN, ROUND_FORMS } from "@/lib/pack";
 import { rolesOf, type ArtInfo } from "../three/art";
 import { REST_ANGLE } from "../pack/orbit";
+import { GALLERY_LABELS, GALLERY_TONES, galleryFor } from "@/lib/gallery";
 
-export type ShotSpec = { id: string; name: { zh: string; en: string }; angle: { x: number; y: number }; zoom: number; open?: boolean; bg: "white" | "brand"; dims?: boolean };
+export type ShotSpec = { id: string; name: { zh: string; en: string }; angle: { x: number; y: number }; zoom: number; open?: boolean; bg: "white" | "brand" | "gallery"; dims?: boolean };
 
 export const SHOTS: ShotSpec[] = [
   { id: "01-main", name: { zh: "主图（白底）", en: "Main image (white)" }, angle: REST_ANGLE, zoom: 1, bg: "white" },
@@ -20,6 +22,8 @@ export const SHOTS: ShotSpec[] = [
   { id: "05-detail", name: { zh: "细节", en: "Close-up" }, angle: { x: -10, y: -18 }, zoom: 2.1, bg: "white" },
   { id: "06-size", name: { zh: "尺寸", en: "Dimensions" }, angle: { x: -14, y: -32 }, zoom: 0.82, bg: "white", dims: true },
   { id: "07-brand", name: { zh: "品牌色背景", en: "Brand background" }, angle: REST_ANGLE, zoom: 0.95, bg: "brand" },
+  // on the display gallery that suits the product: 素白, 天青 or 墨
+  { id: "08-gallery", name: { zh: "陈列图", en: "Gallery shot" }, angle: { x: -12, y: -24 }, zoom: 0.92, bg: "gallery" },
 ];
 
 const SIZE = 800;
@@ -60,6 +64,7 @@ export async function renderShots(inp: ImageInput): Promise<{ name: string; labe
   document.body.appendChild(host);
   const scene = new PackScene(canvas, { quality: "high", stage: "transparent" });
   const roles = rolesOf(inp.d);
+  const gallery = galleryFor(inp.category, roles, inp.spec.form);
   const out: { name: string; label: { zh: string; en: string }; blob: Blob }[] = [];
   const canOpen = CAN_OPEN.includes(inp.spec.form);
   const shots = SHOTS.filter((s) => !s.open || canOpen);
@@ -71,6 +76,16 @@ export async function renderShots(inp: ImageInput): Promise<{ name: string; labe
       scene.setView(s.angle, s.zoom);
       const bg = s.bg === "brand" ? roles.key : "#FFFFFF";
       const blob = await scene.exportImage(SCALE, (ctx, w, h) => {
+        if (s.bg === "gallery") {
+          const t = GALLERY_TONES[gallery];
+          const g = ctx.createRadialGradient(w * 0.46, h * 0.38, 0, w * 0.46, h * 0.38, Math.max(w, h) * 0.9);
+          g.addColorStop(0, t.hi);
+          g.addColorStop(0.5, t.mid);
+          g.addColorStop(1, t.lo);
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, w, h);
+          return;
+        }
         ctx.fillStyle = bg;
         ctx.fillRect(0, 0, w, h);
         if (s.bg === "brand") {
@@ -92,7 +107,8 @@ export async function renderShots(inp: ImageInput): Promise<{ name: string; labe
         dimsOverlay(ctx, c.width, c.height, inp.spec, "#222222", inp.lang);
         final = await new Promise<Blob>((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error("export failed"))), "image/png"));
       }
-      out.push({ name: `${s.id}.png`, label: s.name, blob: final });
+      const label = s.bg === "gallery" ? { zh: `${s.name.zh}（${GALLERY_LABELS[gallery].zh}）`, en: `${s.name.en} (${GALLERY_LABELS[gallery].en})` } : s.name;
+      out.push({ name: s.bg === "gallery" ? `${s.id}-${gallery}.png` : `${s.id}.png`, label, blob: final });
       inp.onProgress?.(i + 1, shots.length);
     }
   } finally {

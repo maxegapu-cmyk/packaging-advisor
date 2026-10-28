@@ -72,6 +72,46 @@ export function rolesOf(d: Direction): Roles {
   return { ground, ink, key, accent };
 }
 
+const rgbOf = (hex: string) => {
+  const n = hex.replace("#", "");
+  const f = n.length === 3 ? n.split("").map((c) => c + c).join("") : n.padEnd(6, "0").slice(0, 6);
+  return [0, 2, 4].map((i) => (parseInt(f.slice(i, i + 2), 16) || 0) / 255);
+};
+const hueOf = (hex: string): { hue: number; chroma: number } => {
+  const [r, g, b] = rgbOf(hex);
+  const mx = Math.max(r, g, b);
+  const mn = Math.min(r, g, b);
+  const c = mx - mn;
+  if (c < 1e-6) return { hue: 0, chroma: 0 };
+  let h = mx === r ? ((g - b) / c) * 60 : mx === g ? (2 + (b - r) / c) * 60 : (4 + (r - g) / c) * 60;
+  if (h < 0) h += 360;
+  return { hue: h, chroma: c };
+};
+
+/** Seal ink: the palette's red when it has one (朱砂, the colour of seal paste), else the key colour. */
+export function sealRoleOf(r: Roles): keyof Roles {
+  let best: keyof Roles = "key";
+  let score = 0.0001;
+  for (const k of ["accent", "key", "ink"] as (keyof Roles)[]) {
+    const { hue, chroma } = hueOf(r[k]);
+    const red = chroma >= 0.25 && (hue > 335 || hue < 28) ? chroma : 0;
+    if (red > score) {
+      score = red;
+      best = k;
+    }
+  }
+  return best;
+}
+
+/**
+ * Painted hills: the key colour when it is a green or a blue (青绿山水, the blue-green landscapes
+ * of the Song court), otherwise ink (水墨): red or brown hills are not a Song landscape.
+ */
+export function hillRoleOf(r: Roles): keyof Roles {
+  const { hue, chroma } = hueOf(r.key);
+  return chroma >= 0.08 && hue > 70 && hue < 260 ? "key" : "ink";
+}
+
 /** The direction as the seller finalised it: their palette and front wording. */
 export function applyArtwork(d: Direction, a: Artwork): Direction {
   const base = rolesOf(d);

@@ -146,7 +146,7 @@ function invert(c: HTMLCanvasElement): HTMLCanvasElement {
 
 /** "art" is the color page; an effect name is that effect's plate (black = where it goes). */
 type PageKind = "art" | Effect;
-const PLATE: Record<Effect, string> = { goldFoil: "GOLD FOIL PLATE", silverFoil: "SILVER FOIL PLATE", holo: "HOLOGRAPHIC FOIL PLATE", spotUV: "SPOT UV PLATE", emboss: "EMBOSS PLATE" };
+const PLATE: Record<Effect, string> = { goldFoil: "GOLD FOIL PLATE", silverFoil: "SILVER FOIL PLATE", holo: "HOLOGRAPHIC FOIL PLATE", spotUV: "SPOT UV PLATE", emboss: "EMBOSS PLATE", deboss: "DEBOSS PLATE", letterpress: "LETTERPRESS PLATE" };
 
 async function artPage(L: Lib, doc: import("pdf-lib").PDFDocument, sheet: Sheet, a: ArtInput, kind: PageKind, dpi: number, font: import("pdf-lib").PDFFont, slug: string) {
   const W = sheet.w * PT;
@@ -168,7 +168,9 @@ async function artPage(L: Lib, doc: import("pdf-lib").PDFDocument, sheet: Sheet,
     for (const p of piece.panels) {
       const ppm = panelPpm(p, dpi);
       const art = panelArt(p, a, ppm, BLEED);
-      let src = kind !== "art" ? (art.foil ? invert(art.foil) : null) : art.color;
+      // a letterpress plate is all the type; every other effect plate is the accent mask
+      const plate = kind === "letterpress" ? art.press : art.foil;
+      let src = kind !== "art" ? (plate ? invert(plate) : null) : art.color;
       if (!src) continue;
       if (engrave) src = threshold(src, ground);
       const img = await doc.embedJpg(await toJpeg(src));

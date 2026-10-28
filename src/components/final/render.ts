@@ -31,7 +31,7 @@ export function panelPpm(p: Panel, dpi: number, bleed = BLEED): number {
   return Math.min(want, Math.sqrt(MAX_PX / area));
 }
 
-export type PanelArt = { color: HTMLCanvasElement; foil: HTMLCanvasElement | null; ppm: number; bleed: number };
+export type PanelArt = { color: HTMLCanvasElement; foil: HTMLCanvasElement | null; press: HTMLCanvasElement | null; ppm: number; bleed: number };
 
 /**
  * One panel at `ppm`, extended by `bleed` mm on every side (edge pixels stretched, so stripes
@@ -59,7 +59,7 @@ export function panelArt(p: Panel, a: ArtInput, ppm: number, bleed = BLEED): Pan
     ctx.drawImage(src, b, b);
     return rotate(c, p.rot);
   };
-  return { color: extend(fix(art.color)), foil: art.foil ? extend(fix(art.foil)) : null, ppm, bleed };
+  return { color: extend(fix(art.color)), foil: art.foil ? extend(fix(art.foil)) : null, press: art.press ? extend(fix(art.press)) : null, ppm, bleed };
 }
 
 function rotate(src: HTMLCanvasElement, rot: Panel["rot"]): HTMLCanvasElement {
