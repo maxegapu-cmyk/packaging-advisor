@@ -48,6 +48,7 @@ export default async function FinalPage({ params }: { params: Promise<{ id: stri
         spaceHref={spaceHref}
         fileStem={project.title}
         library={loadLibrary()}
+        docsUrl={`/api/projects/${project.id}/documents`}
       />
     </main>
   );

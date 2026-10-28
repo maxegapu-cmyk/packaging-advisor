@@ -9,6 +9,8 @@ import type { Board } from "../board/schema";
 import { ROUND_FORMS, type PackSpec } from "../pack";
 import { layoutBack, MIN_TEXT_MM } from "./backpanel";
 import { LIST, offListOf, problemsOf, rulesFor, usesOf } from "../materials";
+import { overpackChecks } from "../compliance/overpack";
+import { coverage, coverageSummary, type SupplierDoc } from "../compliance/documents";
 import { contrast, deltaE } from "./color";
 import { checkEan13, EAN_NOMINAL } from "./ean13";
 import { artSize, infoPanels, printLayout, wrapBack } from "./layout";
@@ -27,7 +29,7 @@ export function infoSize(spec: PackSpec): { w: number; h: number } | null {
   return ip.panel.kind === "tinWrap" ? wrapBack(s.w, s.h) : s;
 }
 
-export function preflight(a: Artwork, board: Board, spec: PackSpec): Check[] {
+export function preflight(a: Artwork, board: Board, spec: PackSpec, docs: SupplierDoc[] = []): Check[] {
   const out: Check[] = [];
   const fields = labelFields(board.meta.category);
   const val = (k: string) => a.rows.find((r) => r.key === k)?.value.trim() ?? "";
@@ -104,6 +106,19 @@ export function preflight(a: Artwork, board: Board, spec: PackSpec): Check[] {
   // picks the 3D model draws with the default look: the render is not the product until proofed
   const sketch = uses.filter((u) => !u.drawn);
   if (sketch.length) out.push(C("mat-look", "info", `${sketch.length} 处选材在 3D 中按常见外观示意`, `${sketch.length} pick${sketch.length > 1 ? "s" : ""} shown in 3D with the usual look`, `${sketch.map((u) => `${u.label.zh}（${u.m.name.zh} ${u.id}）`).join("、")}。外观以打样为准。`, `${sketch.map((u) => `${u.label.en} (${u.m.name.en} ${u.id})`).join(", ")}. The proof decides how they look.`));
+  // over-packaging: GB 23350 and GB 45186, worked out from the pack
+  for (const x of overpackChecks(spec, board.meta.category)) if (x.level !== "info" || x.id === "void") out.push(C(`over-${x.id}`, x.level, `${x.rule} ${x.title.zh}`, `${x.rule} ${x.title.en}`, x.detail.zh, x.detail.en));
+  // supplier documents: what the rules ask for, part by part
+  const reqs = coverage(uses, rulesFor(spec, board.meta.category, uses), docs);
+  const sum = coverageSummary(reqs);
+  const name = (r: (typeof reqs)[number], lang: "zh" | "en") => `${lang === "zh" ? r.label.zh : r.label.en}（${r.rule}）`;
+  if (sum.criticalGaps.length) out.push(C("docs-critical", "warn", `${sum.criticalGaps.length} 项接触内容物的部件缺证明文件`, `${sum.criticalGaps.length} contact part requirement${sum.criticalGaps.length > 1 ? "s" : ""} lack documents`, sum.criticalGaps.map((r) => name(r, "zh")).join("、"), sum.criticalGaps.map((r) => name(r, "en")).join(", ")));
+  if (sum.expired.length) out.push(C("docs-expired", "error", `${sum.expired.length} 项证明文件已过期`, `${sum.expired.length} document requirement${sum.expired.length > 1 ? "s have" : " has"} expired documents`, sum.expired.map((r) => name(r, "zh")).join("、"), sum.expired.map((r) => name(r, "en")).join(", ")));
+  if (sum.expiring.length) out.push(C("docs-expiring", "warn", `${sum.expiring.length} 项证明文件 30 天内到期`, `${sum.expiring.length} document${sum.expiring.length > 1 ? "s expire" : " expires"} within 30 days`, sum.expiring.map((r) => name(r, "zh")).join("、"), sum.expiring.map((r) => name(r, "en")).join(", ")));
+  if (reqs.length) out.push(C("docs", sum.met === sum.total ? "ok" : "info", `证明文件已齐 ${sum.met}/${sum.total}`, `Documents in place ${sum.met}/${sum.total}`, "在 3D 空间「合规」中上传和管理。", "Upload and manage them under Compliance in the 3D space."));
+  // the materials frozen at sign-off, or not yet
+  if (spec.frozen) out.push(C("frozen", "ok", `材料已冻结（${spec.frozen.at.slice(0, 10)}）`, `Materials frozen (${spec.frozen.at.slice(0, 10)})`, spec.frozen.note ?? "", spec.frozen.note ?? ""));
+  else out.push(C("frozen", a.proof.confirmed ? "warn" : "info", "材料还没有冻结", "Materials not frozen yet", "定稿时在 3D 空间「合规」中冻结，之后材料库的修改不会影响这个产品。", "Freeze them under Compliance in the 3D space at sign-off, so later library changes don't touch this product."));
   const listed = new Set(uses.map((u) => u.id)).size;
   out.push(C("mat-list", "ok", `材料均来自委托方清单（${listed} 种）`, `All materials from the principal's list (${listed})`, `清单核对日期 ${LIST.checked}；所需资料见印刷工单第 2 页。`, `List checked ${LIST.checked}; the documents needed are on page 2 of the job sheet.`));
 

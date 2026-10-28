@@ -9,6 +9,7 @@
  */
 import type { Pair } from "../i18n";
 import { DOCS, FAMILIES, MATERIALS, RULES, type FamilyId, type Material, type Rule } from "./catalog";
+import { normalizeLimits, type Limits } from "../compliance/limits";
 
 /** Changes to one material; `hidden` takes it out of every choice (picks fall back to defaults). */
 export type MaterialEdit = Partial<Omit<Material, "id" | "custom">> & { hidden?: boolean };
@@ -27,6 +28,8 @@ export type Library = {
    * "gift.process.film"…
    */
   recommend?: Record<string, string[]>;
+  /** the over-packaging checks' numbers, where they differ from the standards' defaults */
+  limits?: Partial<Limits>;
   updatedAt?: string;
 };
 
@@ -212,6 +215,8 @@ export function normalizeLibrary(v: unknown): Library {
     }
     if (Object.keys(rec).length) lib.recommend = rec;
   }
+  const limits = normalizeLimits(o.limits);
+  if (limits) lib.limits = limits;
   const at = text(o.updatedAt, 40);
   if (at) lib.updatedAt = at;
   return lib;
@@ -270,10 +275,42 @@ export function libraryStats(lib: Library) {
   const edits = Object.values(lib.materials ?? {});
   return {
     edited: edits.filter((e) => Object.keys(e).some((k) => k !== "hidden")).length,
-    hidden: edits.filter((e) => e.hidden).length + (lib.added ?? []).filter((m) => lib.materials?.[m.id]?.hidden).length,
+    hidden: edits.filter((e) => e.hidden).length,
     added: lib.added?.length ?? 0,
     rulesEdited: Object.keys(lib.rules ?? {}).length,
     rulesAdded: lib.addedRules?.length ?? 0,
     recommend: Object.keys(lib.recommend ?? {}).length,
+    limits: Object.keys(lib.limits ?? {}).length,
   };
 }
+
+/** What changed between two libraries, by material, rule, part and limit. */
+export type LibraryDiff = { materials: string[]; rules: string[]; recommend: string[]; limits: boolean; count: number };
+
+export function diffLibraries(a: Library, b: Library): LibraryDiff {
+  const same = (x: unknown, y: unknown) => JSON.stringify(x ?? null) === JSON.stringify(y ?? null);
+  const keys = (x?: Record<string, unknown>, y?: Record<string, unknown>) => [...new Set([...Object.keys(x ?? {}), ...Object.keys(y ?? {})])];
+  const addedA = new Map((a.added ?? []).map((m) => [m.id, m]));
+  const addedB = new Map((b.added ?? []).map((m) => [m.id, m]));
+  const materials = [...new Set([...keys(a.materials, b.materials).filter((id) => !same(a.materials?.[id], b.materials?.[id])), ...[...new Set([...addedA.keys(), ...addedB.keys()])].filter((id) => !same(addedA.get(id), addedB.get(id)))])].sort();
+  const rulesA = new Map((a.addedRules ?? []).map((r) => [r.id, r]));
+  const rulesB = new Map((b.addedRules ?? []).map((r) => [r.id, r]));
+  const rules = [...new Set([...keys(a.rules, b.rules).filter((id) => !same(a.rules?.[id], b.rules?.[id])), ...[...new Set([...rulesA.keys(), ...rulesB.keys()])].filter((id) => !same(rulesA.get(id), rulesB.get(id)))])].sort();
+  const recommend = keys(a.recommend, b.recommend).filter((k) => !same(a.recommend?.[k], b.recommend?.[k])).sort();
+  const limits = !same(a.limits, b.limits);
+  return { materials, rules, recommend, limits, count: materials.length + rules.length + recommend.length + (limits ? 1 : 0) };
+}
+
+/** A one-line account of a diff: "材料 M019、U001；规则 F05；推荐 gift.wrap；核算限值". */
+export function diffText(d: LibraryDiff, lang: "zh" | "en"): string {
+  const cut = (ids: string[]) => (ids.length > 6 ? `${ids.slice(0, 6).join(lang === "zh" ? "、" : ", ")}${lang === "zh" ? ` 等 ${ids.length} 项` : ` and ${ids.length - 6} more`}` : ids.join(lang === "zh" ? "、" : ", "));
+  const parts: string[] = [];
+  if (d.materials.length) parts.push(lang === "zh" ? `材料 ${cut(d.materials)}` : `materials ${cut(d.materials)}`);
+  if (d.rules.length) parts.push(lang === "zh" ? `规则 ${cut(d.rules)}` : `rules ${cut(d.rules)}`);
+  if (d.recommend.length) parts.push(lang === "zh" ? `部件推荐 ${cut(d.recommend)}` : `part recommendations ${cut(d.recommend)}`);
+  if (d.limits) parts.push(lang === "zh" ? "核算限值" : "check limits");
+  return parts.length ? parts.join(lang === "zh" ? "；" : "; ") : lang === "zh" ? "无变化" : "no change";
+}
+
+/** One saved version of the library, kept so changes can be traced and undone. */
+export type HistoryEntry = { at: string; by: string; summary: { zh: string; en: string }; library: Library };

@@ -42,6 +42,7 @@ export default async function SpacePage({ params, searchParams }: { params: Prom
       library={loadLibrary()}
       libraryUrl={invite.isAdmin ? "/api/materials" : undefined}
       libraryHref={invite.isAdmin ? "/admin/materials" : undefined}
+      docsUrl={`/api/projects/${project.id}/documents`}
     />
   );
 }

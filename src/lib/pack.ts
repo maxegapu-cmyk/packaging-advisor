@@ -6,6 +6,7 @@
  */
 import type { Pair } from "./i18n";
 import { isCategory, type Category } from "./categories";
+import { normalizeLibrary, type Library } from "./materials/library";
 
 export const FORMS = ["carton", "gift", "bookBox", "mailer", "drawer", "paperTube", "bag", "aseptic", "pouch", "bottle", "tube", "blister", "jar", "glassBottle", "tin", "can", "ceramic", "woodBox", "brocade"] as const;
 export type Form = (typeof FORMS)[number];
@@ -64,10 +65,41 @@ export type ExtraPart = { key: string; label: string; id: string; inner?: boolea
 export type PackUsage = { courier?: boolean; shoppingBag?: boolean };
 
 /**
+ * What the over-packaging checks need to know about the contents and the sale (GB 23350 and
+ * GB 45186): net content of one unit, the product kind (its necessary-space coefficient k), the
+ * selling price and packaging cost, total mass, layers the model does not show, and for courier
+ * packs the item class and planned tape.
+ */
+export type ContentInfo = {
+  net?: number;
+  unit?: "g" | "mL";
+  kind?: string;
+  /** k entered by hand (for a kind without one, or to override) */
+  k?: number;
+  /** selling price, yuan */
+  price?: number;
+  /** cost of every layer except the one touching the contents, yuan */
+  packCost?: number;
+  /** whole product's mass with its packaging, g (tea's 8× rule) */
+  totalMass?: number;
+  /** sales-packaging layers the 3D model does not show (an inner bag, an outer sleeve) */
+  extraLayers?: number;
+  courierClass?: "normal" | "fragile" | "fresh";
+  /** courier layers added beyond the courier box (a fully wrapping bubble bag) */
+  courierExtra?: number;
+  /** planned sealing tape, mm; and its width, mm */
+  tape?: number;
+  tapeWidth?: number;
+};
+
+/** A project's materials frozen at sign-off: the library as it was then, kept with the pack. */
+export type Frozen = { at: string; library: Library; note?: string };
+
+/**
  * `materials` holds the seller's picks by part ("wrap", "insert", "inner.body", "process.film",
  * "off.magnets"…); parts not named use their defaults. `extraParts` are parts the seller added.
  */
-export type PackSpec = { form: Form; w: number; h: number; d: number; finish: Finish; effects?: Effect[]; inner?: InnerSpec | null; materials?: Record<string, MaterialPick>; extraParts?: ExtraPart[]; usage?: PackUsage };
+export type PackSpec = { form: Form; w: number; h: number; d: number; finish: Finish; effects?: Effect[]; inner?: InnerSpec | null; materials?: Record<string, MaterialPick>; extraParts?: ExtraPart[]; usage?: PackUsage; content?: ContentInfo; frozen?: Frozen };
 
 /** Turns an effect on or off, keeping a single foil and a single pressing. */
 export function withEffect(spec: PackSpec, e: Effect, on: boolean): PackSpec {
@@ -282,6 +314,29 @@ function normalizePicks(v: unknown, hasInner: boolean): Record<string, MaterialP
   return Object.keys(out).length ? out : null;
 }
 
+function normalizeContent(v: unknown): ContentInfo | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  const n = (x: unknown, max: number) => (typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= max ? x : undefined);
+  const out: ContentInfo = {};
+  const set = <K extends keyof ContentInfo>(k: K, val: ContentInfo[K] | undefined) => {
+    if (val !== undefined) out[k] = val;
+  };
+  set("net", n(o.net, 1e7));
+  set("unit", o.unit === "g" || o.unit === "mL" ? o.unit : undefined);
+  set("kind", typeof o.kind === "string" && /^[a-zA-Z][a-zA-Z0-9]{0,23}$/.test(o.kind) ? o.kind : undefined);
+  set("k", n(o.k, 1000));
+  set("price", n(o.price, 1e8));
+  set("packCost", n(o.packCost, 1e8));
+  set("totalMass", n(o.totalMass, 1e8));
+  set("extraLayers", n(o.extraLayers, 10) !== undefined ? Math.round(o.extraLayers as number) : undefined);
+  set("courierClass", o.courierClass === "normal" || o.courierClass === "fragile" || o.courierClass === "fresh" ? o.courierClass : undefined);
+  set("courierExtra", n(o.courierExtra, 10) !== undefined ? Math.round(o.courierExtra as number) : undefined);
+  set("tape", n(o.tape, 1e6));
+  set("tapeWidth", n(o.tapeWidth, 1000));
+  return Object.keys(out).length ? out : null;
+}
+
 /** Accepts anything (stored JSON, request body) and returns a valid spec. */
 export function normalizePack(v: unknown, fallback: PackSpec = DEFAULT_PACK): PackSpec {
   let o: Record<string, unknown> = {};
@@ -342,6 +397,13 @@ export function normalizePack(v: unknown, fallback: PackSpec = DEFAULT_PACK): Pa
     if (typeof u.courier === "boolean") usage.courier = u.courier;
     if (typeof u.shoppingBag === "boolean") usage.shoppingBag = u.shoppingBag;
     if (Object.keys(usage).length) base.usage = usage;
+  }
+  const content = normalizeContent(o.content);
+  if (content) base.content = content;
+  if (o.frozen && typeof o.frozen === "object") {
+    const f = o.frozen as Record<string, unknown>;
+    const at = typeof f.at === "string" ? f.at.slice(0, 40) : "";
+    if (at) base.frozen = { at, library: normalizeLibrary(f.library), ...(typeof f.note === "string" && f.note.trim() ? { note: f.note.trim().slice(0, 160) } : {}) };
   }
   return base;
 }

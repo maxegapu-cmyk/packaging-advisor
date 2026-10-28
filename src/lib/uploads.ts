@@ -48,11 +48,25 @@ export async function normalizeLogo(input: Buffer): Promise<Buffer> {
 
 export function uploadPath(file: string): string {
   // file names are generated server-side; still refuse anything that is not a bare name.
-  if (!/^[A-Za-z0-9_-]+\.(jpg|png)$/.test(file)) throw new UploadError("Invalid file name");
+  if (!/^[A-Za-z0-9_-]+\.(jpg|png|pdf)$/.test(file)) throw new UploadError("Invalid file name");
   return path.join(dataDir(), "uploads", file);
 }
 
-export function writeUpload(id: string, data: Buffer, ext: "jpg" | "png" = "jpg"): string {
+/**
+ * A supplier document: a PDF kept as it is (checked by its header, not its name), or a photo or
+ * scan re-encoded like any image upload.
+ */
+export async function normalizeDocument(input: Buffer): Promise<{ data: Buffer; ext: "pdf" | "jpg"; mime: string }> {
+  if (input.byteLength > MAX_UPLOAD_BYTES) throw new UploadError("文件超过 15 MB File is larger than 15 MB");
+  if (input.subarray(0, 5).toString("latin1") === "%PDF-") return { data: input, ext: "pdf", mime: "application/pdf" };
+  try {
+    return { data: await normalizeImage(input), ext: "jpg", mime: "image/jpeg" };
+  } catch {
+    throw new UploadError("请上传 PDF 或图片 Upload a PDF or an image");
+  }
+}
+
+export function writeUpload(id: string, data: Buffer, ext: "jpg" | "png" | "pdf" = "jpg"): string {
   const file = `${id}.${ext}`;
   fs.writeFileSync(uploadPath(file), data);
   return file;

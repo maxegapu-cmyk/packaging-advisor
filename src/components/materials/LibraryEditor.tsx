@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Lang, Pair } from "@/lib/i18n";
 import { FORM_LABELS, FORMS, INSERT_LABELS, INSERTS, type Form } from "@/lib/pack";
+import { DEFAULT_LIMITS, LIMIT_SOURCES, mergeLimits, type Kind, type Limits } from "@/lib/compliance/limits";
 import {
   DOCS,
   FAMILIES,
@@ -26,6 +27,9 @@ import {
   slotsOf,
   isHidden,
   isRuleHidden,
+  diffLibraries,
+  diffText,
+  type HistoryEntry,
   type Library,
   type Material,
   type MaterialEdit,
@@ -45,6 +49,8 @@ const T = {
   materials: P("材料", "Materials"),
   rules: P("规则", "Rules"),
   recommend: P("部件推荐", "Part recommendations"),
+  limits: P("核算限值", "Check limits"),
+  history: P("修改记录", "History"),
   search: P("搜索编号、名称、俗名、用途", "Search number, name, trade name, use"),
   allFamilies: P("全部大类", "All families"),
   show: { all: P("全部", "All"), edited: P("已修改", "Edited"), added: P("新增", "Added"), hidden: P("已隐藏", "Hidden") },
@@ -110,11 +116,28 @@ const T = {
 
 type Status = "idle" | "saving" | "saved" | "error";
 
-export function LibraryEditor({ initial, lang, saveUrl, onSave }: { initial: Library; lang: Lang; saveUrl?: string; onSave?: (lib: Library) => void }) {
+/** Saved versions of the library: from the app's API, or kept by the caller (the preview). */
+export type HistoryApi = { list: () => Promise<HistoryEntry[]>; restore: (at: string) => Promise<Library | null> };
+
+function urlHistory(url: string): HistoryApi {
+  return {
+    list: async () => {
+      const r = await fetch(url);
+      return r.ok ? r.json() : [];
+    },
+    restore: async (at) => {
+      const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ at }) });
+      return r.ok ? normalizeLibrary(await r.json()) : null;
+    },
+  };
+}
+
+export function LibraryEditor({ initial, lang, saveUrl, onSave, historyUrl, history }: { initial: Library; lang: Lang; saveUrl?: string; onSave?: (lib: Library) => void; historyUrl?: string; history?: HistoryApi }) {
+  const histApi = useMemo(() => history ?? (historyUrl ? urlHistory(historyUrl) : null), [history, historyUrl]);
   const [lib, setLib] = useState<Library>(() => normalizeLibrary(initial));
   setLibrary(lib);
   const [status, setStatus] = useState<Status>("idle");
-  const [tab, setTab] = useState<"materials" | "rules" | "recommend">("materials");
+  const [tab, setTab] = useState<"materials" | "rules" | "recommend" | "limits" | "history">("materials");
   const [note, setNote] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const first = useRef(true);
@@ -211,7 +234,7 @@ export function LibraryEditor({ initial, lang, saveUrl, onSave }: { initial: Lib
       ) : null}
 
       <div className="lib-tabs" role="tablist">
-        {(["materials", "rules", "recommend"] as const).map((t) => (
+        {(histApi ? (["materials", "rules", "recommend", "limits", "history"] as const) : (["materials", "rules", "recommend", "limits"] as const)).map((t) => (
           <button key={t} type="button" role="tab" aria-selected={tab === t} className={tab === t ? "lib-tab is-active" : "lib-tab"} onClick={() => setTab(t)}>
             {one(T[t], lang)}
           </button>
@@ -221,6 +244,8 @@ export function LibraryEditor({ initial, lang, saveUrl, onSave }: { initial: Lib
       {tab === "materials" ? <MaterialsTab lib={lib} update={update} lang={lang} /> : null}
       {tab === "rules" ? <RulesTab lib={lib} update={update} lang={lang} /> : null}
       {tab === "recommend" ? <RecommendTab lib={lib} update={update} lang={lang} /> : null}
+      {tab === "limits" ? <LimitsTab lib={lib} update={update} lang={lang} /> : null}
+      {tab === "history" && histApi ? <HistoryTab api={histApi} current={lib} lang={lang} onRestored={(l) => { first.current = true; setLib(l); setStatus("saved"); }} /> : null}
     </div>
   );
 }
@@ -654,6 +679,308 @@ function RecommendTab({ lib, update, lang }: { lib: Library; update: Update; lan
           </details>
         );
       })}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- limits */
+
+const LT = {
+  lead: P("过度包装核算用的数值，默认取自 GB 23350-2021（含第 1、2 号修改单）和 GB 45186-2024。标准修订或核对到原文不同时，在这里改。", "The numbers the over-packaging checks use, by default from GB 23350-2021 (with Amendments 1 and 2) and GB 45186-2024. Change them here when a standard is revised or its text says otherwise."),
+  reset: P("全部恢复标准默认值", "Restore every default"),
+  voidBands: P("空隙率限值（按单件净含量 Q，g 或 mL）", "Void-ratio limits (by one unit's net content Q, g or mL)"),
+  upTo: P("Q 不超过", "Q up to"),
+  above: P("以上", "and above"),
+  limit: P("限值 %", "Limit %"),
+  kinds: P("产品类别与必要空间系数 k", "Product kinds and their coefficient k"),
+  label: P("类别（中 / 英）", "Kind (Chinese / English)"),
+  layers: P("层数上限", "Max layers"),
+  costAbove: P("售价超过（元）", "Price above (yuan)"),
+  costLimit: P("则成本限值 %", "then cost limit %"),
+  mass: P("包装质量 ≤ 内装物 × ", "Packaging mass ≤ contents ×"),
+  source: P("来源", "Source"),
+  addKind: P("新增类别", "Add a kind"),
+  addBand: P("新增分档", "Add a band"),
+  remove: P("删除", "Remove"),
+  general: P("通用", "General"),
+  layersDefault: P("其他食品和化妆品的层数上限", "Layers allowed for other food and cosmetics"),
+  cost: P("包装成本占售价上限 %", "Packaging cost cap, % of price"),
+  courier: P("快递包装（GB 45186）", "Courier packaging (GB 45186)"),
+  courierLayers: P("快递包装层数上限：非易损易碎 / 易损易碎 / 生鲜冷链", "Courier layers: non-fragile / fragile / fresh"),
+  diagonal: P("箱体对角线 ≤ 倍数 × 内件对角线（按内件对角线 mm 分档）", "Box diagonal ≤ ratio × item diagonal (bands by the item's diagonal, mm)"),
+  from: P("从", "From"),
+  to: P("到", "to"),
+  ratio: P("倍数", "Ratio"),
+  exempt: P("箱体对角线不超过此值（mm）不受倍数限制", "Boxes with a diagonal up to this (mm) are exempt"),
+  tape: P("封箱胶带 ≤ 倍数 × 长宽高之和（按长宽高之和 mm 分档）", "Tape ≤ multiple × (L+W+H) (bands by L+W+H, mm)"),
+  multiple: P("倍数", "Multiple"),
+  tapeWidth: P("胶带宽度上限（mm）", "Max tape width (mm)"),
+  tapeRelax: P("易碎或贵重物品胶带放宽倍数", "Tape allowance for fragile or valuable items (×)"),
+  changed: P("已改", "Changed"),
+};
+
+const numIn = (v: string) => {
+  const n = Number(v);
+  return v.trim() === "" || !Number.isFinite(n) ? undefined : n;
+};
+
+function LimitsTab({ lib, update, lang }: { lib: Library; update: Update; lang: Lang }) {
+  const L = mergeLimits(lib.limits);
+  const set = <K extends keyof Limits>(k: K, v: Limits[K]) =>
+    update((l) => {
+      const own: Partial<Limits> = { ...(l.limits ?? {}) };
+      if (JSON.stringify(v) === JSON.stringify(DEFAULT_LIMITS[k])) delete own[k];
+      else own[k] = v;
+      return { ...l, limits: Object.keys(own).length ? own : undefined };
+    });
+  const changed = (k: keyof Limits) => (lib.limits?.[k] !== undefined ? <em className="lib-badge">{one(LT.changed, lang)}</em> : null);
+  const setKind = (i: number, patch: Partial<Kind>) => set("kinds", L.kinds.map((k, j) => (j === i ? { ...k, ...patch } : k)));
+  return (
+    <div className="lib-limits">
+      <p className="muted">{one(LT.lead, lang)}</p>
+      <p className="lib-base">{one(LIMIT_SOURCES, lang)}</p>
+      {lib.limits ? (
+        <p>
+          <button type="button" className="btn btn-small btn-quiet" onClick={() => update((l) => ({ ...l, limits: undefined }))}>
+            {one(LT.reset, lang)}
+          </button>
+        </p>
+      ) : null}
+
+      <section className="lib-card">
+        <h2>
+          {one(LT.voidBands, lang)} {changed("voidBands")}
+        </h2>
+        <table className="lib-table">
+          <thead>
+            <tr>
+              <th>{one(LT.upTo, lang)}</th>
+              <th>{one(LT.limit, lang)}</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {L.voidBands.map((b, i) => (
+              <tr key={i}>
+                <td>
+                  {b.upTo === null ? (
+                    one(LT.above, lang)
+                  ) : (
+                    <input inputMode="decimal" value={b.upTo} onChange={(e) => set("voidBands", L.voidBands.map((x, j) => (j === i ? { ...x, upTo: numIn(e.currentTarget.value) ?? 0 } : x)))} aria-label={one(LT.upTo, lang)} />
+                  )}
+                </td>
+                <td>
+                  <input inputMode="decimal" value={b.limit} onChange={(e) => set("voidBands", L.voidBands.map((x, j) => (j === i ? { ...x, limit: numIn(e.currentTarget.value) ?? 0 } : x)))} aria-label={one(LT.limit, lang)} />
+                </td>
+                <td>
+                  {b.upTo !== null && L.voidBands.length > 1 ? (
+                    <button type="button" className="st-link" onClick={() => set("voidBands", L.voidBands.filter((_, j) => j !== i))}>
+                      {one(LT.remove, lang)}
+                    </button>
+                  ) : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button type="button" className="btn btn-small btn-quiet" onClick={() => set("voidBands", [...L.voidBands.filter((b) => b.upTo !== null), { upTo: 100, limit: 30 }, ...L.voidBands.filter((b) => b.upTo === null)])}>
+          {one(LT.addBand, lang)}
+        </button>
+      </section>
+
+      <section className="lib-card">
+        <h2>
+          {one(LT.kinds, lang)} {changed("kinds")}
+        </h2>
+        <div className="lib-kinds">
+          {L.kinds.map((k, i) => (
+            <div key={k.id} className="lib-kind">
+              <div className="lib-pair">
+                <input value={k.label.zh} aria-label={`${one(LT.label, lang)} 中文`} onChange={(e) => setKind(i, { label: { ...k.label, zh: e.currentTarget.value } })} />
+                <input value={k.label.en} aria-label={`${one(LT.label, lang)} English`} onChange={(e) => setKind(i, { label: { ...k.label, en: e.currentTarget.value } })} />
+              </div>
+              <div className="lib-kind-nums">
+                <label>
+                  k <input inputMode="decimal" value={k.k ?? ""} onChange={(e) => setKind(i, { k: numIn(e.currentTarget.value) ?? null })} />
+                </label>
+                <label>
+                  {one(LT.layers, lang)} <input inputMode="numeric" value={k.layers ?? ""} placeholder={String(L.layers)} onChange={(e) => setKind(i, { layers: numIn(e.currentTarget.value) })} />
+                </label>
+                <label>
+                  {one(LT.costAbove, lang)} <input inputMode="decimal" value={k.costHigh?.above ?? ""} onChange={(e) => { const above = numIn(e.currentTarget.value); setKind(i, { costHigh: above === undefined ? undefined : { above, limit: k.costHigh?.limit ?? L.cost } }); }} />
+                </label>
+                <label>
+                  {one(LT.costLimit, lang)} <input inputMode="decimal" value={k.costHigh?.limit ?? ""} disabled={!k.costHigh} onChange={(e) => k.costHigh && setKind(i, { costHigh: { ...k.costHigh, limit: numIn(e.currentTarget.value) ?? L.cost } })} />
+                </label>
+                <label>
+                  {one(LT.mass, lang)} <input inputMode="decimal" value={k.massRatio ?? ""} onChange={(e) => setKind(i, { massRatio: numIn(e.currentTarget.value) })} />
+                </label>
+              </div>
+              <div className="lib-pair">
+                <input value={k.source.zh} placeholder={one(LT.source, "zh")} aria-label={`${one(LT.source, lang)} 中文`} onChange={(e) => setKind(i, { source: { ...k.source, zh: e.currentTarget.value } })} />
+                <input value={k.source.en} placeholder={one(LT.source, "en")} aria-label={`${one(LT.source, lang)} English`} onChange={(e) => setKind(i, { source: { ...k.source, en: e.currentTarget.value } })} />
+              </div>
+              <button type="button" className="st-link" onClick={() => set("kinds", L.kinds.filter((_, j) => j !== i))}>
+                {one(LT.remove, lang)}
+              </button>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="btn btn-small btn-quiet"
+          onClick={() => {
+            let n = 1;
+            while (L.kinds.some((k) => k.id === `custom${n}`)) n++;
+            set("kinds", [...L.kinds, { id: `custom${n}`, label: { zh: "新类别", en: "New kind" }, k: null, source: { zh: "", en: "" } }]);
+          }}
+        >
+          {one(LT.addKind, lang)}
+        </button>
+      </section>
+
+      <section className="lib-card">
+        <h2>{one(LT.general, lang)}</h2>
+        <div className="lib-kind-nums">
+          <label>
+            {one(LT.layersDefault, lang)} {changed("layers")}
+            <input inputMode="numeric" value={L.layers} onChange={(e) => set("layers", numIn(e.currentTarget.value) ?? DEFAULT_LIMITS.layers)} />
+          </label>
+          <label>
+            {one(LT.cost, lang)} {changed("cost")}
+            <input inputMode="decimal" value={L.cost} onChange={(e) => set("cost", numIn(e.currentTarget.value) ?? DEFAULT_LIMITS.cost)} />
+          </label>
+        </div>
+      </section>
+
+      <section className="lib-card">
+        <h2>{one(LT.courier, lang)}</h2>
+        <div className="lib-field">
+          <span className="lib-label">
+            {one(LT.courierLayers, lang)} {changed("courierLayers")}
+          </span>
+          <div className="lib-kind-nums">
+            {(["normal", "fragile", "fresh"] as const).map((k) => (
+              <input key={k} inputMode="numeric" aria-label={k} value={L.courierLayers[k]} onChange={(e) => set("courierLayers", { ...L.courierLayers, [k]: numIn(e.currentTarget.value) ?? DEFAULT_LIMITS.courierLayers[k] })} />
+            ))}
+          </div>
+        </div>
+        <div className="lib-field">
+          <span className="lib-label">
+            {one(LT.diagonal, lang)} {changed("diagonal")}
+          </span>
+          {L.diagonal.map((b, i) => (
+            <div key={i} className="lib-kind-nums">
+              <label>
+                {one(LT.from, lang)} <input inputMode="decimal" value={b.from} onChange={(e) => set("diagonal", L.diagonal.map((x, j) => (j === i ? { ...x, from: numIn(e.currentTarget.value) ?? 0 } : x)))} />
+              </label>
+              <label>
+                {one(LT.to, lang)} <input inputMode="decimal" value={b.to} onChange={(e) => set("diagonal", L.diagonal.map((x, j) => (j === i ? { ...x, to: numIn(e.currentTarget.value) ?? 0 } : x)))} />
+              </label>
+              <label>
+                {one(LT.ratio, lang)} <input inputMode="decimal" value={b.ratio} onChange={(e) => set("diagonal", L.diagonal.map((x, j) => (j === i ? { ...x, ratio: numIn(e.currentTarget.value) ?? 1 } : x)))} />
+              </label>
+            </div>
+          ))}
+        </div>
+        <label className="lib-field">
+          <span className="lib-label">
+            {one(LT.exempt, lang)} {changed("diagonalExempt")}
+          </span>
+          <input inputMode="decimal" value={L.diagonalExempt} onChange={(e) => set("diagonalExempt", numIn(e.currentTarget.value) ?? DEFAULT_LIMITS.diagonalExempt)} />
+        </label>
+        <div className="lib-field">
+          <span className="lib-label">
+            {one(LT.tape, lang)} {changed("tape")}
+          </span>
+          {L.tape.map((b, i) => (
+            <div key={i} className="lib-kind-nums">
+              <label>
+                {one(LT.upTo, lang)} <input inputMode="decimal" value={b.upTo} onChange={(e) => set("tape", L.tape.map((x, j) => (j === i ? { ...x, upTo: numIn(e.currentTarget.value) ?? 0 } : x)))} />
+              </label>
+              <label>
+                {one(LT.multiple, lang)} <input inputMode="decimal" value={b.multiple} onChange={(e) => set("tape", L.tape.map((x, j) => (j === i ? { ...x, multiple: numIn(e.currentTarget.value) ?? 1 } : x)))} />
+              </label>
+            </div>
+          ))}
+        </div>
+        <div className="lib-kind-nums">
+          <label>
+            {one(LT.tapeWidth, lang)} {changed("tapeWidth")}
+            <input inputMode="decimal" value={L.tapeWidth} onChange={(e) => set("tapeWidth", numIn(e.currentTarget.value) ?? DEFAULT_LIMITS.tapeWidth)} />
+          </label>
+          <label>
+            {one(LT.tapeRelax, lang)} {changed("tapeRelax")}
+            <input inputMode="decimal" value={L.tapeRelax} onChange={(e) => set("tapeRelax", numIn(e.currentTarget.value) ?? DEFAULT_LIMITS.tapeRelax)} />
+          </label>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- history */
+
+const HT = {
+  lead: P("每次保存都会留一个版本：谁、何时、改了什么。恢复会作为一次新的保存，所以也可以再撤回。", "Every save keeps a version: who, when, and what changed. A restore is itself a new save, so it can be undone too."),
+  empty: P("还没有修改记录。", "No changes recorded yet."),
+  restore: P("恢复到这个版本", "Restore this version"),
+  confirm: P("再点一次确认恢复", "Click again to restore"),
+  vsNow: P("与当前相比", "Compared with now"),
+  current: P("当前版本", "Current version"),
+  failed: P("没有恢复成功，请稍后再试", "Couldn't restore; try again shortly"),
+};
+
+function HistoryTab({ api, current, lang, onRestored }: { api: HistoryApi; current: Library; lang: Lang; onRestored: (l: Library) => void }) {
+  const [list, setList] = useState<HistoryEntry[] | null>(null);
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const load = async () => setList(await api.list().catch(() => []));
+  useEffect(() => {
+    void load();
+  }, [api]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!list) return <p className="muted">…</p>;
+  return (
+    <div className="lib-history">
+      <p className="muted">{one(HT.lead, lang)}</p>
+      {err ? <p className="notice notice-error">{err}</p> : null}
+      {list.length ? (
+        <ol className="lib-hist">
+          {list.map((e, i) => {
+            const d = diffLibraries(e.library, current);
+            return (
+              <li key={e.at}>
+                <div className="lib-hist-head">
+                  <strong>{e.at.slice(0, 19).replace("T", " ")}</strong>
+                  {e.by ? <span>{e.by}</span> : null}
+                  {i === 0 && !d.count ? <em className="lib-badge">{one(HT.current, lang)}</em> : null}
+                </div>
+                <p>{one(e.summary, lang)}</p>
+                {d.count ? <p className="lib-base">{`${one(HT.vsNow, lang)}：${diffText(d, lang)}`}</p> : null}
+                {d.count ? (
+                  <button
+                    type="button"
+                    className={confirm === e.at ? "btn btn-small btn-danger" : "btn btn-small btn-quiet"}
+                    onBlur={() => setConfirm(null)}
+                    onClick={async () => {
+                      if (confirm !== e.at) return setConfirm(e.at);
+                      setConfirm(null);
+                      const lib = await api.restore(e.at).catch(() => null);
+                      if (!lib) return setErr(one(HT.failed, lang));
+                      onRestored(lib);
+                      void load();
+                    }}
+                  >
+                    {one(confirm === e.at ? HT.confirm : HT.restore, lang)}
+                  </button>
+                ) : null}
+              </li>
+            );
+          })}
+        </ol>
+      ) : (
+        <p className="muted">{one(HT.empty, lang)}</p>
+      )}
     </div>
   );
 }

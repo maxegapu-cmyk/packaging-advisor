@@ -148,7 +148,12 @@ export function MaterialPanel({
   onLibrary,
   libraryHref,
   librarySave = "idle",
+  frozen = false,
+  onCompliance,
 }: {
+  /** the pack's materials are frozen at sign-off: shown, not changed */
+  frozen?: boolean;
+  onCompliance?: () => void;
   spec: PackSpec;
   category: string;
   lang: Lang;
@@ -198,6 +203,17 @@ export function MaterialPanel({
 
   return (
     <div className="st-tabpanel mat-panel" role="tabpanel">
+      {frozen ? (
+        <p className="mat-frozen" role="status">
+          {lang === "en" ? "The materials are frozen at sign-off, so nothing here can change. " : "材料已在定稿时冻结，这里只能查看。"}
+          {onCompliance ? (
+            <button type="button" className="st-link" onClick={onCompliance}>
+              {lang === "en" ? "Unfreeze under Compliance" : "到「合规」中解冻"}
+            </button>
+          ) : null}
+        </p>
+      ) : null}
+      <fieldset className="mat-lock" disabled={frozen}>
       <section className="st-sec">
         <p className="st-note">{one(T.lead, lang)}</p>
         {libraryHref ? (
@@ -340,6 +356,7 @@ export function MaterialPanel({
         </ul>
         <span className="st-small">{one(T.checked, lang)}</span>
       </section>
+      </fieldset>
     </div>
   );
 }

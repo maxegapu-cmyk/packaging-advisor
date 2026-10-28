@@ -762,3 +762,19 @@ export function libraryPrompt(): string {
   if (hidden.length) out.push("", `以下编号已停用，不得选用：${hidden.join("、")}。`);
   return out.join("\n");
 }
+
+/* ---------------------------------------------------------------- frozen snapshots */
+
+/**
+ * Freezes a project's materials with the library as it is now, so later library changes don't
+ * alter a design that has been signed off. The pack then uses the frozen library everywhere.
+ */
+export function freezeMaterials(spec: PackSpec, live: Library, note?: string): PackSpec {
+  return { ...spec, frozen: { at: new Date().toISOString(), library: live, ...(note?.trim() ? { note: note.trim().slice(0, 160) } : {}) } };
+}
+export function unfreezeMaterials(spec: PackSpec): PackSpec {
+  const { frozen: _f, ...rest } = spec; // eslint-disable-line @typescript-eslint/no-unused-vars
+  return rest;
+}
+/** The library a pack uses: its frozen one, else the live one. */
+export const libraryFor = (spec: PackSpec | undefined, live: Library | undefined): Library | undefined => spec?.frozen?.library ?? live;

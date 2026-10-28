@@ -19,6 +19,8 @@ import type { Check } from "@/lib/print/preflight";
 import { handTextOf, rolesOf, type ArtInput } from "../three/art";
 import { loadInscription } from "@/lib/fonts";
 import { choiceText, documentsFor, LIST, offListOf, rulesFor, usesOf } from "@/lib/materials";
+import { overpackChecks } from "@/lib/compliance/overpack";
+import { coverage, coverageSummary, DOC_TYPE_LABELS, type SupplierDoc } from "@/lib/compliance/documents";
 import { baseColor, drawSheetPreview, panelArt, panelPpm } from "./render";
 
 const PT = 72 / 25.4;
@@ -232,6 +234,8 @@ export type PdfInput = {
   board: Board;
   spec: PackSpec;
   checks: Check[];
+  /** the product's supplier documents (for the materials page) */
+  docs?: SupplierDoc[];
   lang: Lang;
   dpi?: number;
   onProgress?: (done: number, total: number) => void;
@@ -341,6 +345,31 @@ function materialSheet(inp: PdfInput): HTMLCanvasElement {
     text(a.rule.id, 14, y, 2.8, 700);
     y = para(ctx, `${one(a.rule.standard)}  —  ${one(a.rule.scope)}`, 26, y, 2.6, 170, mm, "#222");
     y = para(ctx, (en ? "Obtain: " : "应取得：") + one(a.rule.docs), 26, y + 3.9, 2.4, 170, mm, "#555");
+  }
+  heading(en ? "Over-packaging (GB 23350 / GB 45186)" : "过度包装核算（GB 23350 / GB 45186）");
+  for (const x of overpackChecks(inp.spec, cat)) {
+    y += 5.6;
+    if (!room(8)) break;
+    const mark = { error: "✕", warn: "!", ok: "✓", info: "i" }[x.level];
+    const tone = { error: "#C8102E", warn: "#B25E00", ok: "#2E7D32", info: "#555" }[x.level];
+    text(mark, 14, y, 2.8, 700, tone);
+    y = para(ctx, `${x.rule}  ${one(x.title)}${one(x.detail) ? `  —  ${one(x.detail)}` : ""}`, 19, y, 2.5, 177, mm, "#222");
+  }
+  const reqs = coverage(uses, rules, inp.docs ?? []);
+  if (reqs.length) {
+    const sum = coverageSummary(reqs);
+    heading(en ? `Supplier documents: ${sum.met}/${sum.total} in place` : `证明文件：已齐 ${sum.met}/${sum.total}`);
+    for (const r of reqs) {
+      y += 5;
+      if (!room(7)) break;
+      const st = r.expired.length ? (en ? "expired" : "已过期") : r.missing.length ? (en ? "missing " : "缺 ") + r.missing.map((g) => g.map((t) => one(DOC_TYPE_LABELS[t])).join(en ? " or " : "或")).join(en ? "; " : "；") : en ? "in place" : "已齐";
+      const color = r.expired.length || (r.missing.length && r.critical) ? "#C8102E" : r.missing.length ? "#B25E00" : "#2E7D32";
+      y = para(ctx, `${r.rule}  ${one(r.label)} ${r.materialId}  —  ${st}${r.docs.length ? `  (${r.docs.map((d) => d.number ?? d.title).join(", ")})` : ""}`, 14, y, 2.4, 182, mm, color);
+    }
+  }
+  if (inp.spec.frozen) {
+    y += 7;
+    if (room(6)) text(en ? `Materials frozen at sign-off: ${inp.spec.frozen.at.slice(0, 16).replace("T", " ")}${inp.spec.frozen.note ? ` · ${inp.spec.frozen.note}` : ""}` : `材料已于定稿时冻结：${inp.spec.frozen.at.slice(0, 16).replace("T", " ")}${inp.spec.frozen.note ? ` · ${inp.spec.frozen.note}` : ""}`, 14, y, 2.6, 600, "#3B675C");
   }
   heading(en ? "Ask the suppliers for" : "向供应商索取");
   for (const d of documentsFor(uses)) {

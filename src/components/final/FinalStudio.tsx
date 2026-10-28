@@ -1,6 +1,8 @@
 "use client";
 
 import { setLibrary, type Library } from "@/lib/materials";
+import type { SupplierDoc } from "@/lib/compliance/documents";
+import { urlDocStore, type DocStore } from "../compliance/docStore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { applyArtwork, labelFields, renderPalette, rolesOf, type Artwork, type Roles } from "@/lib/artwork";
 import type { Board } from "@/lib/board/schema";
@@ -166,7 +168,12 @@ export function FinalStudio({
   fileStem,
   logoSrc: logoSrcFor = (id) => `/api/uploads/${id}`,
   library,
+  docsUrl,
+  docStore,
 }: {
+  /** the product's supplier documents, for the pre-press checks and the job sheet */
+  docsUrl?: string;
+  docStore?: DocStore;
   /** the material library in force (the app's edits to the principal's list) */
   library?: Library;
   board: Board;
@@ -182,7 +189,21 @@ export function FinalStudio({
   fileStem: string;
   logoSrc?: (id: string) => string;
 }) {
-  if (library !== undefined) setLibrary(library);
+  // a pack frozen at sign-off keeps the library it was frozen with
+  setLibrary(pack.frozen?.library ?? library ?? {});
+  const [docs, setDocs] = useState<SupplierDoc[]>([]);
+  useEffect(() => {
+    const store = docStore ?? (docsUrl ? urlDocStore(docsUrl) : null);
+    if (!store) return;
+    let live = true;
+    store
+      .list()
+      .then((d) => live && setDocs(d))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [docStore, docsUrl]);
   const [art, setArt] = useState<Artwork>(initial);
   const [save, setSave] = useState<"idle" | "saving" | "saved" | "failed">("idle");
   const [tab, setTab] = useState<"3d" | "sheet" | "proof">("3d");
@@ -203,7 +224,7 @@ export function FinalStudio({
   const logo = useImage(logoSrc);
   const info = useMemo(() => artInfoOf(art, pack, logo), [art, pack, logo]);
   const layout = useMemo(() => printLayout(pack), [pack]);
-  const checks = useMemo(() => preflight(art, board, pack), [art, board, pack]);
+  const checks = useMemo(() => preflight(art, board, pack, docs), [art, board, pack, docs]);
   const errors = blocking(checks).length;
   const fields = useMemo(() => labelFields(board.meta.category), [board.meta.category]);
   const bc = checkEan13(art.barcode);
@@ -304,7 +325,7 @@ export function FinalStudio({
     setError(null);
     try {
       const { buildPrintPdf } = await import("./printPdf");
-      const bytes = await buildPrintPdf({ layout, art: artInput, artwork: art, board, spec: pack, checks, lang, onProgress: (n, t) => setProgress(n / t) });
+      const bytes = await buildPrintPdf({ layout, art: artInput, artwork: art, board, spec: pack, checks, docs, lang, onProgress: (n, t) => setProgress(n / t) });
       download(new Blob([bytes as BlobPart], { type: "application/pdf" }), `${safeName(fileStem)}-印刷文件-print.pdf`);
       if (exportUrl) fetch(exportUrl, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "pdf", errors }) }).catch(() => {});
     } catch (e) {

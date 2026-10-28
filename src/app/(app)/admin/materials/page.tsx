@@ -18,7 +18,7 @@ export default async function MaterialsAdminPage() {
         <h1>材料库 Material library</h1>
         <AdminNav current="materials" />
       </div>
-      <LibraryEditor initial={lib} lang={lang} saveUrl="/api/materials" />
+      <LibraryEditor initial={lib} lang={lang} saveUrl="/api/materials" historyUrl="/api/materials/history" />
     </main>
   );
 }

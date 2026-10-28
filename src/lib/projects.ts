@@ -3,11 +3,13 @@ import { randomId, randomToken } from "./crypto";
 import type { Artwork } from "./artwork";
 import type { Board } from "./board/schema";
 import { isCategory, type Category } from "./categories";
-import { readUpload, writeUpload } from "./uploads";
+import fs from "node:fs";
+import { readUpload, uploadPath, writeUpload } from "./uploads";
+import { normalizeDocMeta, type DocMeta, type SupplierDoc } from "./compliance/documents";
 import { defaultPack, normalizePack, type PackSpec } from "./pack";
 
 export type Project = { id: string; inviteId: number; title: string; category: Category; itemType: string; brand: string; description: string; mustText: string; pack: PackSpec; createdAt: string };
-export type Upload = { id: string; projectId: string; kind: "product" | "reference" | "logo" | "proof"; note: string; file: string; mime: string };
+export type Upload = { id: string; projectId: string; kind: "product" | "reference" | "logo" | "proof" | "doc"; note: string; file: string; mime: string };
 export type BoardRecord = { id: string; projectId: string; version: number; data: Board; modelLabel: string; note: string; shareToken: string | null; picked: string | null; createdAt: string };
 
 type ProjectRow = { id: string; invite_id: number; title: string; category: string; item_type?: string; brand: string; description: string; must_text: string; pack?: string; artwork?: string | null; created_at: string };
@@ -105,9 +107,51 @@ export function addLogo(projectId: string, png: Buffer): Upload {
 
 export function listUploads(projectId: string): Upload[] {
   // product photos and references only: logos belong to the artwork, not to the model's input
-  return (getDb().prepare("SELECT id, project_id, kind, note, file, mime FROM uploads WHERE project_id = ? AND kind NOT IN ('logo', 'proof') ORDER BY created_at, rowid").all(projectId) as any[]).map((r) => ({
+  return (getDb().prepare("SELECT id, project_id, kind, note, file, mime FROM uploads WHERE project_id = ? AND kind NOT IN ('logo', 'proof', 'doc') ORDER BY created_at, rowid").all(projectId) as any[]).map((r) => ({
     id: r.id, projectId: r.project_id, kind: r.kind, note: r.note, file: r.file, mime: r.mime,
   }));
+}
+
+/* ---------------------------------------------------------------- supplier documents */
+
+/** A supplier document for the project; its details (type, dates, what it covers) as JSON in the note. */
+export function addDocument(projectId: string, file: { data: Buffer; ext: "pdf" | "jpg"; mime: string }, meta: DocMeta): SupplierDoc {
+  const id = randomId();
+  const name = writeUpload(id, file.data, file.ext);
+  const at = now();
+  getDb().prepare("INSERT INTO uploads (id, project_id, kind, note, file, mime, created_at) VALUES (?, ?, 'doc', ?, ?, ?, ?)").run(id, projectId, JSON.stringify(meta), name, file.mime, at);
+  return { ...meta, id, mime: file.mime, url: `/api/uploads/${id}`, addedAt: at };
+}
+
+export function listDocuments(projectId: string): SupplierDoc[] {
+  const rows = getDb().prepare("SELECT id, note, mime, created_at FROM uploads WHERE project_id = ? AND kind = 'doc' ORDER BY created_at, rowid").all(projectId) as { id: string; note: string; mime: string; created_at: string }[];
+  const out: SupplierDoc[] = [];
+  for (const r of rows) {
+    let meta: DocMeta | null = null;
+    try {
+      meta = normalizeDocMeta(JSON.parse(r.note));
+    } catch {
+      meta = null;
+    }
+    if (meta) out.push({ ...meta, id: r.id, mime: r.mime, url: `/api/uploads/${r.id}`, addedAt: r.created_at });
+  }
+  return out;
+}
+
+export function updateDocument(projectId: string, id: string, meta: DocMeta): boolean {
+  return getDb().prepare("UPDATE uploads SET note = ? WHERE id = ? AND project_id = ? AND kind = 'doc'").run(JSON.stringify(meta), id, projectId).changes > 0;
+}
+
+export function deleteDocument(projectId: string, id: string): boolean {
+  const row = getDb().prepare("SELECT file FROM uploads WHERE id = ? AND project_id = ? AND kind = 'doc'").get(id, projectId) as { file: string } | undefined;
+  if (!row) return false;
+  getDb().prepare("DELETE FROM uploads WHERE id = ?").run(id);
+  try {
+    fs.unlinkSync(uploadPath(row.file));
+  } catch {
+    /* already gone */
+  }
+  return true;
 }
 
 export function getUpload(id: string): Upload | null {

@@ -125,13 +125,13 @@ export function BoardView({
   /** Base link to the full-screen 3D space; `d=<direction>` is appended. */
   studioBase?: string;
 }) {
-  if (library !== undefined) setLibrary(library);
+  if (library !== undefined) setLibrary(pack.frozen?.library ?? library);
   const cat = isCategory(board.meta.category) ? CATEGORIES[board.meta.category] : null;
   const rec = board.recommendation;
   const recDir = board.directions.find((d) => d.id === rec.pick);
   return (
     <div className="board">
-      {library !== undefined ? <LibraryInForce library={library} /> : null}
+      {library !== undefined ? <LibraryInForce library={pack.frozen?.library ?? library} /> : null}
       <div className="board-sheet" style={sheetVars(recDir)}>
         <RegMarks />
         <div className="board-sheet-in">

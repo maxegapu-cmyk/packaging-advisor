@@ -43,6 +43,8 @@ import { Orbit, REST_ANGLE, reducedMotion, VIEWS, type Angle } from "./orbit";
 import { Stage3D } from "./Stage3D";
 import { FormGlyph } from "./FormGlyph";
 import { MaterialPanel } from "./MaterialPanel";
+import { CompliancePanel } from "../compliance/CompliancePanel";
+import { memoryDocStore, urlDocStore, type DocStore } from "../compliance/docStore";
 import { pruneMaterials, setLibrary, type Library } from "@/lib/materials";
 import { ColorStrip, RegMarks, sheetVars } from "../PressSheet";
 
@@ -92,6 +94,7 @@ const S = {
   tabLook: { zh: "外观", en: "Look" },
   tabCheck: { zh: "尺寸", en: "Size" },
   tabMaterials: { zh: "材料", en: "Materials" },
+  tabCompliance: { zh: "合规", en: "Compliance" },
   refH: { zh: "放个东西对比大小", en: "Compare with something familiar" },
   refNote: { zh: "常见物品按真实尺寸放在包装旁边，一眼看出包装有多大。", en: "Everyday objects at their real size, beside the package, so you can see how big it is." },
   refNone: { zh: "不放", en: "None" },
@@ -133,7 +136,7 @@ const BACKDROPS: { id: Backdrop; label: Pair; hint: Pair }[] = [
   { id: "brand", label: { zh: "品牌色", en: "Brand" }, hint: { zh: "包装的主色", en: "The pack's key colour" } },
 ];
 
-type PanelTab = "pack" | "materials" | "look" | "check";
+type PanelTab = "pack" | "materials" | "compliance" | "look" | "check";
 
 type Detail = { id: string; label: Pair; angle: Angle; zoom: number; open?: boolean; text: (d: Direction) => Pair };
 
@@ -288,7 +291,12 @@ export function Studio({
   libraryUrl,
   onLibrary,
   libraryHref,
+  docsUrl,
+  docStore,
 }: {
+  /** where the product's supplier documents are kept (the app's API), or a store of the caller's */
+  docsUrl?: string;
+  docStore?: DocStore;
   /** the material library in force (the app's edits to the principal's list) */
   library?: Library;
   /** where an admin's library changes are saved (PUT); with `onLibrary`, the caller saves them */
@@ -314,13 +322,15 @@ export function Studio({
 
   // the library in force: what the page passed, then the edits made here
   const [lib, setLib] = useState<Library | undefined>(library);
-  if (lib !== undefined) setLibrary(lib);
   const canEditLibrary = !!(libraryUrl || onLibrary);
   const [libSave, setLibSave] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [spec, setSpecState] = useState(initialPack);
+  // a pack frozen at sign-off keeps the library it was frozen with
+  setLibrary(spec.frozen?.library ?? lib ?? {});
+  const docs = useMemo(() => docStore ?? (docsUrl ? urlDocStore(docsUrl) : isSample ? memoryDocStore(`pa-docs-${board.meta.category}-${board.meta.product.zh}`) : null), [docStore, docsUrl, isSample, board.meta.category, board.meta.product.zh]);
   const changeLibrary = async (next: Library) => {
     setLib(next);
-    setLibrary(next);
+    setLibrary(spec.frozen?.library ?? next);
     // the 3D model rebuilds: its key carries the library's version
     setSpecState((s) => ({ ...s }));
     if (onLibrary) {
@@ -537,6 +547,7 @@ export function Studio({
   const panelTabs: { id: PanelTab; label: Pair }[] = [
     { id: "pack", label: S.tabPack },
     { id: "materials", label: S.tabMaterials },
+    { id: "compliance", label: S.tabCompliance },
     { id: "look", label: S.tabLook },
     { id: "check", label: S.tabCheck },
   ];
@@ -908,8 +919,12 @@ export function Studio({
             onLibrary={canEditLibrary ? changeLibrary : undefined}
             libraryHref={libraryHref}
             librarySave={libSave}
+            frozen={!!spec.frozen}
+            onCompliance={() => setTab("compliance")}
           />
         ) : null}
+
+        {tab === "compliance" ? <CompliancePanel spec={spec} category={board.meta.category} lang={lang} onChange={setSpec} live={lib ?? {}} store={docs} /> : null}
 
         {tab === "look" ? (
           <div className="st-tabpanel" role="tabpanel">

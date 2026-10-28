@@ -20,5 +20,5 @@ export async function PUT(req: Request) {
     return jsonError(400, "需要 JSON Expected JSON");
   }
   if (JSON.stringify(body ?? {}).length > 600_000) return jsonError(413, "材料库太大 The library is too large");
-  return NextResponse.json(saveLibrary(body));
+  return NextResponse.json(saveLibrary(body, invite.label || `#${invite.id}`));
 }
