@@ -117,7 +117,8 @@ The skill files the app reads at generation time are bundled in `skills/`; promp
 
 - 原件 Original：委托方提供的 `china-packaging-materials-2026-10-28.xlsx`，放在 `data/materials/`（`data/` 不进仓库，原件不公开 the original stays out of the repository）。
 - `python3 scripts/materials/build_catalog.py` 从原件生成 `src/lib/materials/catalog.ts`（材料、规则、使用说明，中英对照）、`src/lib/materials/ids.ts`（编号表，供方案校验）和 `skills/packaging-visual-direction/references/material-list.md`（生成时给模型的清单）。英文译文在 `scripts/materials/en_materials.py` 与 `en_rules.py`；清单有新增行而没有译文时脚本会停下。 Generates the catalog, the number list and the model's reference from the original; English lives in the two `en_*.py` files, and the script stops if a row has none.
-- 每个盒型有哪些部件、每个部件可选哪些清单材料、规则怎样适用，见 `src/lib/materials/index.ts`。 Which parts each structure has, which listed materials each can be, and how the rules apply: `src/lib/materials/index.ts`.
+- 材料库可编辑 Editable library：管理员在后台「材料库」`/admin/materials`（3D 空间「材料」页也有入口）可以改任何材料的任何字段（名称、俗名、大类、部位、用途、要点、使用边界、限非食品/化妆品、食品接触规则、始终适用的规则、寄递/购物袋/G02、采购资料、来源链接、3D 颜色），新增材料（编号 U001 起）、隐藏材料、逐项恢复清单原值；23 条规则同样可改、可隐藏、可新增（编号 X01 起）；按盒型和部件设定推荐材料与默认材料（也可在 3D 空间里对当前部件一键“设为默认”“加入推荐”）；整个材料库可导出为 JSON、再导入。原件不改，修改单独保存在数据库 `settings` 表；改动作用于 3D 外观与结构解剖、规则与资料、印前检查、印刷工单，并写进 AI 生成的提示词，新增编号也能通过方案校验。预览站的材料库保存在浏览器里（`materials.html`）。 Admins edit any field of any material and rule, add, hide and restore materials and rules, set each part's recommended and default materials (also one click from the 3D space), and export or import the whole library as JSON. The original list is untouched; edits live in the database's `settings` table and reach the 3D model, rules, pre-press checks, the job sheet and AI generation. The preview keeps the library in the browser.
+- 每个盒型有哪些部件、每个部件可选哪些清单材料、规则怎样适用，见 `src/lib/materials/index.ts`；材料库的合并与校验见 `src/lib/materials/library.ts`。 Which parts each structure has, which listed materials each can be, and how the rules apply: `src/lib/materials/index.ts`.
 - 清单给出的是合规路径，不是合格证明：最终以供应商资料和成品检测为准；标准换版或用途变化时须重新核验。 The list gives a path to compliance, not a certificate: supplier documents and finished-product tests decide, and it must be re-verified when standards or uses change.
 
 ## 开发 · Development
@@ -139,7 +140,7 @@ src/lib/            与框架无关的核心逻辑 Framework-agnostic core
 src/components/     方案板等页面组件 Board and shared components
   pack/             3D 引擎：盒型、灯光、相机、3D 空间 3D engine: forms, lighting, camera, studio
 src/lib/pack.ts     盒型、尺寸、工艺 Package structure, size, finish
-src/lib/materials/  委托方材料清单：部件、选材、规则、所需资料 The principal's material list: parts, picks, rules, documents
+src/lib/materials/  委托方材料清单与可编辑材料库：部件、选材、规则、所需资料 The principal's list and the editable library: parts, picks, rules, documents
 src/lib/print/      印刷文件：展开图、条码、色差、印前检查 Print files: nets, barcode, colour, pre-press
   folds.ts          折叠结构的唯一描述：印刷展开图和首页影片的折叠都来自它 The one fold description: print nets and the film fold from it
 src/components/hero/  首页影片「共生」和「平面到立体」 The homepage films, Symbiosis and Flat to form

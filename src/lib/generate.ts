@@ -3,6 +3,7 @@
  * prompt → model → JSON extraction → validation (one repair retry) → saved board version.
  */
 import { validateBoard, type Board } from "./board/schema";
+import { loadLibrary } from "./materialsStore";
 import { applyRevision, type Dimension } from "./board/revise";
 import { extractJson } from "./llm/json";
 import { resolveModel, type ResolvedModel } from "./llm/providers";
@@ -97,7 +98,7 @@ export async function generateBoard(projectId: string, actor: Actor, modelId?: n
   if (resolved.vision) for (const u of uploads) parts.push({ type: "image", mime: "image/jpeg", base64: uploadBase64(u) });
 
   const messages: ChatMessage[] = [
-    { role: "system", content: generationSystemPrompt(project.category) },
+    { role: "system", content: (loadLibrary(), generationSystemPrompt(project.category)) },
     { role: "user", content: parts },
   ];
 
@@ -127,7 +128,7 @@ export async function reviseDirection(
   checkLimit(actor);
   const resolved = resolveModel(args.modelId);
   const messages: ChatMessage[] = [
-    { role: "system", content: revisionSystemPrompt(project.category) },
+    { role: "system", content: (loadLibrary(), revisionSystemPrompt(project.category)) },
     { role: "user", content: revisionUserText(direction, args.dimension, args.feedback.slice(0, 1000)) },
   ];
   try {

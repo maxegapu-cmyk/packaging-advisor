@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { setLibrary, type Library } from "@/lib/materials";
+import { LibraryInForce } from "./materials/LibraryInForce";
 import type { Board, Direction } from "@/lib/board/schema";
 import { CATEGORIES, isCategory } from "@/lib/categories";
 import { plain, UI, type Lang } from "@/lib/i18n";
@@ -107,7 +109,10 @@ export function BoardView({
   pack = DEFAULT_PACK,
   packSaveUrl,
   studioBase,
+  library,
 }: {
+  /** the material library in force (the app's edits to the principal's list) */
+  library?: Library;
   board: Board;
   lang: Lang;
   pickedId?: string | null;
@@ -120,11 +125,13 @@ export function BoardView({
   /** Base link to the full-screen 3D space; `d=<direction>` is appended. */
   studioBase?: string;
 }) {
+  if (library !== undefined) setLibrary(library);
   const cat = isCategory(board.meta.category) ? CATEGORIES[board.meta.category] : null;
   const rec = board.recommendation;
   const recDir = board.directions.find((d) => d.id === rec.pick);
   return (
     <div className="board">
+      {library !== undefined ? <LibraryInForce library={library} /> : null}
       <div className="board-sheet" style={sheetVars(recDir)}>
         <RegMarks />
         <div className="board-sheet-in">

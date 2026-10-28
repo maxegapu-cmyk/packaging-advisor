@@ -95,6 +95,8 @@ const MIGRATIONS: string[] = [
   `ALTER TABLE projects ADD COLUMN item_type TEXT NOT NULL DEFAULT '';`,
   // v4: the finished artwork (final files step), JSON
   `ALTER TABLE projects ADD COLUMN artwork TEXT;`,
+  // v5: app-wide settings as JSON documents (the material library)
+  `CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL);`,
 ];
 
 let db: DatabaseSync | null = null;

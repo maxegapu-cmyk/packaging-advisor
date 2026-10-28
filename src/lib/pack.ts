@@ -255,11 +255,11 @@ const text = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/[\
 
 /** One part's choices, cleaned (a bare string is a material number, as first stored). */
 function pickFields(v: unknown): MaterialPick | null {
-  if (typeof v === "string") return /^(M\d{3}|none)$/.test(v) ? { id: v } : null;
+  if (typeof v === "string") return /^([MU]\d{3}|none)$/.test(v) ? { id: v } : null;
   if (!v || typeof v !== "object" || Array.isArray(v)) return null;
   const o = v as Record<string, unknown>;
   const out: MaterialPick = {};
-  if (typeof o.id === "string" && /^(M\d{3}|none)$/.test(o.id)) out.id = o.id;
+  if (typeof o.id === "string" && /^([MU]\d{3}|none)$/.test(o.id)) out.id = o.id;
   const grade = text(o.grade, 40);
   const supplier = text(o.supplier, 60);
   const note = text(o.note, 160);

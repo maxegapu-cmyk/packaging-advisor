@@ -43,7 +43,7 @@ import { Orbit, REST_ANGLE, reducedMotion, VIEWS, type Angle } from "./orbit";
 import { Stage3D } from "./Stage3D";
 import { FormGlyph } from "./FormGlyph";
 import { MaterialPanel } from "./MaterialPanel";
-import { pruneMaterials } from "@/lib/materials";
+import { pruneMaterials, setLibrary, type Library } from "@/lib/materials";
 import { ColorStrip, RegMarks, sheetVars } from "../PressSheet";
 
 /* ---------------------------------------------------------------- Text */
@@ -284,7 +284,18 @@ export function Studio({
   backHref,
   handoffHref,
   isSample = false,
+  library,
+  libraryUrl,
+  onLibrary,
+  libraryHref,
 }: {
+  /** the material library in force (the app's edits to the principal's list) */
+  library?: Library;
+  /** where an admin's library changes are saved (PUT); with `onLibrary`, the caller saves them */
+  libraryUrl?: string;
+  onLibrary?: (lib: Library) => void;
+  /** the full library editor, for those who may change it */
+  libraryHref?: string;
   board: Board;
   initialPack: PackSpec;
   initialDirection?: string;
@@ -301,7 +312,31 @@ export function Studio({
   const d = dirs[idx];
   const brand = board.meta.brand.startsWith("[") ? "" : board.meta.brand;
 
+  // the library in force: what the page passed, then the edits made here
+  const [lib, setLib] = useState<Library | undefined>(library);
+  if (lib !== undefined) setLibrary(lib);
+  const canEditLibrary = !!(libraryUrl || onLibrary);
+  const [libSave, setLibSave] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [spec, setSpecState] = useState(initialPack);
+  const changeLibrary = async (next: Library) => {
+    setLib(next);
+    setLibrary(next);
+    // the 3D model rebuilds: its key carries the library's version
+    setSpecState((s) => ({ ...s }));
+    if (onLibrary) {
+      onLibrary(next);
+      setLibSave("saved");
+      return;
+    }
+    if (!libraryUrl) return;
+    setLibSave("saving");
+    try {
+      const res = await fetch(libraryUrl, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(next) });
+      setLibSave(res.ok ? "saved" : "error");
+    } catch {
+      setLibSave("error");
+    }
+  };
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const setSpec = useCallback(
@@ -863,7 +898,18 @@ export function Studio({
           </div>
         ) : null}
 
-        {tab === "materials" ? <MaterialPanel spec={spec} category={board.meta.category} lang={lang} onChange={setSpec} /> : null}
+        {tab === "materials" ? (
+          <MaterialPanel
+            spec={spec}
+            category={board.meta.category}
+            lang={lang}
+            onChange={setSpec}
+            library={canEditLibrary ? (lib ?? {}) : undefined}
+            onLibrary={canEditLibrary ? changeLibrary : undefined}
+            libraryHref={libraryHref}
+            librarySave={libSave}
+          />
+        ) : null}
 
         {tab === "look" ? (
           <div className="st-tabpanel" role="tabpanel">

@@ -4,6 +4,7 @@ import { Studio } from "@/components/pack/Studio";
 import { initApp } from "@/lib/init";
 import { getBoardByShareToken, getProject } from "@/lib/projects";
 import { defaultPack } from "@/lib/pack";
+import { loadLibrary } from "@/lib/materialsStore";
 import { getLang } from "../../../_server/session";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,7 @@ export default async function SharedSpacePage({ params, searchParams }: { params
       initialDirection={sp.d ?? board.picked ?? undefined}
       lang={lang}
       backHref={`/s/${token}`}
+      library={loadLibrary()}
     />
   );
 }

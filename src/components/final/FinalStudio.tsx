@@ -1,5 +1,6 @@
 "use client";
 
+import { setLibrary, type Library } from "@/lib/materials";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { applyArtwork, labelFields, renderPalette, rolesOf, type Artwork, type Roles } from "@/lib/artwork";
 import type { Board } from "@/lib/board/schema";
@@ -164,7 +165,10 @@ export function FinalStudio({
   spaceHref,
   fileStem,
   logoSrc: logoSrcFor = (id) => `/api/uploads/${id}`,
+  library,
 }: {
+  /** the material library in force (the app's edits to the principal's list) */
+  library?: Library;
   board: Board;
   pack: PackSpec;
   initial: Artwork;
@@ -178,6 +182,7 @@ export function FinalStudio({
   fileStem: string;
   logoSrc?: (id: string) => string;
 }) {
+  if (library !== undefined) setLibrary(library);
   const [art, setArt] = useState<Artwork>(initial);
   const [save, setSave] = useState<"idle" | "saving" | "saved" | "failed">("idle");
   const [tab, setTab] = useState<"3d" | "sheet" | "proof">("3d");

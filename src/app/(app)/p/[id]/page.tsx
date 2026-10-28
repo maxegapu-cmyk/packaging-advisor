@@ -5,6 +5,7 @@ import { Bi, T } from "@/components/Bi";
 import { Journey, journeyOf } from "@/components/Journey";
 import { BoardView } from "@/components/BoardView";
 import { listModelChoices } from "@/lib/llm/providers";
+import { loadLibrary } from "@/lib/materialsStore";
 import { plain, UI } from "@/lib/i18n";
 import { canAccess, getBoard, getProject, isHandedOff, listBoards, listUploads } from "@/lib/projects";
 import { feedbackAction, handoffAction, pickAction, shareAction } from "../../../actions";
@@ -112,6 +113,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         pack={project.pack}
         packSaveUrl={`/api/projects/${project.id}/pack`}
         studioBase={`/space/${project.id}?v=${board.id}`}
+        library={loadLibrary()}
         headerExtra={
           <div className="form" style={{ gap: 10, justifyItems: "end" }}>
             <p className="muted" style={{ fontSize: 13 }}>

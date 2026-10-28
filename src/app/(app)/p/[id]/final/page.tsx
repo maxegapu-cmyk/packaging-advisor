@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { FinalStudio } from "@/components/final/FinalStudio";
 import { Journey } from "@/components/Journey";
 import { defaultArtwork, normalizeArtwork } from "@/lib/artwork";
+import { loadLibrary } from "@/lib/materialsStore";
 import { canAccess, getArtworkRaw, getBoard, getProject, listBoards } from "@/lib/projects";
 import { getLang, requireInvite } from "../../../../_server/session";
 
@@ -46,6 +47,7 @@ export default async function FinalPage({ params }: { params: Promise<{ id: stri
         boardHref={`${boardHref}#handoff`}
         spaceHref={spaceHref}
         fileStem={project.title}
+        library={loadLibrary()}
       />
     </main>
   );

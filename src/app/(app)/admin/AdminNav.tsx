@@ -1,10 +1,11 @@
 import Link from "next/link";
 
-export function AdminNav({ current }: { current: "overview" | "models" | "invites" }) {
+export function AdminNav({ current }: { current: "overview" | "models" | "invites" | "materials" }) {
   const items = [
     { key: "overview", href: "/admin", label: "测试概况 Test overview" },
     { key: "models", href: "/admin/models", label: "模型平台 Model platforms" },
     { key: "invites", href: "/admin/invites", label: "邀请码 Invite codes" },
+    { key: "materials", href: "/admin/materials", label: "材料库 Material library" },
   ] as const;
   return (
     <nav className="toolbar" aria-label="管理 Admin">

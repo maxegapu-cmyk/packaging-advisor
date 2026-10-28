@@ -17,10 +17,13 @@ import {
   colorDrawn,
   documentsFor,
   FAMILIES,
+  insertKind,
+  libraryStats,
   LIST,
+  listMaterials,
   material,
-  MATERIALS,
   offListOf,
+  partsOf,
   pathText,
   problemsOf,
   removeExtra,
@@ -31,6 +34,7 @@ import {
   usesOf,
   withChoice,
   withUsage,
+  type Library,
   type Use,
 } from "@/lib/materials";
 
@@ -86,6 +90,14 @@ const T = {
   status: { zh: "状态", en: "Status" },
   standard: { zh: "标准或法规", en: "Standard" },
   docs: { zh: "向供应商索取", en: "Ask suppliers for" },
+  editLibrary: { zh: "编辑材料库：改任何材料和规则的内容，新增或隐藏材料", en: "Edit the material library: change any material or rule, add or hide materials" },
+  editThis: { zh: "在材料库中编辑这种材料", en: "Edit this material in the library" },
+  libSave: { saving: { zh: "材料库保存中…", en: "Saving the library…" }, saved: { zh: "材料库已保存", en: "Library saved" }, error: { zh: "材料库没有保存成功", en: "The library didn't save" } },
+  setDefault: { zh: "设为这个部件的默认材料", en: "Make it this part's default" },
+  addRec: { zh: "加入这个部件的推荐", en: "Add to this part's recommendations" },
+  dropRec: { zh: "移出推荐", en: "Remove from the recommendations" },
+  isDefault: { zh: "这个部件的默认材料", en: "This part's default" },
+  resetRec: { zh: "推荐恢复为盒型自带", en: "Recommendations back to the structure's own" },
   checked: { zh: `清单核对日期 ${LIST.checked}。标准换版、法规调整或用途变化时须重新核验。`, en: `List checked ${LIST.checked}. Re-verify when standards or regulations change, or the use does.` },
 } satisfies Record<string, Pair | Record<string, Pair>>;
 
@@ -93,7 +105,8 @@ const one = (p: Pair, lang: Lang) => (lang === "en" ? p.en : p.zh);
 
 /** The whole list as option groups: the given ids first, then every family. */
 function MaterialOptions({ first, firstLabel, lang, none }: { first: string[]; firstLabel: Pair; lang: Lang; none?: boolean }) {
-  const rest = useMemo(() => FAMILIES.map((f) => ({ f, items: MATERIALS.filter((m) => m.family === f.id && !first.includes(m.id)) })).filter((g) => g.items.length), [first]);
+  const all = listMaterials();
+  const rest = FAMILIES.map((f) => ({ f, items: all.filter((m) => m.family === f.id && !first.includes(m.id)) })).filter((g) => g.items.length);
   const label = (id: string) => {
     const m = material(id);
     return m ? `${one(m.name, lang)}  ${id}` : id;
@@ -123,7 +136,47 @@ function MaterialOptions({ first, firstLabel, lang, none }: { first: string[]; f
   );
 }
 
-export function MaterialPanel({ spec, category, lang, onChange }: { spec: PackSpec; category: string; lang: Lang; onChange: (s: PackSpec) => void }) {
+/** What the library-editing controls need: the library, how to change it, where the editor is. */
+type LibCtl = { library: Library; onLibrary: (lib: Library) => void; recKey: (u: Use) => string; base: (u: Use) => string[] };
+
+export function MaterialPanel({
+  spec,
+  category,
+  lang,
+  onChange,
+  library,
+  onLibrary,
+  libraryHref,
+  librarySave = "idle",
+}: {
+  spec: PackSpec;
+  category: string;
+  lang: Lang;
+  onChange: (s: PackSpec) => void;
+  /** given (with onLibrary) to those who may change the library */
+  library?: Library;
+  onLibrary?: (lib: Library) => void;
+  libraryHref?: string;
+  librarySave?: "idle" | "saving" | "saved" | "error";
+}) {
+  // the key a part's recommendations live under in the library, and its current list
+  const ctl: LibCtl | null =
+    library && onLibrary
+      ? {
+          library,
+          onLibrary,
+          recKey: (u) => {
+            const inner = u.key.startsWith("inner.");
+            const k = inner ? u.key.slice(6) : u.key;
+            const form = inner && spec.inner ? spec.inner.form : spec.form;
+            if (k.startsWith("process.")) return `${form}.process.${k.slice(8)}`;
+            if (k === "insert") return `${form}.insert.${insertKind(spec)}`;
+            return `${form}.${k}`;
+          },
+          base: (u) => (u.process ? [u.defaultId] : (partsOf(spec).find((p) => p.key === u.key)?.slot.options ?? u.options)),
+        }
+      : null;
+  const stats = library ? libraryStats(library) : null;
   const all = useMemo(() => usesOf(spec, category, true), [spec, category]);
   const uses = useMemo(() => all.filter((u) => !u.removed), [all]);
   const rules = useMemo(() => rulesFor(spec, category, uses), [spec, category, uses]);
@@ -147,6 +200,15 @@ export function MaterialPanel({ spec, category, lang, onChange }: { spec: PackSp
     <div className="st-tabpanel mat-panel" role="tabpanel">
       <section className="st-sec">
         <p className="st-note">{one(T.lead, lang)}</p>
+        {libraryHref ? (
+          <p className="mat-libline">
+            <a className="st-link" href={libraryHref}>
+              {one(T.editLibrary, lang)}
+            </a>
+            {stats ? <small>{fmtStats(stats, lang)}</small> : null}
+            {librarySave !== "idle" ? <small className={librarySave === "error" ? "is-error" : undefined}>{one(T.libSave[librarySave], lang)}</small> : null}
+          </p>
+        ) : null}
         {problems.length ? (
           <ul className="mat-problems" role="alert">
             {problems.map((p) => (
@@ -186,7 +248,7 @@ export function MaterialPanel({ spec, category, lang, onChange }: { spec: PackSp
           {g.process ? <span className="st-small">{one(T.processNote, lang)}</span> : null}
           <div className="mat-list">
             {g.items.map((u) => (
-              <MaterialRow key={u.key} u={u} spec={spec} lang={lang} rules={rules.filter((r) => r.by.includes(u.key)).map((r) => r.rule.id)} onChange={onChange} />
+              <MaterialRow key={u.key} u={u} spec={spec} lang={lang} rules={rules.filter((r) => r.by.includes(u.key)).map((r) => r.rule.id)} onChange={onChange} ctl={u.kind === "part" || u.process ? ctl : null} libraryHref={libraryHref} />
             ))}
           </div>
         </section>
@@ -282,7 +344,7 @@ export function MaterialPanel({ spec, category, lang, onChange }: { spec: PackSp
   );
 }
 
-function MaterialRow({ u, spec, lang, rules, onChange }: { u: Use; spec: PackSpec; lang: Lang; rules: string[]; onChange: (s: PackSpec) => void }) {
+function MaterialRow({ u, spec, lang, rules, onChange, ctl, libraryHref }: { u: Use; spec: PackSpec; lang: Lang; rules: string[]; onChange: (s: PackSpec) => void; ctl: LibCtl | null; libraryHref?: string }) {
   const id = `mat-${u.key.replace(/\./g, "-")}`;
   const extraKey = u.kind === "extra" ? u.key.slice("extra.".length) : null;
   // a change to one of this part's own fields
@@ -405,6 +467,14 @@ function MaterialRow({ u, spec, lang, rules, onChange }: { u: Use; spec: PackSpe
           ) : null}
         </>
       ) : null}
+      {ctl && !u.removed ? <LibraryActions u={u} ctl={ctl} lang={lang} /> : null}
+      {libraryHref && !u.removed ? (
+        <p className="mat-actions">
+          <a className="st-link" href={`${libraryHref}#${u.id}`}>
+            {one(T.editThis, lang)}
+          </a>
+        </p>
+      ) : null}
       {custom || extraKey ? (
         <p className="mat-actions">
           {custom ? (
@@ -462,5 +532,56 @@ function AddPart({ spec, lang, onChange }: { spec: PackSpec; lang: Lang; onChang
         </button>
       </form>
     </section>
+  );
+}
+
+function fmtStats(s: ReturnType<typeof libraryStats>, lang: Lang): string {
+  const total = s.edited + s.hidden + s.added + s.rulesEdited + s.rulesAdded + s.recommend;
+  if (!total) return lang === "en" ? "the list as received" : "与清单原件一致";
+  return lang === "en"
+    ? `${s.edited} edited, ${s.added} added, ${s.hidden} hidden, ${s.rulesEdited + s.rulesAdded} rules changed, ${s.recommend} parts' recommendations set`
+    : `已改 ${s.edited} 种、新增 ${s.added} 种、隐藏 ${s.hidden} 种、规则改动 ${s.rulesEdited + s.rulesAdded} 条、${s.recommend} 个部件设了推荐`;
+}
+
+/** Library controls on a part: make the pick the default, add it to or remove it from the recommendations. */
+function LibraryActions({ u, ctl, lang }: { u: Use; ctl: LibCtl; lang: Lang }) {
+  const key = ctl.recKey(u);
+  const own = ctl.library.recommend?.[key];
+  const list = own ?? ctl.base(u);
+  const isDefault = list[0] === u.id;
+  const save = (next: string[] | null) => {
+    const rec = { ...(ctl.library.recommend ?? {}) };
+    if (next && next.length) rec[key] = next;
+    else delete rec[key];
+    ctl.onLibrary({ ...ctl.library, recommend: rec });
+  };
+  return (
+    <p className="mat-actions mat-libactions">
+      {isDefault ? (
+        <small>{one(T.isDefault, lang)}</small>
+      ) : (
+        <button type="button" className="st-link" onClick={() => save([u.id, ...list.filter((x) => x !== u.id)])}>
+          {one(T.setDefault, lang)}
+        </button>
+      )}
+      {!u.process ? (
+        list.includes(u.id) ? (
+          !isDefault ? (
+            <button type="button" className="st-link" onClick={() => save(list.filter((x) => x !== u.id))}>
+              {one(T.dropRec, lang)}
+            </button>
+          ) : null
+        ) : (
+          <button type="button" className="st-link" onClick={() => save([...list, u.id])}>
+            {one(T.addRec, lang)}
+          </button>
+        )
+      ) : null}
+      {own ? (
+        <button type="button" className="st-link" onClick={() => save(null)}>
+          {one(T.resetRec, lang)}
+        </button>
+      ) : null}
+    </p>
   );
 }

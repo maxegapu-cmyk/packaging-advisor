@@ -8,6 +8,7 @@ import { UI } from "@/lib/i18n";
 import { initApp } from "@/lib/init";
 import { getBoardByShareToken, getProject } from "@/lib/projects";
 import { defaultPack } from "@/lib/pack";
+import { loadLibrary } from "@/lib/materialsStore";
 import { getLang } from "../../_server/session";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,7 @@ export default async function SharedBoardPage({ params }: { params: Promise<{ to
           pickedId={board.picked}
           pack={getProject(board.projectId)?.pack ?? defaultPack(board.data.meta.category)}
           studioBase={`/s/${token}/space`}
+          library={loadLibrary()}
         />
       </main>
     </>

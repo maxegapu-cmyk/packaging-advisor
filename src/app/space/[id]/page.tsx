@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { Studio } from "@/components/pack/Studio";
 import { SAMPLES } from "@/lib/samples";
+import { loadLibrary } from "@/lib/materialsStore";
 import { canAccess, getBoard, getProject, listBoards } from "@/lib/projects";
 import { getLang, requireInvite } from "../../_server/session";
 
@@ -19,7 +20,7 @@ export default async function SpacePage({ params, searchParams }: { params: Prom
 
   if (id === "demo") {
     const sample = SAMPLES.find((x) => x.id === sp.s) ?? SAMPLES[0];
-    return <Studio board={sample.board} initialPack={sample.pack} initialDirection={sp.d} lang={lang} backHref="/#samples" isSample />;
+    return <Studio board={sample.board} initialPack={sample.pack} initialDirection={sp.d} lang={lang} backHref="/#samples" isSample library={loadLibrary()} />;
   }
 
   const invite = await requireInvite();
@@ -38,6 +39,9 @@ export default async function SpacePage({ params, searchParams }: { params: Prom
       saveUrl={`/api/projects/${project.id}/pack`}
       backHref={`/p/${project.id}?v=${record.id}`}
       handoffHref={`/p/${project.id}/final`}
+      library={loadLibrary()}
+      libraryUrl={invite.isAdmin ? "/api/materials" : undefined}
+      libraryHref={invite.isAdmin ? "/admin/materials" : undefined}
     />
   );
 }

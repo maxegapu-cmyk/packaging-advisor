@@ -15,14 +15,64 @@
 import type { Pair } from "../i18n";
 import { FORM_LABELS, isOuter, type Effect, type ExtraPart, type Finish, type Form, type Insert, type MaterialPick, type PackSpec, type PackUsage } from "../pack";
 import { DOCS, FAMILIES, LIST, MATERIALS, NOTES, PATHS, RULES, SOURCES, type Material, type Rule } from "./catalog";
+import { applyLibrary, type Library } from "./library";
+import { setKnownMaterials } from "./registry";
 
 export { DOCS, FAMILIES, LIST, MATERIALS, NOTES, PATHS, RULES, SOURCES, type Material, type Rule };
+export * from "./library";
 
-const BY_ID = new Map(MATERIALS.map((m) => [m.id, m]));
-const RULE_BY_ID = new Map(RULES.map((r) => [r.id, r]));
-export const material = (id: string): Material | undefined => BY_ID.get(id);
-export const rule = (id: string): Rule | undefined => RULE_BY_ID.get(id);
-export const isListed = (id: string) => BY_ID.has(id);
+/* ---------------------------------------------------------------- the active library */
+
+/**
+ * The library in force: the principal's list with the app's edits on top (see library.ts). Pages
+ * set it from what the server stores (setLibrary) before anything is drawn or checked; with no
+ * edits it is the list itself.
+ */
+type Active = { lib: Library; key: string; version: number; list: Material[]; byId: Map<string, Material>; hidden: Set<string>; rules: Rule[]; ruleById: Map<string, Rule>; hiddenRules: Set<string> };
+let active: Active = build({}, 0);
+
+function build(lib: Library, version: number): Active {
+  const a = applyLibrary(lib);
+  return { lib, key: JSON.stringify(lib), version, list: a.materials, byId: new Map(a.materials.map((m) => [m.id, m])), hidden: a.hidden, rules: a.rules, ruleById: new Map(a.rules.map((r) => [r.id, r])), hiddenRules: a.hiddenRules };
+}
+
+/** Puts a library in force (the same library again changes nothing). */
+export function setLibrary(lib: Library | null | undefined): void {
+  const l = lib ?? {};
+  if (JSON.stringify(l) === active.key) return;
+  active = build(l, active.version + 1);
+  setKnownMaterials(active.list.filter((m) => !active.hidden.has(m.id)).map((m) => m.id));
+}
+export const getLibrary = (): Library => active.lib;
+/** Goes up each time the library changes (for caches and the 3D model's rebuild key). */
+export const libraryVersion = () => active.version;
+
+/** A material by number, hidden ones included (so an old pick can still be named). */
+export const material = (id: string): Material | undefined => active.byId.get(id);
+export const rule = (id: string): Rule | undefined => (active.hiddenRules.has(id) ? undefined : active.ruleById.get(id));
+/** Whether a material can be chosen: in the library and not hidden. */
+export const isListed = (id: string) => active.byId.has(id) && !active.hidden.has(id);
+export const isHidden = (id: string) => active.hidden.has(id);
+/** The materials that can be chosen, in list order, added ones last. */
+export const listMaterials = (): Material[] => active.list.filter((m) => !active.hidden.has(m.id));
+/** Every material in the library, hidden ones too (for the editor). */
+export const libraryMaterials = (): Material[] => active.list;
+export const listRules = (): Rule[] => active.rules.filter((r) => !active.hiddenRules.has(r.id));
+export const libraryRules = (): Rule[] => active.rules;
+export const isRuleHidden = (id: string) => active.hiddenRules.has(id);
+
+/** The recommended materials for a part key ("gift.wrap"): the library's, else the structure's. */
+function recommended(key: string, base: string[]): string[] {
+  const own = active.lib.recommend?.[key]?.filter(isListed);
+  if (own?.length) return own;
+  const b = base.filter(isListed);
+  return b.length ? b : base;
+}
+/** The recommended materials for a structure's insert of one kind. */
+export const insertOptionsFor = (form: Form, kind: Insert): string[] => recommended(`${form}.insert.${kind}`, form === "brocade" && kind === "velvet" ? ["M128", "M129", "M036"] : INSERT_OPTIONS[kind]);
+
+/** The key a part's recommendations are stored under. */
+export const recommendKey = (form: Form, slotId: string, kind?: string) => (kind ? `${form}.${slotId}.${kind}` : `${form}.${slotId}`);
 
 const P = (zh: string, en: string): Pair => ({ zh, en });
 
@@ -83,8 +133,13 @@ const wrap = (grade = P("128–157 g", "128–157 gsm")): Slot => ({ id: "wrap",
 const LABEL_PAPERS = ["M079", "M053", "M019", "M021", "M037", "M038"];
 const label = (first: string, contact: Contact = "outer"): Slot => ({ id: "label", label: P("标签", "Label"), options: [first, ...LABEL_PAPERS.filter((x) => x !== first)], contact, print: "stock" });
 
-/** The parts of each structure, as built in 3D and laid out in the print file. */
+/** The parts of each structure, with the library's recommendations. */
 export function slotsOf(form: Form): Slot[] {
+  return baseSlotsOf(form).map((s) => ({ ...s, options: recommended(recommendKey(form, s.id), s.options) }));
+}
+
+/** The parts of each structure, as built in 3D and laid out in the print file. */
+function baseSlotsOf(form: Form): Slot[] {
   switch (form) {
     case "carton":
       return [{ id: "body", label: P("盒身", "Carton board"), options: ["M001", "M003", "M002", "M005", "M079"], contact: "outer", print: "board", grade: P("300–400 g/m²，厚约 0.45 mm", "300–400 gsm, about 0.45 mm") }];
@@ -180,7 +235,7 @@ function insertSlot(spec: PackSpec): Slot | null {
   const label = spec.inner ? P("内托", "Insert") : spec.form === "brocade" ? P("内衬软垫", "Lining pad") : P("内托垫", "Tray pad");
   // a Song box's pad is satin-covered, as such boxes are lined
   const options = spec.form === "brocade" && kind === "velvet" ? ["M128", "M129", "M036"] : INSERT_OPTIONS[kind];
-  return { id: "insert", label, options, contact: "outer" };
+  return { id: "insert", label, options: recommended(recommendKey(spec.form, "insert", kind), options), contact: "outer" };
 }
 
 /** Parts the list does not cover, by structure and effect: shown, never substituted. */
@@ -238,7 +293,8 @@ const laminated = (f: Finish) => f === "matte" || f === "gloss" || f === "softTo
 export function optionsFor(slot: Slot, finish: Finish): string[] {
   if (slot.print !== "stock") return slot.options;
   if (handmadeFinish(finish)) return [HANDMADE];
-  const keep = slot.options.filter((id) => (laminated(finish) ? COATED.has(id) : SPECIALTY.has(id)));
+  // a laminated finish drops the uncoated papers, an uncoated one the coated; others stay
+  const keep = slot.options.filter((id) => (laminated(finish) ? !SPECIALTY.has(id) : !COATED.has(id)));
   return keep.length ? keep : slot.options;
 }
 
@@ -276,7 +332,11 @@ function processesOfPack(spec: PackSpec, own: PackSpec, prefix: string): Process
   if (f === "blister") out.push({ key: "seal", label: P("热封涂层", "Heat-seal coating"), id: "M160" });
   // a combination's product has its own print and glue: named as the product's
   const own_ = prefix ? FORM_LABELS[own.form] : null;
-  return out.map((x) => ({ ...x, key: prefix + "process." + x.key, label: own_ ? { zh: `${own_.zh} · ${x.label.zh}`, en: `${own_.en}: ${x.label.en.toLowerCase()}` } : x.label }));
+  return out.map((x) => {
+    // the library may set another default for a process material
+    const id = recommended(recommendKey(f, "process", x.key), [x.id])[0];
+    return { ...x, id, note: id === x.id ? x.note : undefined, key: prefix + "process." + x.key, label: own_ ? { zh: `${own_.zh} · ${x.label.zh}`, en: `${own_.en}: ${x.label.en.toLowerCase()}` } : x.label };
+  });
 }
 
 export function processesOf(spec: PackSpec): Process[] {
@@ -324,6 +384,8 @@ export type Use = {
 /** A part's own 3D look by material, where the model draws it (see lookOf). */
 function drawnAs(spec: PackSpec, key: string, id: string, defaultId: string): boolean {
   if (id === defaultId) return true;
+  // a colour from the library is drawn where the part shows its colour
+  if (material(id)?.look && colorDrawn(spec, key)) return true;
   if ((spec.form === "carton" || spec.form === "bag") && key === "body") return id in BOARD;
   if (key === "insert") return id in INSERT_TINT || ["M036", "M129", "M128"].includes(id);
   if (spec.form === "brocade" && key === "toggle") return id in TOGGLE;
@@ -494,6 +556,7 @@ export function rulesFor(spec: PackSpec, category: string, uses0 = usesOf(spec, 
     add("G01", u.key, P("所有包装材料的一般质量要求", "General quality requirements for every packaging material"));
     if (u.touches === "food") for (const f of ["F01", ...u.m.food]) add(f, u.key, P("直接接触食品的部件", "Parts in direct contact with food"));
     if (u.touches === "cosmetics") add("C01", u.key, P("直接接触化妆品的部件", "Parts in direct contact with the cosmetic"));
+    for (const id of u.m.always ?? []) add(id, u.key, P("材料库为这种材料设定的规则", "Set for this material in the library"));
     // inks, adhesives and coatings on a pack that holds the food itself: the list's own rules for
     // them (F13, F10, F08), since outer layers can migrate, permeate or set off
     if (u.process && isFood(category) && primary.has(u.inner))
@@ -506,20 +569,21 @@ export function rulesFor(spec: PackSpec, category: string, uses0 = usesOf(spec, 
     add("G03", null, P("作为快递包装寄递", "Shipped as courier packaging"));
     add("G04", null, P("快递包装：箱体与内件尺寸、层数、胶带用量", "Courier packaging: box-to-contents fit, layers, tape"));
   }
-  const order = RULES.map((r) => r.id);
+  const order = listRules().map((r) => r.id);
   return [...got.values()].sort((a, b) => order.indexOf(a.rule.id) - order.indexOf(b.rule.id));
 }
 
 /** The supplier documents to collect: each material's own list, once per kind, with its parts. */
 export function documentsFor(uses: Use[]): { docs: Pair; ids: string[] }[] {
-  const by = new Map<number, string[]>();
+  const by = new Map<string, { docs: Pair; ids: string[] }>();
   for (const u of uses) {
     if (u.removed) continue;
-    const ids = by.get(u.m.docs) ?? [];
-    if (!ids.includes(u.id)) ids.push(u.id);
-    by.set(u.m.docs, ids);
+    const docs = u.m.docsText ?? DOCS[u.m.docs];
+    const g = by.get(docs.zh) ?? { docs, ids: [] };
+    if (!g.ids.includes(u.id)) g.ids.push(u.id);
+    by.set(docs.zh, g);
   }
-  return [...by.entries()].map(([i, ids]) => ({ docs: DOCS[i], ids }));
+  return [...by.values()];
 }
 
 /* ---------------------------------------------------------------- 3D */
@@ -579,7 +643,13 @@ export function lookOf(spec: PackSpec): Look {
     const p = partsOf(spec).find((x) => x.key === key);
     return p ? pick(spec, key, p.slot) : null;
   };
-  const color = (key: string) => choiceOf(spec, key).color;
+  // the seller's colour for a part, else the colour the library gives its material
+  const color = (key: string) => {
+    const own = choiceOf(spec, key).color;
+    if (own) return own;
+    const id = get(key);
+    return id && colorDrawn(spec, key) ? material(id)?.look : undefined;
+  };
   const board = spec.form === "carton" || spec.form === "bag" ? get("body") : null;
   if (board && BOARD[board]) look.board = BOARD[board];
   // the seller's colour for the board: its back, and the cut edge a little lighter
@@ -607,7 +677,7 @@ export function lookOf(spec: PackSpec): Look {
 
 /** What the 3D model depends on among the choices: the materials and the colours, not the notes. */
 export function lookKey(spec: PackSpec): string {
-  return JSON.stringify([partsOf(spec).map((p) => pick(spec, p.key, p.slot)), lookOf(spec)]);
+  return JSON.stringify([active.version, partsOf(spec).map((p) => pick(spec, p.key, p.slot)), lookOf(spec)]);
 }
 
 /** The parts whose colour the 3D model shows (others are recorded for the print file only). */
@@ -675,3 +745,20 @@ export function materialLine(spec: PackSpec, category: string, inner: boolean): 
 export const familyLabel = (id: string) => FAMILIES.find((f) => f.id === id)?.label;
 export const pathText = (m: Material) => PATHS[m.path];
 export const sourceText = (m: Material) => SOURCES[m.source];
+
+/**
+ * The library's changes for the model's prompt: added materials it may now use, edited names and
+ * limits, and hidden materials it must not. Empty when the library is the list itself.
+ */
+export function libraryPrompt(): string {
+  const lib = active.lib;
+  const row = (m: Material) => `| ${m.id} | ${m.name.zh} | ${FAMILIES.find((f) => f.id === m.family)?.label.zh ?? ""} | ${m.use.zh} | ${m.boundary.zh}${m.noFood ? "（非食品接触）" : ""} |`;
+  const added = (lib.added ?? []).filter((m) => !active.hidden.has(m.id)).map((m) => active.byId.get(m.id)!);
+  const edited = Object.keys(lib.materials ?? {}).filter((id) => !active.hidden.has(id) && id.startsWith("M")).map((id) => active.byId.get(id)!);
+  const hidden = [...active.hidden];
+  if (!added.length && !edited.length && !hidden.length) return "";
+  const out = ["# 材料库更新（本应用对委托方材料清单的修改，与上表冲突时以此为准）"];
+  if (added.length || edited.length) out.push("", "| 编号 | 材料 | 大类 | 典型用途 | 使用边界 |", "|---|---|---|---|---|", ...[...added, ...edited].map(row));
+  if (hidden.length) out.push("", `以下编号已停用，不得选用：${hidden.join("、")}。`);
+  return out.join("\n");
+}
