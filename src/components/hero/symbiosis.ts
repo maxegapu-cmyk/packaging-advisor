@@ -15,6 +15,7 @@ import { rolesOf } from "@/lib/artwork";
 import type { Direction } from "@/lib/board/schema";
 import { roundAreas } from "@/lib/print/layout";
 import { drawFace, type FaceKind } from "../three/art";
+import { compileInBackground } from "../three/compile";
 import { studioEquirect } from "../three/studio";
 
 export type HeroItem = {
@@ -549,6 +550,7 @@ export class SymbiosisScene {
   private running = false;
   /** Whether the first start has compiled the shaders yet. */
   private compiled = false;
+  private disposed = false;
   private shiftX = 0;
   /** Override for the sideways framing (fraction of the width; null = automatic). */
   private shiftOverride: number | null = null;
@@ -944,7 +946,7 @@ export class SymbiosisScene {
         this.running = false;
         this.start();
       };
-      this.renderer.compileAsync(this.scene, this.camera).then(go, go);
+      compileInBackground(this.renderer, this.scene, this.camera, this.scene, () => !this.disposed).then(go);
       return;
     }
     const base = performance.now() / 1000;
@@ -973,6 +975,7 @@ export class SymbiosisScene {
   }
 
   dispose() {
+    this.disposed = true;
     this.stop();
     for (const o of this.own) o.dispose();
     if (this.next) for (const o of this.next.own) o.dispose();

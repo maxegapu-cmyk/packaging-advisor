@@ -20,6 +20,7 @@ import type { Reference } from "@/lib/reference";
 import { buildReference } from "./reference";
 import { aim, RAD, step, tw, type Built, type Pair, type PinOnScreen } from "./common";
 import { buildForm } from "./build";
+import { compileInBackground } from "./compile";
 import { LIVE_SWEEP_ENV, makeKit, type Kit } from "./kit";
 import { backdropLook, studioEquirect, sweepGeometry, type Backdrop } from "./studio";
 
@@ -599,7 +600,7 @@ export class PackScene {
     };
     // the first build too: a new page's 3D appears once its shaders are compiled off the main
     // thread, instead of freezing the page (and the click that opened it) while they compile
-    if (typeof r.compileAsync !== "function") return finish();
+    if (typeof r.compile !== "function") return finish();
     const textures = new Set<THREE.Texture>();
     p.built!.root.traverse((o) => {
       const m = (o as THREE.Mesh).material;
@@ -614,9 +615,9 @@ export class PackScene {
       if (queue.length) requestAnimationFrame(upload);
       else finish();
     };
-    r.compileAsync(p.built!.root, this.camera, this.scene)
-      .then(() => requestAnimationFrame(upload))
-      .catch(finish);
+    compileInBackground(r, p.built!.root, this.camera, this.scene, () => this.preparing === prep).then(() => {
+      if (this.preparing === prep) requestAnimationFrame(upload);
+    });
   }
 
   private dropPreparing() {

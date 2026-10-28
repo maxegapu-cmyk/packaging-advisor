@@ -15,6 +15,7 @@ import type { PackSpec } from "@/lib/pack";
 import type { ArtInput } from "../../three/art";
 import { buildForm } from "../../three/build";
 import { U } from "../../three/common";
+import { compileInBackground } from "../../three/compile";
 import { makeKit, type Kit } from "../../three/kit";
 import { studioEquirect } from "../../three/studio";
 import { clamp, ease, seg } from "../symbiosis";
@@ -137,6 +138,7 @@ export class FormsScene {
   private running = false;
   /** Whether the first start has compiled the shaders yet. */
   private compiled = false;
+  private disposed = false;
   private maxTex: number;
   private job: Job | null = null;
   onFrame?: (f: FormsFrame) => void;
@@ -856,7 +858,7 @@ export class FormsScene {
         this.running = false;
         this.start();
       };
-      this.renderer.compileAsync(this.scene, this.camera).then(go, go);
+      compileInBackground(this.renderer, this.scene, this.camera, this.scene, () => !this.disposed).then(go);
       return;
     }
     if (!this.t0) this.t0 = performance.now() / 1000;
@@ -880,6 +882,7 @@ export class FormsScene {
   }
 
   dispose() {
+    this.disposed = true;
     this.stop();
     if (this.job && !this.job.act) this.job.gen.return(undefined as unknown as Act);
     this.job = null;
