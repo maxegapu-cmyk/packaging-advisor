@@ -79,3 +79,39 @@ test("the brocade box prints only its title slip, sized to the lid and inside it
     assert.ok(p.h < d && (d - p.h) / 2 + p.w < w / 2, `${w}×${d}`);
   }
 });
+
+test("the inscription hand: which text it writes, and the bundled font covers it", async () => {
+  const { handTextOf } = await import("../src/components/three/art");
+  const fs = await import("node:fs");
+  const tea = SAMPLES.find((s) => s.id === "tea")!;
+  const A = tea.board.directions.find((d) => d.id === "A")!;
+  const B = tea.board.directions.find((d) => d.id === "B")!;
+  assert.equal(A.layout, "scroll");
+  assert.ok(handTextOf(A, tea.board.meta.brand, "carton").includes(A.mockup.headline));
+  assert.equal(handTextOf(B, tea.board.meta.brand, "carton"), "");
+  // the brocade box's slip is written in the hand whatever the layout
+  assert.ok(handTextOf(B, tea.board.meta.brand, "brocade").includes(B.mockup.headline));
+  // every slice the CSS names exists, and together they cover GB 2312 and every sample's words
+  const css = fs.readFileSync("src/app/fonts.css", "utf8");
+  const rules = [...css.matchAll(/url\("\/fonts\/zhuque\/(zq-\d+\.woff2)"\)[^}]*unicode-range: ([^;]+);/g)];
+  assert.ok(rules.length > 50, `${rules.length} slices`);
+  const ranges: [number, number][] = [];
+  for (const [, file, list] of rules) {
+    assert.ok(fs.existsSync(`public/fonts/zhuque/${file}`), file);
+    for (const r of list.split(", ")) {
+      const [a, b] = r.slice(2).split("-");
+      ranges.push([parseInt(a, 16), parseInt(b ?? a, 16)]);
+    }
+  }
+  const covered = (ch: string) => ranges.some(([a, b]) => ch.codePointAt(0)! >= a && ch.codePointAt(0)! <= b);
+  const gb = new TextDecoder("gb2312");
+  let missing = 0;
+  for (let hi = 0xb0; hi <= 0xf7; hi++)
+    for (let lo = 0xa1; lo <= 0xfe; lo++) {
+      const ch = gb.decode(new Uint8Array([hi, lo]));
+      if (ch !== "�" && /\p{Script=Han}/u.test(ch) && !covered(ch)) missing++;
+    }
+  assert.equal(missing, 0, `${missing} GB 2312 hanzi without the hand`);
+  for (const s of SAMPLES) for (const d of s.board.directions) for (const ch of handTextOf(d, s.board.meta.brand, "brocade")) if (/\p{Script=Han}/u.test(ch)) assert.ok(covered(ch), `${s.id} ${d.id} ${ch}`);
+  assert.ok(fs.existsSync("public/fonts/zhuque/OFL.txt"), "licence beside the font");
+});

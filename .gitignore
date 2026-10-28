@@ -7,3 +7,8 @@ board-preview*.html
 .env
 .env.local
 .harness
+
+# licensed 瘦金体 fonts stay out of the repository (see .env.example)
+public/fonts/shoujin/
+
+__pycache__/

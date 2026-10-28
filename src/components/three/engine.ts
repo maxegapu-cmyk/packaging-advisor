@@ -14,7 +14,8 @@
 import * as THREE from "three";
 import type { Direction } from "@/lib/board/schema";
 import type { PackSpec } from "@/lib/pack";
-import { rolesOf, type ArtInfo, type ArtInput } from "./art";
+import { handTextOf, rolesOf, type ArtInfo, type ArtInput } from "./art";
+import { inscriptionEpoch, needInscription, onInscriptionFont } from "@/lib/fonts";
 import type { Reference } from "@/lib/reference";
 import { buildReference } from "./reference";
 import { aim, RAD, step, tw, type Built, type Pair, type PinOnScreen } from "./common";
@@ -221,6 +222,8 @@ export class PackScene {
   private own: { dispose: () => void }[] = [];
   private input: SceneInput | null = null;
   private buildKey = "";
+  /** Redraws the print when the inscription hand's glyphs arrive. */
+  private offFont: () => void = () => {};
   private openT = tw(0);
   private anatomyT = tw(0);
   private view: View = { x: -16, y: -34 };
@@ -255,6 +258,9 @@ export class PackScene {
   constructor(canvas: HTMLCanvasElement, opts: SceneOptions = {}) {
     this.canvas = canvas;
     this.opts = opts;
+    this.offFont = onInscriptionFont(() => {
+      if (this.input) this.update(this.input);
+    });
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance", preserveDrawingBuffer: false });
     const r = this.renderer;
     r.setClearColor(0x000000, 0);
@@ -432,7 +438,11 @@ export class PackScene {
   update(input: SceneInput) {
     const prev = this.input;
     this.input = input;
-    const key = [input.d.id, input.d.layout, input.d.palette.map((p) => p.hex).join(), input.d.mockup.headline, input.d.mockup.detail, input.brand, input.spec.form, input.spec.w, input.spec.h, input.spec.d, input.spec.finish, (input.spec.effects ?? []).join("+"), JSON.stringify(input.spec.inner ?? null), input.category ?? "", input.info?.key ?? ""].join("|");
+    // text in the inscription hand is drawn on canvas, which does not wait for web fonts: ask for
+    // its glyphs, and rebuild (the epoch is in the key) when they arrive
+    const hand = handTextOf(input.d, input.brand, input.spec.form);
+    if (hand) needInscription(hand);
+    const key = [inscriptionEpoch(), input.d.id, input.d.layout, input.d.palette.map((p) => p.hex).join(), input.d.mockup.headline, input.d.mockup.detail, input.brand, input.spec.form, input.spec.w, input.spec.h, input.spec.d, input.spec.finish, (input.spec.effects ?? []).join("+"), JSON.stringify(input.spec.inner ?? null), input.category ?? "", input.info?.key ?? ""].join("|");
     let changed = false;
     if (key !== this.buildKey) {
       this.buildKey = key;
@@ -755,6 +765,7 @@ export class PackScene {
 
   dispose() {
     if (this.frame) cancelAnimationFrame(this.frame);
+    this.offFont();
     this.ref?.dispose();
     this.disposeBuilt();
     this.shadow.dispose();

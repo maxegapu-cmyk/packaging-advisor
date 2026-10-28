@@ -14,7 +14,8 @@ import { SegPill } from "../SegPill";
 import { Package3D } from "../pack/Package3D";
 import { Orbit, REST_ANGLE } from "../pack/orbit";
 import { Stage3D } from "../pack/Stage3D";
-import type { ArtInfo } from "../three/art";
+import { handTextOf, type ArtInfo } from "../three/art";
+import { useInscription } from "../useInscription";
 import { ProofMatch } from "./ProofMatch";
 import { drawSheetPreview } from "./render";
 
@@ -226,8 +227,9 @@ export function FinalStudio({
     return () => clearTimeout(t);
   }, [art, saveUrl]);
 
-  // flat sheet preview
+  // flat sheet preview, redrawn when the inscription hand arrives
   const sheetHost = useRef<HTMLDivElement>(null);
+  const hand = useInscription(handTextOf(view.d, view.brand, pack.form));
   useEffect(() => {
     if (tab !== "sheet") return;
     const host = sheetHost.current;
@@ -243,7 +245,7 @@ export function FinalStudio({
       host.replaceChildren(c);
     }, 250);
     return () => clearTimeout(t);
-  }, [tab, sheetIx, layout, view, lang]);
+  }, [tab, sheetIx, layout, view, lang, hand]);
 
   const set = (patch: Partial<Artwork>) => setArt((a) => ({ ...a, ...patch }));
   const setRow = (key: string, label: string, value: string) =>

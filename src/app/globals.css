@@ -69,6 +69,8 @@
   --display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", Georgia, serif;
   /* inscriptions and quotes: 楷 */
   --kai: "Iowan Old Style", "Palatino Linotype", Palatino, "Kaiti SC", "STKaiti", "KaiTi", "BiauKai", "AR PL UKai CN", "Songti SC", "Noto Serif CJK SC", serif;
+  /* the inscription hand: 瘦金体 when a licensed face is configured, else 朱雀仿宋 (bundled, OFL), else 楷 (lib/fonts.ts) */
+  --hand: "PA Shoujin", "Zhuque Fangsong", "Kaiti SC", "STKaiti", "KaiTi", "BiauKai", "AR PL UKai CN", serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --ease: cubic-bezier(0.3, 0.7, 0.2, 1);
   --gutter: clamp(16px, 4vw, 56px);
@@ -285,14 +287,14 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 .band-headrow { display: grid; gap: 12px; margin-bottom: clamp(24px, 3vw, 36px); }
 .band-sub { color: var(--ink-2); max-width: 44em; }
 /* Chinese, wide screens: each section title becomes a 题签, the title slip pasted on a book's cover,
-   written top to bottom in 楷 (as a calligrapher wrote the slips) beside the section, and kept in
+   written top to bottom in the inscription hand (as Huizong wrote his slips in 瘦金体) beside the section, and kept in
    view while the section scrolls by */
 @media (min-width: 1101px) {
   .is-zh .band { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: clamp(36px, 4vw, 72px); align-items: start; }
   .is-zh .band > .band-h {
     position: sticky; top: 96px; margin: 0; writing-mode: vertical-rl;
     min-height: 11em; padding: 48px 15px 26px;
-    font-family: var(--kai); font-size: clamp(23px, 1.85vw, 28px); line-height: 1.3; letter-spacing: 0.2em; font-weight: 500;
+    font-family: var(--hand); font-size: clamp(23px, 1.85vw, 28px); line-height: 1.3; letter-spacing: 0.2em; font-weight: 400;
     background: var(--surface) var(--fishtail) no-repeat center 18px / 15px 11px;
     border: 1px solid var(--ink-2); box-shadow: inset 0 0 0 3px var(--surface), inset 0 0 0 4px var(--rule-strong);
   }
@@ -1242,7 +1244,7 @@ textarea.short { min-height: 72px; }
 /* Chinese: the headline is an inscription (题跋), two columns written top to bottom, read right to left */
 @media (min-width: 821px) {
   .sym-copy:has(.hero-v) { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto auto 1fr; column-gap: clamp(32px, 3.4vw, 56px); width: min(50%, 720px); }
-  .sym .hero-v { grid-column: 1; grid-row: 1 / -1; writing-mode: vertical-rl; font-family: var(--kai); font-weight: 400; font-size: clamp(38px, min(4.4vw, 6.4svh), 72px); line-height: 1.42; letter-spacing: 0.14em; }
+  .sym .hero-v { grid-column: 1; grid-row: 1 / -1; writing-mode: vertical-rl; font-family: var(--hand); font-weight: 400; font-size: clamp(38px, min(4.4vw, 6.4svh), 72px); line-height: 1.42; letter-spacing: 0.14em; }
   .sym .hero-v .hero-line:last-child::after { width: 0.5em; height: 0.5em; margin: 0.5em 0 0; vertical-align: baseline; }
   .sym-copy:has(.hero-v) > :not(.hero-h) { grid-column: 2; }
   .sym-copy:has(.hero-v) .hero-sub { margin-top: 0.4em; }
@@ -1451,8 +1453,8 @@ textarea.short { min-height: 72px; }
 .fa-painting { position: absolute; left: 10%; right: 10%; top: 22%; bottom: 14%; background: var(--ground); box-shadow: 0 0 0 0.4cqmin color-mix(in srgb, var(--p-ink) 30%, transparent); overflow: hidden; }
 .fa-hills { position: absolute; left: 0; right: 0; bottom: 0; height: 58%; background: linear-gradient(transparent, color-mix(in srgb, var(--p-hill) 45%, transparent)); clip-path: polygon(0 40%, 14% 18%, 26% 34%, 40% 6%, 55% 30%, 68% 14%, 82% 36%, 100% 20%, 100% 100%, 0 100%); opacity: 0.8; }
 .fa-inscription { position: absolute; right: 7%; top: 6%; display: flex; flex-direction: row-reverse; gap: 2cqmin; writing-mode: vertical-rl; }
-.fa-inscription strong { font-family: var(--kai, var(--serif)); font-weight: 400; font-size: 14cqmin; letter-spacing: 0.1em; }
-.fa-inscription small { font-family: var(--kai, var(--serif)); font-size: 4.6cqmin; margin-top: 3cqmin; letter-spacing: 0.1em; }
+.fa-inscription strong { font-family: var(--hand); font-weight: 400; font-size: 14cqmin; letter-spacing: 0.1em; }
+.fa-inscription small { font-family: var(--hand); font-size: 4.6cqmin; margin-top: 3cqmin; letter-spacing: 0.1em; }
 .face-scroll .fa-seal-small { position: absolute; right: 9%; bottom: 10%; font-size: 6cqmin; }
 .face-seal .fa-seal-big { position: absolute; right: 8%; top: 7%; font-size: 19cqmin; transform: rotate(-1.5deg); }
 .face-seal .fa-name { left: 8.5cqmin; right: 8.5cqmin; bottom: 14cqmin; }
@@ -1460,7 +1462,7 @@ textarea.short { min-height: 72px; }
 .fa-frame { position: absolute; inset: 4.5cqmin; border: 1.2cqmin solid var(--key); box-shadow: inset 0 0 0 1.4cqmin var(--ground), inset 0 0 0 1.8cqmin var(--key); }
 .face-symmetric { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4cqmin; text-align: center; }
 .face-symmetric .fa-brand { position: static; letter-spacing: 0.35em; font-size: 5cqmin; }
-.fa-slip { writing-mode: vertical-rl; text-orientation: upright; padding: 3cqmin 2.6cqmin; background: var(--key); color: var(--ground); font-family: var(--serif); font-weight: 700; font-size: 12cqmin; letter-spacing: 0.15em; box-shadow: inset 0 0 0 1cqmin var(--key), inset 0 0 0 1.3cqmin color-mix(in srgb, var(--ground) 55%, transparent); }
+.fa-slip { writing-mode: vertical-rl; text-orientation: upright; padding: 3cqmin 2.6cqmin; background: var(--key); color: var(--ground); font-family: var(--hand); font-weight: 400; font-size: 12cqmin; letter-spacing: 0.15em; box-shadow: inset 0 0 0 1cqmin var(--key), inset 0 0 0 1.3cqmin color-mix(in srgb, var(--ground) 55%, transparent); }
 .fa-detail { font-size: 5cqmin; font-weight: 600; letter-spacing: 0.18em; }
 .face-symmetric .fa-seal-small { font-size: 5cqmin; }
 .side-scroll { background: linear-gradient(var(--key) 0 17%, color-mix(in srgb, var(--ground) 84%, var(--key)) 17% 90%, var(--key) 90%); }
@@ -1529,3 +1531,7 @@ textarea.short { min-height: 72px; }
   /* on a phone the side seal would hang past the screen edge */
   .seal-at-side { display: none; }
 }
+/* the closing line, in Chinese, in the inscription hand */
+.is-zh .end-h { font-family: var(--hand); font-weight: 400; letter-spacing: 0.06em; }
+/* on every width, in Chinese: the hero's inscription and the section titles in the hand */
+.is-zh .sym .hero-v, .is-zh .band-h { font-family: var(--hand); font-weight: 400; }

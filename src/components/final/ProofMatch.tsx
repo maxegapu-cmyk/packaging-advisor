@@ -6,7 +6,8 @@ import type { Lang, Pair } from "@/lib/i18n";
 import { ROUND_FORMS, type PackSpec } from "@/lib/pack";
 import { deltaE } from "@/lib/print/color";
 import { artSize, printLayout, WRAP_FRONT, type Panel } from "@/lib/print/layout";
-import { drawFace, type ArtInput } from "../three/art";
+import { drawFace, handTextOf, type ArtInput } from "../three/art";
+import { useInscription } from "../useInscription";
 
 const T = {
   intro: {
@@ -65,7 +66,9 @@ export function ProofMatch({ art, spec, input, lang, setProof, uploadPhoto, phot
     im.src = photoSrc;
   }, [photoSrc]);
 
-  // the front artwork exactly as it will print (wraps: the front 30%)
+  // the front artwork exactly as it will print (wraps: the front 30%), redrawn when the
+  // inscription hand arrives
+  const hand = useInscription(handTextOf(input.d, input.brand, spec.form));
   const front = useMemo(() => {
     const p = frontPanel(spec);
     if (!p) return null;
@@ -79,7 +82,7 @@ export function ProofMatch({ art, spec, input, lang, setProof, uploadPhoto, phot
     out.height = c.height;
     out.getContext("2d")!.drawImage(c, (c.width - fw) / 2, 0, fw, c.height, 0, 0, fw, c.height);
     return { c: out, w: s.w * WRAP_FRONT, h: s.h };
-  }, [spec, input]);
+  }, [spec, input, hand]);
 
   useEffect(() => {
     const el = cv.current;

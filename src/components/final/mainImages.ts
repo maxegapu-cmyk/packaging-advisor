@@ -8,7 +8,8 @@ import type { Direction } from "@/lib/board/schema";
 import type { Lang } from "@/lib/i18n";
 import type { PackSpec } from "@/lib/pack";
 import { CAN_OPEN, ROUND_FORMS } from "@/lib/pack";
-import { rolesOf, type ArtInfo } from "../three/art";
+import { handTextOf, rolesOf, type ArtInfo } from "../three/art";
+import { loadInscription } from "@/lib/fonts";
 import { REST_ANGLE } from "../pack/orbit";
 import { GALLERY_LABELS, GALLERY_TONES, galleryFor } from "@/lib/gallery";
 
@@ -56,6 +57,7 @@ export type ImageInput = { d: Direction; brand: string; spec: PackSpec; category
 /** Renders every shot; returns PNG blobs keyed by file name. */
 export async function renderShots(inp: ImageInput): Promise<{ name: string; label: { zh: string; en: string }; blob: Blob }[]> {
   const { PackScene } = await import("../three/engine");
+  await loadInscription(handTextOf(inp.d, inp.brand, inp.spec.form));
   if (typeof document !== "undefined" && document.fonts?.ready) await document.fonts.ready;
   const host = document.createElement("div");
   host.style.cssText = `position:fixed;left:-${SIZE * 3}px;top:0;width:${SIZE}px;height:${SIZE}px;pointer-events:none;`;

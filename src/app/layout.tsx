@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import "./fonts.css";
 import "./globals.css";
+import { InscriptionFont } from "@/components/InscriptionFont";
 import { THEME_SCRIPT } from "@/lib/theme";
 
 export const metadata: Metadata = {
@@ -24,7 +26,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <InscriptionFont />
+        {children}
+      </body>
     </html>
   );
 }

@@ -4,6 +4,7 @@
  * stamped), so the foil finish can become real metal in the material.
  * Layouts follow the direction's `layout` (offset / stripe / split) and palette roles.
  */
+import { INSCRIPTION_STACK } from "@/lib/fonts";
 import { hillRoleOf, rolesOf as libRolesOf, sealRoleOf, type Roles } from "@/lib/artwork";
 import type { Direction } from "@/lib/board/schema";
 import type { Effect, Finish } from "@/lib/pack";
@@ -17,8 +18,12 @@ export type Role = keyof Roles;
 export const GOLD = "#D6B460";
 const SERIF = '"Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", "Noto Serif CJK TC", serif';
 const SANS = '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "Helvetica Neue", Arial, sans-serif';
-/** 楷: inscriptions on the scroll layout, as a calligrapher would write them. */
-const KAI = '"Kaiti SC", "STKaiti", "KaiTi", "BiauKai", "AR PL UKai CN", "Songti SC", "STSong", "Noto Serif CJK SC", serif';
+/**
+ * The inscription hand: what is written on the scroll and the symmetric cover's title slip, and
+ * on the brocade box's slip. 瘦金体 when a licensed face is configured, else 朱雀仿宋, else 楷
+ * (lib/fonts). Callers load its glyphs before drawing (needInscription).
+ */
+const HAND = INSCRIPTION_STACK;
 /** The three layouts drawn from Song painting and books: a mounted scroll, a carved seal, a symmetric cover. */
 export const SONG_LAYOUTS = ["scroll", "seal", "symmetric"] as const;
 const isSong = (l: string) => (SONG_LAYOUTS as readonly string[]).includes(l);
@@ -658,16 +663,25 @@ function drawSlip(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint) {
   const ss = m * 0.38;
   const room = H - 2 * inner - ss * 1.4;
   let s = Math.min(W * 0.44, (room * 0.9) / Math.max(1, vTokens(head).length * 1.3));
-  setFont(ctx, 400, s, KAI);
+  setFont(ctx, 400, s, HAND);
   let len = verticalLength(ctx, head, s);
   if (len > room * 0.9) {
     s *= (room * 0.9) / len;
-    setFont(ctx, 400, s, KAI);
+    setFont(ctx, 400, s, HAND);
     len = verticalLength(ctx, head, s);
   }
   ctx.fillStyle = P("ink", true);
   vertical(ctx, head, W / 2, inner + len / 2, s);
   drawSealMark(ctx, sealText(a), W / 2, H - inner - ss / 2, ss, P(sealRole(P)), "bai", 0);
+}
+
+/**
+ * The characters a direction writes in the inscription hand on this structure ("" when none):
+ * the scroll and symmetric layouts, and the brocade box's title slip whatever the layout.
+ */
+export function handTextOf(d: Direction, brand: string, form?: string): string {
+  if (d.layout !== "scroll" && d.layout !== "symmetric" && form !== "brocade") return "";
+  return `${d.mockup.headline}${d.mockup.detail}${brand ?? ""}`;
 }
 
 /** What the seal carries: the brand, or the headline when there is no separate brand. */
@@ -698,14 +712,14 @@ function drawScrollFront(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, 
     // the name down a column, the detail in a smaller column to its left, the seal beneath
     const n = Math.max(1, vTokens(head).length);
     let s = Math.min(maxW * 0.5, (maxH * 0.62) / (n * 1.28));
-    setFont(ctx, 400, s, KAI);
+    setFont(ctx, 400, s, HAND);
     const len = verticalLength(ctx, head, s);
     ctx.fillStyle = P("ink", true);
     vertical(ctx, head, x, top + len / 2, s);
     const ds = Math.max(s * 0.34, ppm * 1.8);
-    setFont(ctx, 400, ds, KAI);
+    setFont(ctx, 400, ds, HAND);
     const dlen = Math.min(verticalLength(ctx, detail, ds), maxH * 0.62);
-    if (dlen < verticalLength(ctx, detail, ds)) setFont(ctx, 400, (ds * dlen) / verticalLength(ctx, detail, ds), KAI);
+    if (dlen < verticalLength(ctx, detail, ds)) setFont(ctx, 400, (ds * dlen) / verticalLength(ctx, detail, ds), HAND);
     ctx.fillStyle = P("ink");
     vertical(ctx, detail, x - s * 0.95, top + s * 0.4 + dlen / 2, ds);
     const ss = Math.min(s * 1.05, maxH - len - s * 0.5);
@@ -871,11 +885,11 @@ function drawSymmetricFront(ctx: Ctx, W: number, H: number, a: ArtInput, P: Pain
     const n = Math.max(1, vTokens(head).length);
     const availH = bottom - top - ds0 * 2.6 - ss * 1.3;
     let s = Math.min(m * 0.13, (availH * 0.84) / (n * 1.3));
-    setFont(ctx, 700, s, SERIF);
+    setFont(ctx, 400, s, HAND);
     let len = verticalLength(ctx, head, s);
     if (len > availH * 0.84) {
       s *= (availH * 0.84) / len;
-      setFont(ctx, 700, s, SERIF);
+      setFont(ctx, 400, s, HAND);
       len = verticalLength(ctx, head, s);
     }
     const sw = s * 1.9;
@@ -1106,12 +1120,12 @@ function drawSongSide(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint, var
   const seal = variant === "left" && W > 4;
   const room = H - top - foot;
   let size = Math.min(W * 0.22, (room * 0.58) / Math.max(2, Array.from(text).length * 1.3));
-  setFont(ctx, d.layout === "scroll" ? 400 : 700, size, d.layout === "scroll" ? KAI : d.layout === "symmetric" ? SERIF : SANS);
+  setFont(ctx, d.layout === "seal" ? 700 : 400, size, d.layout === "seal" ? SANS : HAND);
   const len = verticalLength(ctx, text, size);
   const maxLen = room * (seal ? 0.56 : 0.66);
   if (len > maxLen) {
     size *= maxLen / len;
-    setFont(ctx, d.layout === "scroll" ? 400 : 700, size, d.layout === "scroll" ? KAI : d.layout === "symmetric" ? SERIF : SANS);
+    setFont(ctx, d.layout === "seal" ? 700 : 400, size, d.layout === "seal" ? SANS : HAND);
   }
   const L = verticalLength(ctx, text, size);
   const ss = Math.min(W * 0.34, size * 1.5);
@@ -1142,7 +1156,7 @@ function drawTop(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint) {
     }
     const t = a.brand || a.d.mockup.headline;
     ctx.fillStyle = P("ink", true);
-    const s = fit(ctx, t, a.d.layout === "scroll" ? 400 : 700, m * 0.24, a.d.layout === "scroll" ? KAI : SERIF, W * 0.5, 0.3);
+    const s = fit(ctx, t, 400, m * 0.24, HAND, W * 0.5, 0.3);
     ctx.textAlign = "center";
     ctx.fillText(t, W / 2 - s * 0.45, H / 2 + s * 0.35);
     const tw = ctx.measureText(t).width;

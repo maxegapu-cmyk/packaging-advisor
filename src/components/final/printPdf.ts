@@ -15,7 +15,8 @@ import { EFFECT_LABELS, finishText, FORM_LABELS, type Effect, type PackSpec } fr
 import { cmykText } from "@/lib/print/color";
 import { BLEED, type PrintLayout, type Sheet } from "@/lib/print/layout";
 import type { Check } from "@/lib/print/preflight";
-import { rolesOf, type ArtInput } from "../three/art";
+import { handTextOf, rolesOf, type ArtInput } from "../three/art";
+import { loadInscription } from "@/lib/fonts";
 import { baseColor, drawSheetPreview, panelArt, panelPpm } from "./render";
 
 const PT = 72 / 25.4;
@@ -333,6 +334,8 @@ function jobSheet(inp: PdfInput): HTMLCanvasElement {
 /** Builds the PDF. pdf-lib is loaded on demand. */
 export async function buildPrintPdf(inp: PdfInput): Promise<Uint8Array> {
   const L = await import("pdf-lib");
+  // the inscription hand must be loaded before its text is set on canvas
+  await loadInscription(handTextOf(inp.art.d, inp.art.brand, inp.spec.form));
   const dpi = inp.dpi ?? 300;
   const doc = await L.PDFDocument.create();
   doc.setTitle(`${inp.artwork.brand} ${inp.artwork.headline} print file`.trim());
