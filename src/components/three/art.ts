@@ -662,7 +662,7 @@ function drawSlip(ctx: Ctx, W: number, H: number, a: ArtInput, P: Paint) {
   const inner = o + m * 0.2;
   const ss = m * 0.38;
   const room = H - 2 * inner - ss * 1.4;
-  let s = Math.min(W * 0.5, (room * 0.9) / Math.max(1, vTokens(head).length * 1.3));
+  let s = Math.min(W * 0.44, (room * 0.9) / Math.max(1, vTokens(head).length * 1.3));
   setFont(ctx, 400, s, HAND);
   let len = verticalLength(ctx, head, s);
   if (len > room * 0.9) {

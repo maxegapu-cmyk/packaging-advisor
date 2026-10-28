@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Lang, Pair } from "@/lib/i18n";
 import { UI } from "@/lib/i18n";
 import { CATEGORIES, CATEGORY_FAMILIES } from "@/lib/categories";
@@ -11,7 +11,6 @@ import { Box3D, BoxSync, PackProvider, SpaceIcon } from "./Box3D";
 import { paletteVars } from "./BoxFaces";
 import { Brandmark } from "./Brandmark";
 import { ThemeSwitch } from "./ThemeSwitch";
-import { SegPill } from "./SegPill";
 import { ColorBar } from "./ColorBar";
 import { SymbiosisHero } from "./hero/SymbiosisHero";
 import { FaceLayout } from "./FaceLayout";
@@ -134,7 +133,17 @@ function Topbar({ lang, langSwitch }: { lang: Lang; langSwitch: React.ReactNode 
 export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.ReactNode }) {
   const one = (p: Pair) => (lang === "en" ? p.en : p.zh);
   const [si, setSi] = useState(0);
-  const sample = SAMPLES[si];
+  // the press animation is for a choice, not for the page arriving
+  const [touched, setTouched] = useState(false);
+  // the tab answers at once; the sample below follows a moment later, once the tab's press has
+  // played, so the 3D boxes' rebuild never competes with it
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    if (shown === si) return;
+    const t = setTimeout(() => setShown(si), typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 300);
+    return () => clearTimeout(t);
+  }, [si, shown]);
+  const sample = SAMPLES[shown];
   const board = sample.board;
   const rec = board.directions.find((d) => d.id === board.recommendation.pick) ?? board.directions[0];
   const tea = SAMPLES[0].board;
@@ -233,10 +242,11 @@ export function Landing({ lang, langSwitch }: { lang: Lang; langSwitch: React.Re
         <Bi p={C.samplesH} lang={lang} as="h2" className="band-h band-h-lead" />
         <div className="band-body">
           <Bi p={C.samplesSub} lang={lang} as="p" className="band-sub band-lead" />
-          <div className="sample-tabs seg" role="tablist" aria-label={one(C.samplesH)}>
-            <SegPill />
+          {/* no sliding highlight across these two rows of cards: the chosen card's ink frame
+              closes in on it where it stands (globals.css .sample-tab::after) */}
+          <div className={touched ? "sample-tabs is-touched" : "sample-tabs"} role="tablist" aria-label={one(C.samplesH)}>
             {SAMPLES.map((s, i) => (
-              <button key={s.id} type="button" role="tab" aria-selected={i === si} className={i === si ? "sample-tab is-active" : "sample-tab"} onClick={() => setSi(i)}>
+              <button key={s.id} type="button" role="tab" aria-selected={i === si} className={i === si ? "sample-tab is-active" : "sample-tab"} onClick={() => (setSi(i), setTouched(true))}>
                 <FormGlyph form={s.pack.form} />
                 <span className="sample-tab-text">
                   <strong>{one(s.label)}</strong>
