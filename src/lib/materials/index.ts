@@ -108,6 +108,8 @@ export type Slot = {
   print?: PrintRole;
   /** grade and thickness as the structure is drawn (grammage, wall), for the job sheet */
   grade?: Pair;
+  /** the grammage (g/m²) that grade means, for the weight and cost estimates */
+  gsm?: number;
 };
 
 /** What a combination's products sit in, by insert kind. */
@@ -127,11 +129,11 @@ export function insertKind(spec: PackSpec): Insert {
 /** Structures with an insert or tray (with products packed, or empty). */
 const HAS_INSERT: readonly Form[] = ["gift", "bookBox", "mailer", "drawer", "woodBox", "brocade"];
 
-const CORE: Slot = { id: "core", label: P("灰板骨架", "Board core"), options: ["M016"], contact: "outer", grade: P("1200–1500 g", "1200–1500 gsm") };
+const CORE: Slot = { id: "core", label: P("灰板骨架", "Board core"), options: ["M016"], contact: "outer", grade: P("1200–1500 g", "1200–1500 gsm"), gsm: 1200 };
 const WRAP_PAPERS = ["M019", "M020", "M005", "M021", "M037", "M031", "M028", "M029", "M030", "M032", "M038"];
-const wrap = (grade = P("128–157 g", "128–157 gsm")): Slot => ({ id: "wrap", label: P("裱纸", "Wrap"), options: WRAP_PAPERS, contact: "outer", print: "stock", grade });
+const wrap = (grade = P("128–157 g", "128–157 gsm")): Slot => ({ id: "wrap", label: P("裱纸", "Wrap"), options: WRAP_PAPERS, contact: "outer", print: "stock", grade, gsm: 157 });
 const LABEL_PAPERS = ["M079", "M053", "M019", "M021", "M037", "M038"];
-const label = (first: string, contact: Contact = "outer"): Slot => ({ id: "label", label: P("标签", "Label"), options: [first, ...LABEL_PAPERS.filter((x) => x !== first)], contact, print: "stock" });
+const label = (first: string, contact: Contact = "outer"): Slot => ({ id: "label", label: P("标签", "Label"), options: [first, ...LABEL_PAPERS.filter((x) => x !== first)], contact, print: "stock", gsm: 80 });
 
 /** The parts of each structure, with the library's recommendations. */
 export function slotsOf(form: Form): Slot[] {
@@ -142,14 +144,14 @@ export function slotsOf(form: Form): Slot[] {
 function baseSlotsOf(form: Form): Slot[] {
   switch (form) {
     case "carton":
-      return [{ id: "body", label: P("盒身", "Carton board"), options: ["M001", "M003", "M002", "M005", "M079"], contact: "outer", print: "board", grade: P("300–400 g/m²，厚约 0.45 mm", "300–400 gsm, about 0.45 mm") }];
+      return [{ id: "body", label: P("盒身", "Carton board"), options: ["M001", "M003", "M002", "M005", "M079"], contact: "outer", print: "board", grade: P("300–400 g/m²，厚约 0.45 mm", "300–400 gsm, about 0.45 mm"), gsm: 350 }];
     case "gift":
     case "bookBox":
       return [CORE, wrap()];
     case "drawer":
       return [CORE, wrap(), { id: "ribbon", label: P("拉带", "Ribbon pull"), options: ["M128", "M126", "M122"], contact: "outer" }];
     case "mailer":
-      return [{ id: "body", label: P("瓦楞纸板", "Corrugated board"), options: ["M012"], contact: "outer", print: "board", grade: P("3 mm E/B 楞", "3 mm E/B flute") }];
+      return [{ id: "body", label: P("瓦楞纸板", "Corrugated board"), options: ["M012"], contact: "outer", print: "board", grade: P("3 mm E/B 楞", "3 mm E/B flute"), gsm: 500 }];
     case "paperTube":
       return [
         { id: "body", label: P("筒身纸管", "Tube"), options: ["M027"], contact: "outer", grade: P("卷制纸管，壁厚约 2 mm", "wound tube, about 2 mm wall") },
@@ -158,9 +160,9 @@ function baseSlotsOf(form: Form): Slot[] {
       ];
     case "bag":
       return [
-        { id: "body", label: P("袋身", "Bag paper"), options: ["M001", "M019", "M020", "M005", "M004"], contact: "outer", print: "board", grade: P("157–250 g", "157–250 gsm") },
+        { id: "body", label: P("袋身", "Bag paper"), options: ["M001", "M019", "M020", "M005", "M004"], contact: "outer", print: "board", grade: P("157–250 g", "157–250 gsm"), gsm: 250 },
         { id: "handle", label: P("提手绳", "Rope handles"), options: ["M122", "M004", "M126"], contact: "outer" },
-        { id: "base", label: P("底板", "Base card"), options: ["M016", "M001", "M002"], contact: "outer" },
+        { id: "base", label: P("底板", "Base card"), options: ["M016", "M001", "M002"], contact: "outer", gsm: 1200 },
       ];
     case "aseptic":
       return [
@@ -185,7 +187,7 @@ function baseSlotsOf(form: Form): Slot[] {
       ];
     case "blister":
       return [
-        { id: "card", label: P("背卡", "Backing card"), options: ["M001", "M003", "M002"], contact: "outer", print: "board", grade: P("350 g，背面涂热封胶", "350 gsm, heat-seal coated") },
+        { id: "card", label: P("背卡", "Backing card"), options: ["M001", "M003", "M002"], contact: "outer", print: "board", grade: P("350 g，背面涂热封胶", "350 gsm, heat-seal coated"), gsm: 350 },
         { id: "blister", label: P("泡罩", "Blister"), options: ["M058", "M061", "M063", "M066"], contact: "direct", grade: P("透明吸塑", "clear thermoformed") },
       ];
     case "jar":
@@ -204,7 +206,7 @@ function baseSlotsOf(form: Form): Slot[] {
       ];
     case "tin":
       return [
-        { id: "body", label: P("罐身与罐盖", "Body and lid"), options: ["M099", "M100", "M101"], contact: "direct", print: "board", grade: P("0.21–0.25 mm，印铁", "0.21–0.25 mm, printed flat") },
+        { id: "body", label: P("罐身与罐盖", "Body and lid"), options: ["M099", "M100", "M101"], contact: "direct", print: "board", grade: P("0.21–0.25 mm，印铁", "0.21–0.25 mm, printed flat"), gsm: 1806 },
         { id: "lacquer", label: P("内涂层", "Inner lacquer"), options: ["M160"], contact: "direct" },
         { id: "seal", label: P("内封", "Inner seal"), options: ["M102", "M163"], contact: "direct" },
       ];
@@ -221,7 +223,7 @@ function baseSlotsOf(form: Form): Slot[] {
       return [
         CORE,
         { id: "cover", label: P("锦面", "Brocade cover"), options: ["M126", "M128", "M127", "M123", "M125"], contact: "outer", grade: P("提花织造宋锦纹", "jacquard-woven Song brocade pattern") },
-        { id: "slip", label: P("题签", "Title slip"), options: ["M021", "M037", "M038", "M019"], contact: "outer", print: "stock", grade: P("120 g", "120 gsm") },
+        { id: "slip", label: P("题签", "Title slip"), options: ["M021", "M037", "M038", "M019"], contact: "outer", print: "stock", grade: P("120 g", "120 gsm"), gsm: 120 },
         { id: "toggle", label: P("扣", "Toggle"), options: ["M069", "M111", "M071"], contact: "outer" },
         { id: "loop", label: P("绳圈", "Loop"), options: ["M126", "M127", "M122"], contact: "outer" },
       ];
@@ -371,6 +373,8 @@ export type Use = {
   note?: Pair;
   /** the seller's own fields */
   choice: MaterialPick;
+  /** grammage in force: the seller's, the library's for the material, else the structure's grade */
+  gsm?: number;
   /** recommended materials for the part (the first is the default) */
   options: string[];
   defaultId: string;
@@ -409,20 +413,20 @@ export function usesOf(spec: PackSpec, category: string, all = false): Use[] {
     const id = pick(spec, key, slot);
     const options = optionsFor(slot, spec.finish);
     const contact = c.contact ?? slot.contact;
-    out.push({ key, kind: "part", label: slot.label, id, m: material(id)!, contact, defaultContact: slot.contact, inner, touches: touchesOf(contact, category), grade: gradeOf(c, slot.grade), note: stockNote(spec, id) ?? undefined, choice: c, options, defaultId: options[0], drawn: drawnAs(spec, key, id, options[0]) });
+    out.push({ key, kind: "part", label: slot.label, id, m: material(id)!, contact, defaultContact: slot.contact, inner, touches: touchesOf(contact, category), grade: gradeOf(c, slot.grade), note: stockNote(spec, id) ?? undefined, choice: c, gsm: c.gsm ?? material(id)?.gsm ?? (id === options[0] || !material(id)?.gsm ? slot.gsm : undefined), options, defaultId: options[0], drawn: drawnAs(spec, key, id, options[0]) });
   }
   for (const o of offListOf(spec, true)) {
     const key = `off.${o.id}`;
     const c = choiceOf(spec, key);
     if (!c.id || !isListed(c.id)) continue;
     const contact = c.contact ?? "outer";
-    out.push({ key, kind: "off", label: o.label, id: c.id, m: material(c.id)!, contact, defaultContact: "outer", inner: false, touches: touchesOf(contact, category), grade: gradeOf(c), choice: c, options: [], defaultId: "", drawn: false });
+    out.push({ key, kind: "off", label: o.label, id: c.id, m: material(c.id)!, contact, defaultContact: "outer", inner: false, touches: touchesOf(contact, category), grade: gradeOf(c), choice: c, gsm: c.gsm ?? material(c.id)?.gsm, options: [], defaultId: "", drawn: false });
   }
   for (const x of spec.extraParts ?? []) {
     if (!isListed(x.id) || (x.inner && !spec.inner)) continue;
     const contact = x.contact ?? "outer";
     const { key: _k, label, id, inner, ...c } = x; // eslint-disable-line @typescript-eslint/no-unused-vars
-    out.push({ key: `extra.${x.key}`, kind: "extra", label: { zh: label, en: label }, id, m: material(id)!, contact, defaultContact: "outer", inner: !!inner, touches: touchesOf(contact, category), grade: gradeOf(c), choice: { ...c, id }, options: [], defaultId: "", drawn: false });
+    out.push({ key: `extra.${x.key}`, kind: "extra", label: { zh: label, en: label }, id, m: material(id)!, contact, defaultContact: "outer", inner: !!inner, touches: touchesOf(contact, category), grade: gradeOf(c), choice: { ...c, id }, gsm: c.gsm ?? material(id)?.gsm, options: [], defaultId: "", drawn: false });
   }
   for (const p of processesOf(spec)) {
     const c = choiceOf(spec, p.key);
@@ -453,6 +457,7 @@ export function pruneMaterials(spec: PackSpec): PackSpec {
     if (!next.id || next.id === d.id || !(isListed(next.id) || (d.none && next.id === "none"))) delete next.id;
     if (next.contact === d.contact) delete next.contact;
     for (const f of ["grade", "color", "supplier", "note"] as const) if (!next[f]) delete next[f];
+    for (const f of ["gsm", "unitCost", "mass"] as const) if (next[f] === undefined) delete next[f];
     if (Object.keys(next).length) keep[key] = next;
   }
   const extras = (spec.extraParts ?? []).filter((x) => !x.inner || spec.inner);
@@ -488,6 +493,7 @@ export function updateExtra(spec: PackSpec, key: string, patch: Partial<ExtraPar
     if (x.key !== key) return x;
     const next: ExtraPart = { ...x, ...patch, key: x.key };
     for (const f of ["grade", "color", "supplier", "note", "contact"] as const) if (!next[f]) delete next[f];
+    for (const f of ["gsm", "unitCost", "mass"] as const) if (next[f] === undefined) delete next[f];
     if (!next.label?.trim()) next.label = x.label;
     return next;
   });
@@ -722,6 +728,7 @@ export function choiceText(u: Use, lang: "zh" | "en"): string {
   const bits: string[] = [];
   if (c.color) bits.push(lang === "zh" ? `颜色 ${c.color}` : `colour ${c.color}`);
   if (c.supplier) bits.push(lang === "zh" ? `供应商 ${c.supplier}` : `supplier ${c.supplier}`);
+  if (c.gsm) bits.push(`${c.gsm} g/m²`);
   if (c.note) bits.push(lang === "zh" ? `备注 ${c.note}` : `note: ${c.note}`);
   return bits.join(lang === "zh" ? "，" : ", ");
 }

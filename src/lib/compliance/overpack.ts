@@ -15,6 +15,7 @@ import type { Pair } from "../i18n";
 import { comboLayout, isRound, outerSize, type ContentInfo, type PackSpec } from "../pack";
 import { getLibrary, isCosmetic, isFood, usageOf } from "../materials";
 import { mergeLimits, type Kind, type Limits } from "./limits";
+import { estimate } from "./estimate";
 
 export type Level = "error" | "warn" | "ok" | "info";
 export type OverCheck = { id: string; level: Level; title: Pair; detail: Pair; rule: string };
@@ -110,20 +111,25 @@ export function overpackChecks(spec: PackSpec, category: string): OverCheck[] {
         `${ly.shown} shown in 3D${ly.extra ? ` + ${ly.extra} entered` : ""}. Inserts, pads, belly bands and leaflets don't count; any bag or box that fully encloses the contents does.`,
       ),
     });
-    // cost
-    if (c.price && c.packCost !== undefined) {
-      const y = (c.packCost / c.price) * 100;
+    // cost: the seller's figure, else the estimate when every outer part has a price
+    const est = estimate(spec, category);
+    const packCost = c.packCost ?? (est.outerCostComplete && est.outerCost > 0 ? Math.round(est.outerCost * 100) / 100 : undefined);
+    const estimated = c.packCost === undefined && packCost !== undefined;
+    if (c.price && packCost !== undefined) {
+      const y = (packCost / c.price) * 100;
       const lim = kind?.costHigh && c.price > kind.costHigh.above ? kind.costHigh.limit : L.cost;
       const ok = y <= lim;
-      add({ id: "cost", rule: "G02", level: ok ? "ok" : "error", title: ok ? P(`包装成本占售价 ${f1(y)}%，限值 ${lim}%`, `Packaging cost ${f1(y)}% of price, limit ${lim}%`) : P(`包装成本占售价 ${f1(y)}%，超过 ${lim}%`, `Packaging cost ${f1(y)}% of price, over ${lim}%`), detail: P(`除直接接触内容物的一层外，其余包装成本 ${c.packCost} 元 ÷ 售价 ${c.price} 元。`, `Every layer but the one touching the contents, ${c.packCost} yuan ÷ price ${c.price} yuan.`) });
+      add({ id: "cost", rule: "G02", level: ok ? "ok" : "error", title: ok ? P(`包装成本占售价 ${f1(y)}%，限值 ${lim}%`, `Packaging cost ${f1(y)}% of price, limit ${lim}%`) : P(`包装成本占售价 ${f1(y)}%，超过 ${lim}%`, `Packaging cost ${f1(y)}% of price, over ${lim}%`), detail: P(`除直接接触内容物的一层外，其余包装成本 ${packCost} 元${estimated ? "（按材料库价格估算）" : ""} ÷ 售价 ${c.price} 元。`, `Every layer but the one touching the contents, ${packCost} yuan${estimated ? " (estimated from the library's prices)" : ""} ÷ price ${c.price} yuan.`) });
     } else add({ id: "cost", rule: "G02", level: "info", title: P("填写售价和包装成本后可核算成本占比", "Enter the price and packaging cost to check the cost share"), detail: P(`限值 ${L.cost}%${kind?.costHigh ? `；售价超过 ${kind.costHigh.above} 元为 ${kind.costHigh.limit}%` : ""}。`, `Limit ${L.cost}%${kind?.costHigh ? `; ${kind.costHigh.limit}% above ${kind.costHigh.above} yuan` : ""}.`) });
     // tea's mass rule
     if (kind?.massRatio) {
-      if (c.totalMass && net && unit === "g") {
+      // the whole product's mass: the seller's, else the contents plus the estimated packaging
+      const total = c.totalMass ?? (net && est.massUnknown === 0 && est.mass > 0 ? Math.round(net * unitsOf(spec) + est.mass) : undefined);
+      if (total && net && unit === "g") {
         const m2 = net * unitsOf(spec);
-        const w = (c.totalMass - m2) / m2;
+        const w = (total - m2) / m2;
         const ok = w <= kind.massRatio;
-        add({ id: "mass", rule: "G02", level: ok ? "ok" : "error", title: ok ? P(`包装质量为内装物的 ${f1(w)} 倍，不超过 ${kind.massRatio} 倍`, `Packaging is ${f1(w)}× the contents' mass, within ${kind.massRatio}×`) : P(`包装质量为内装物的 ${f1(w)} 倍，超过 ${kind.massRatio} 倍`, `Packaging is ${f1(w)}× the contents' mass, over ${kind.massRatio}×`), detail: P(`(总质量 ${c.totalMass} g − 净含量 ${m2} g) ÷ ${m2} g。`, `(total ${c.totalMass} g − net ${m2} g) ÷ ${m2} g.`) });
+        add({ id: "mass", rule: "G02", level: ok ? "ok" : "error", title: ok ? P(`包装质量为内装物的 ${f1(w)} 倍，不超过 ${kind.massRatio} 倍`, `Packaging is ${f1(w)}× the contents' mass, within ${kind.massRatio}×`) : P(`包装质量为内装物的 ${f1(w)} 倍，超过 ${kind.massRatio} 倍`, `Packaging is ${f1(w)}× the contents' mass, over ${kind.massRatio}×`), detail: P(`(总质量 ${total} g${c.totalMass ? "" : "（按估算）"} − 净含量 ${m2} g) ÷ ${m2} g。`, `(total ${total} g${c.totalMass ? "" : " (estimated)"} − net ${m2} g) ÷ ${m2} g.`) });
       } else add({ id: "mass", rule: "G02", level: "info", title: P("填写整件总质量后可核算包装质量倍数", "Enter the whole product's mass to check the packaging mass"), detail: P(`包装质量不应大于内装物质量的 ${kind.massRatio} 倍。`, `Packaging may weigh at most ${kind.massRatio}× the contents.`) });
     }
   }

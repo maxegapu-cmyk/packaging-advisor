@@ -91,6 +91,18 @@ function materialEdit(v: unknown): MaterialEdit | null {
   if (special) e.special = special;
   for (const k of ["courier", "bag", "g02", "noFood", "noCosmetics"] as const) if (typeof o[k] === "boolean") (e as Record<string, unknown>)[k] = o[k];
   if (typeof o.hidden === "boolean") e.hidden = o.hidden;
+  // cost and footprint: a number, or "" to clear the field
+  for (const [k, max] of [
+    ["gsm", 20000],
+    ["pricePerM2", 1e6],
+    ["pricePerKg", 1e6],
+    ["pricePerPiece", 1e6],
+    ["co2PerKg", 1000],
+  ] as const) {
+    const n = o[k];
+    if (typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= max) e[k] = n;
+  }
+  if (o.recyclable === "yes" || o.recyclable === "partly" || o.recyclable === "no") e.recyclable = o.recyclable;
   if (typeof o.docs === "number" && Number.isInteger(o.docs) && o.docs >= 0 && o.docs < DOCS.length) e.docs = o.docs;
   const u = url(o.url);
   if (u !== undefined) e.url = u;

@@ -58,7 +58,19 @@ export type InnerSpec = { form: InnerForm; count: 1 | 2; w: number; h: number; d
  * grade or thickness, colour (#RRGGBB, shown in 3D where the part is drawn), supplier and note,
  * and whether the part touches the contents (which decides the food and cosmetics rules).
  */
-export type MaterialPick = { id?: string; grade?: string; color?: string; supplier?: string; note?: string; contact?: "direct" | "outer" };
+export type MaterialPick = {
+  id?: string;
+  grade?: string;
+  color?: string;
+  supplier?: string;
+  note?: string;
+  contact?: "direct" | "outer";
+  /** grammage (g/m²), for the weight and cost estimates */
+  gsm?: number;
+  /** the part's cost per package (yuan) and mass per package (g), when known: they override the estimates */
+  unitCost?: number;
+  mass?: number;
+};
 /** A part the seller adds (a sticker, a ribbon, a desiccant sachet…), made of a listed material. */
 export type ExtraPart = { key: string; label: string; id: string; inner?: boolean } & Omit<MaterialPick, "id">;
 /** How the pack is used, when the seller says so (otherwise read from the structure). */
@@ -90,6 +102,10 @@ export type ContentInfo = {
   /** planned sealing tape, mm; and its width, mm */
   tape?: number;
   tapeWidth?: number;
+  /** one-off costs for a print run (dies, plates, set-up), yuan */
+  setup?: number;
+  /** order quantities to quote */
+  tiers?: number[];
 };
 
 /** A project's materials frozen at sign-off: the library as it was then, kept with the pack. */
@@ -300,6 +316,14 @@ function pickFields(v: unknown): MaterialPick | null {
   if (note) out.note = note;
   if (typeof o.color === "string" && /^#[0-9a-fA-F]{6}$/.test(o.color)) out.color = o.color.toUpperCase();
   if (o.contact === "direct" || o.contact === "outer") out.contact = o.contact;
+  for (const [k, max] of [
+    ["gsm", 20000],
+    ["unitCost", 1e6],
+    ["mass", 1e7],
+  ] as const) {
+    const n = o[k];
+    if (typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= max) out[k] = n;
+  }
   return Object.keys(out).length ? out : null;
 }
 
@@ -334,6 +358,11 @@ function normalizeContent(v: unknown): ContentInfo | null {
   set("courierExtra", n(o.courierExtra, 10) !== undefined ? Math.round(o.courierExtra as number) : undefined);
   set("tape", n(o.tape, 1e6));
   set("tapeWidth", n(o.tapeWidth, 1000));
+  set("setup", n(o.setup, 1e8));
+  if (Array.isArray(o.tiers)) {
+    const t = [...new Set(o.tiers.filter((x): x is number => typeof x === "number" && Number.isInteger(x) && x > 0 && x <= 1e8))].sort((a, b) => a - b).slice(0, 6);
+    if (t.length) out.tiers = t;
+  }
   return Object.keys(out).length ? out : null;
 }
 
