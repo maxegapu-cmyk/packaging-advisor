@@ -11,6 +11,7 @@
 import type { Pair } from "../i18n";
 import { comboLayout, FORM_LABELS, isRound, outerSize, type Form, type MaterialPick, type PackSpec } from "../pack";
 import { printLayout, type Piece } from "../print/layout";
+import { ruleOf as dieRule } from "../print/die";
 import { choiceOf, insertKind, partsOf } from "../materials";
 import { stock as bookStock, type BookStock } from "./book";
 import type { StockKind } from "./stocks";
@@ -19,7 +20,8 @@ import { gsmFor, kindsFor, stockFor } from "./stockFor";
 export { gsmFor, kindsFor, stockFor };
 
 export type Lam = "gloss" | "matte" | "soft" | "varnish";
-export type Blank = { w: number; h: number; name: Pair; area: number };
+/** A printed blank: its size, area, the rule its die needs (m, measured from the die line), and the piece itself. */
+export type Blank = { w: number; h: number; name: Pair; area: number; rule?: number; piece?: Piece };
 
 export type CompKind = "sheet" | "rigid" | "tube" | "flute" | "flex" | "label" | "buy" | "insert" | "fabric" | "labour";
 
@@ -65,9 +67,12 @@ export type Comp = {
 
 const P = (zh: string, en: string): Pair => ({ zh, en });
 
-const blankOf = (p: Piece): Blank => ({ w: Math.round(p.w), h: Math.round(p.h), name: p.name, area: (p.w * p.h) / 1e6 });
+const blankOf = (p: Piece): Blank => {
+  const r = dieRule(p);
+  return { w: Math.round(p.w), h: Math.round(p.h), name: p.name, area: (p.w * p.h) / 1e6, rule: (r.cut + r.crease) / 1000, piece: p };
+};
 /** Rule length of a die per blank (cuts plus creases), m: about 1.6× the perimeter. */
-const ruleOf = (b: Blank[]) => b.reduce((a, x) => a + (2 * (x.w + x.h) * 1.6) / 1000, 0);
+const ruleOf = (b: Blank[]) => b.reduce((a, x) => a + (x.rule ?? (2 * (x.w + x.h) * 1.6) / 1000), 0);
 
 const LAM: Record<string, Lam | null> = { matte: "matte", gloss: "gloss", softTouch: "soft", paper: null, xuan: null, goldFleck: null };
 

@@ -15,7 +15,7 @@ import { fullM2, impositions, impositionText, sheetM2, type Imposition } from ".
 
 export type Line = { item: Pair; calc: Pair; setup: number; run: number };
 /** `bought`: bought in at the supplier's price (containers, inserts, your own buying prices): no overhead or margin on top. */
-export type CompQuote = { comp: Comp; lines: Line[]; setup: number; run: number; total: number; bought: boolean; imposition?: Imposition; alt?: Imposition[]; warn?: Pair[]; massG?: number };
+export type CompQuote = { comp: Comp; lines: Line[]; setup: number; run: number; total: number; bought: boolean; imposition?: Imposition; arrange?: "single" | "row" | "col"; alt?: Imposition[]; warn?: Pair[]; massG?: number };
 export type Quote = {
   qty: number;
   comps: CompQuote[];
@@ -175,11 +175,11 @@ function sheetLines(c: Comp, imp: Imposition, ctx: SheetCtx): { lines: Line[]; w
 function quoteSheet(c: Comp, ctx: SheetCtx): CompQuote {
   const blanks = c.blanks ?? [];
   // a set of several pieces (a lid wrap and a base wrap) is run side by side or one above the other, or each on its own
-  const candidates: { blank: { w: number; h: number }; label: Pair }[] = [];
-  if (blanks.length === 1) candidates.push({ blank: blanks[0], label: P("", "") });
+  const candidates: { blank: { w: number; h: number }; arrange: "single" | "row" | "col" }[] = [];
+  if (blanks.length === 1) candidates.push({ blank: blanks[0], arrange: "single" });
   else if (blanks.length > 1) {
-    candidates.push({ blank: { w: blanks.reduce((a, b) => a + b.w + 5, -5), h: Math.max(...blanks.map((b) => b.h)) }, label: P("成套并排", "set side by side") });
-    candidates.push({ blank: { w: Math.max(...blanks.map((b) => b.w)), h: blanks.reduce((a, b) => a + b.h + 5, -5) }, label: P("成套上下排", "set one above the other") });
+    candidates.push({ blank: { w: blanks.reduce((a, b) => a + b.w + 5, -5), h: Math.max(...blanks.map((b) => b.h)) }, arrange: "row" });
+    candidates.push({ blank: { w: Math.max(...blanks.map((b) => b.w)), h: blanks.reduce((a, b) => a + b.h + 5, -5) }, arrange: "col" });
   }
   let best: { q: CompQuote; total: number } | null = null;
   const alts: Imposition[] = [];
@@ -189,7 +189,7 @@ function quoteSheet(c: Comp, ctx: SheetCtx): CompQuote {
       const setup = lines.reduce((a, l) => a + l.setup, 0);
       const run = lines.reduce((a, l) => a + l.run, 0);
       alts.push(imp);
-      if (!best || setup + run < best.total) best = { q: { comp: c, lines, setup, run, total: setup + run, bought: false, imposition: imp, warn }, total: setup + run };
+      if (!best || setup + run < best.total) best = { q: { comp: c, lines, setup, run, total: setup + run, bought: false, imposition: imp, arrange: cand.arrange, warn }, total: setup + run };
     }
   }
   if (!best) return { comp: c, lines: [], setup: 0, run: 0, total: 0, bought: false, warn: [P("展开尺寸超过全张纸，无法上机，请减小尺寸或分拼。", "The blank is larger than a full sheet: make it smaller or split it.")] };

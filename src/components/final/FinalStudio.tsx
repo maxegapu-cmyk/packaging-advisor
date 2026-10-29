@@ -1,5 +1,6 @@
 "use client";
 
+import { DieDownloads } from "../die/DieDownloads";
 import { setLibrary, type Library } from "@/lib/materials";
 import type { SupplierDoc } from "@/lib/compliance/documents";
 import { urlDocStore, type DocStore } from "../compliance/docStore";
@@ -594,6 +595,7 @@ export function FinalStudio({
                 </small>
               </span>
             </button>
+            <DieDownloads spec={pack} category={board.meta.category} product={one(board.meta.product, lang)} lang={lang} className="final-die" />
             {error ? (
               <p className="notice notice-error" role="alert">
                 {error}

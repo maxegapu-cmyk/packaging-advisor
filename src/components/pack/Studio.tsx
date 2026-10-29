@@ -46,6 +46,7 @@ import { MaterialPanel } from "./MaterialPanel";
 import { SpecPanel } from "../spec/SpecPanel";
 import { QuoteSheet } from "../spec/QuoteSheet";
 import { SolutionPicker } from "../spec/SolutionPicker";
+import { DieDownloads } from "../die/DieDownloads";
 import { CompliancePanel } from "../compliance/CompliancePanel";
 import { memoryDocStore, urlDocStore, type DocStore } from "../compliance/docStore";
 import { pruneMaterials, setLibrary, type Library } from "@/lib/materials";
@@ -1033,6 +1034,7 @@ export function Studio({
               </dl>
               <L p={S.materialNote} lang={lang} className="st-small" />
             </section>
+            <DieDownloads spec={spec} category={board.meta.category} product={one(board.meta.product, lang)} lang={lang} className="st-sec" />
           </div>
         ) : null}
 
