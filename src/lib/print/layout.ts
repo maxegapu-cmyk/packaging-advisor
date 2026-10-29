@@ -9,9 +9,10 @@
  * file says so. Client-safe and pure.
  */
 import type { Pair } from "../i18n";
-import type { Effect, Finish, Form, PackSpec } from "../pack";
+import { outerSize, type Effect, type Finish, type Form, type PackSpec } from "../pack";
 import { flatOf, foldsFor, type FoldPiece } from "./folds";
 import { materialLine, offListOf } from "../materials";
+import { wallMm } from "../spec/wall";
 
 export type FaceKind = "front" | "back" | "left" | "right" | "top" | "bottom" | "flap" | "band" | "bandPlain" | "baseSide" | "tinWrap" | "tinCap" | "inner" | "manual" | "slip";
 
@@ -212,7 +213,7 @@ function fromFolds(piece: FoldPiece): Local {
     base: piece.base,
   };
 }
-const nets = (form: Form, w: number, h: number, d: number) => foldsFor(form, w, h, d)!.pieces.map(fromFolds);
+const nets = (form: Form, w: number, h: number, d: number, t?: number) => foldsFor(form, w, h, d, t)!.pieces.map(fromFolds);
 
 /* ---------------------------------------------------------------- simple pieces */
 
@@ -281,7 +282,7 @@ export const EFFECT_NOTE: Record<Effect, Pair> = {
 const DIE = P("刀线和压痕为标准结构，开模前请以印厂刀模为准。", "Cut and crease lines are a standard structure; use your printer's die line before cutting.");
 const CURVED = P("此为平面展开示意，曲面印刷的变形由印厂补偿。", "A flat representation; the printer compensates for printing on the curve.");
 
-function sheetsFor(form: Form, w: number, h: number, d: number, finish: Finish, mat: Pair, prefix = "", qty = 1, effects: Effect[] = []): Sheet[] {
+function sheetsFor(form: Form, w: number, h: number, d: number, finish: Finish, mat: Pair, prefix = "", qty = 1, effects: Effect[] = [], thick?: number): Sheet[] {
   const notes = [(VARNISHED.includes(form) ? VARNISH_NOTE : FINISH_NOTE)[finish], ...effects.map((e) => EFFECT_NOTE[e])];
   const id = (s: string) => prefix + s;
   const nm = (p: Pair): Pair => (prefix ? { zh: `内装 · ${p.zh}`, en: `Inside · ${p.en}` } : p);
@@ -294,7 +295,7 @@ function sheetsFor(form: Form, w: number, h: number, d: number, finish: Finish, 
     case "bookBox":
       return [sheet(id("wraps"), nm(P("书型盒裱纸", "Book box wraps")), nets("bookBox", w, h, d), mat, [...notes, DIE], qty)];
     case "mailer":
-      return [sheet(id("net"), nm(P("飞机盒刀模", "Mailer die")), nets("mailer", w, h, d), mat, [...notes, DIE, P("结构参考 FEFCO 0427：前墙与侧墙双层卷边，盒盖带插舌和防尘耳。", "Structure after FEFCO 0427: rolled double front and side walls, a lid with a tuck and dust ears.")], qty)];
+      return [sheet(id("net"), nm(P("飞机盒刀模", "Mailer die")), nets("mailer", w, h, d, thick), mat, [...notes, DIE, P("结构参考 FEFCO 0427：前墙与侧墙双层卷边，盒盖带插舌和防尘耳。", "Structure after FEFCO 0427: rolled double front and side walls, a lid with a tuck and dust ears.")], qty)];
     case "drawer":
       return [sheet(id("parts"), nm(P("抽屉盒刀模", "Drawer box die")), nets("drawer", w, h, d), mat, [...notes, DIE], qty)];
     case "paperTube": {
@@ -363,7 +364,11 @@ export function printLayout(spec: PackSpec): PrintLayout {
   const off = offListOf(spec);
   const offText = (lang: "zh" | "en") => (off.length ? (lang === "zh" ? `；清单外（待委托方确认）：${off.map((o) => o.label.zh).join("、")}` : `; off the list (for the principal to confirm): ${off.map((o) => o.label.en.toLowerCase()).join(", ")}`) : "");
   const outerMat = materialLine(spec, "other", false);
-  const sheets = sheetsFor(spec.form, spec.w, spec.h, spec.d, spec.finish, { zh: outerMat.zh + offText("zh"), en: outerMat.en + offText("en") }, "", 1, fx);
+  // a combination's outer pack is sized to its contents, as the 3D model draws it
+  const o = outerSize(spec);
+  // the die allows for the board's real thickness (a mailer's flute), as the 3D model draws it
+  const thick = spec.form === "mailer" ? wallMm(spec, "body", 3) : undefined;
+  const sheets = sheetsFor(spec.form, o.w, o.h, o.d, spec.finish, { zh: outerMat.zh + offText("zh"), en: outerMat.en + offText("en") }, "", 1, fx, thick);
   if (spec.inner) sheets.push(...sheetsFor(spec.inner.form, spec.inner.w, spec.inner.h, spec.inner.d, spec.finish, materialLine(spec, "other", true), "inner-", spec.inner.count, fx));
   return { sheets, bleed: BLEED, margin: MARGIN };
 }

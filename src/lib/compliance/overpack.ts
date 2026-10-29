@@ -15,7 +15,7 @@ import type { Pair } from "../i18n";
 import { comboLayout, isRound, outerSize, type ContentInfo, type PackSpec } from "../pack";
 import { getLibrary, isCosmetic, isFood, usageOf } from "../materials";
 import { mergeLimits, type Kind, type Limits } from "./limits";
-import { estimate } from "./estimate";
+import { estimate, outerCost } from "./estimate";
 
 export type Level = "error" | "warn" | "ok" | "info";
 export type OverCheck = { id: string; level: Level; title: Pair; detail: Pair; rule: string };
@@ -111,15 +111,16 @@ export function overpackChecks(spec: PackSpec, category: string): OverCheck[] {
         `${ly.shown} shown in 3D${ly.extra ? ` + ${ly.extra} entered` : ""}. Inserts, pads, belly bands and leaflets don't count; any bag or box that fully encloses the contents does.`,
       ),
     });
-    // cost: the seller's figure, else the estimate when every outer part has a price
+    // cost: the seller's figure, else the quote's
     const est = estimate(spec, category);
-    const packCost = c.packCost ?? (est.outerCostComplete && est.outerCost > 0 ? Math.round(est.outerCost * 100) / 100 : undefined);
+    const quoted = c.packCost === undefined ? outerCost(spec, category) : null;
+    const packCost = c.packCost ?? quoted?.cost;
     const estimated = c.packCost === undefined && packCost !== undefined;
     if (c.price && packCost !== undefined) {
       const y = (packCost / c.price) * 100;
       const lim = kind?.costHigh && c.price > kind.costHigh.above ? kind.costHigh.limit : L.cost;
       const ok = y <= lim;
-      add({ id: "cost", rule: "G02", level: ok ? "ok" : "error", title: ok ? P(`包装成本占售价 ${f1(y)}%，限值 ${lim}%`, `Packaging cost ${f1(y)}% of price, limit ${lim}%`) : P(`包装成本占售价 ${f1(y)}%，超过 ${lim}%`, `Packaging cost ${f1(y)}% of price, over ${lim}%`), detail: P(`除直接接触内容物的一层外，其余包装成本 ${packCost} 元${estimated ? "（按材料库价格估算）" : ""} ÷ 售价 ${c.price} 元。`, `Every layer but the one touching the contents, ${packCost} yuan${estimated ? " (estimated from the library's prices)" : ""} ÷ price ${c.price} yuan.`) });
+      add({ id: "cost", rule: "G02", level: ok ? "ok" : "error", title: ok ? P(`包装成本占售价 ${f1(y)}%，限值 ${lim}%`, `Packaging cost ${f1(y)}% of price, limit ${lim}%`) : P(`包装成本占售价 ${f1(y)}%，超过 ${lim}%`, `Packaging cost ${f1(y)}% of price, over ${lim}%`), detail: P(`除直接接触内容物的一层外，其余包装成本 ${packCost} 元${estimated ? `（按报价测算，${quoted?.qty} 只起订）` : ""} ÷ 售价 ${c.price} 元。`, `Every layer but the one touching the contents, ${packCost} yuan${estimated ? ` (from the quote at ${quoted?.qty})` : ""} ÷ price ${c.price} yuan.`) });
     } else add({ id: "cost", rule: "G02", level: "info", title: P("填写售价和包装成本后可核算成本占比", "Enter the price and packaging cost to check the cost share"), detail: P(`限值 ${L.cost}%${kind?.costHigh ? `；售价超过 ${kind.costHigh.above} 元为 ${kind.costHigh.limit}%` : ""}。`, `Limit ${L.cost}%${kind?.costHigh ? `; ${kind.costHigh.limit}% above ${kind.costHigh.above} yuan` : ""}.`) });
     // tea's mass rule
     if (kind?.massRatio) {

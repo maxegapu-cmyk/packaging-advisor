@@ -7,6 +7,10 @@
  * a moment after each edit. The base list is never changed: "Restore" takes an edit away.
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { PriceBookEditor } from "../spec/PriceBookEditor";
+import { allStocks, priceOf } from "@/lib/spec/book";
+import { CONFIDENCE_LABELS } from "@/lib/spec/sources";
+import { BASIS_UNIT } from "@/lib/spec/stocks";
 import type { Lang, Pair } from "@/lib/i18n";
 import { FORM_LABELS, FORMS, INSERT_LABELS, INSERTS, type Form } from "@/lib/pack";
 import { DEFAULT_LIMITS, LIMIT_SOURCES, mergeLimits, type Kind, type Limits } from "@/lib/compliance/limits";
@@ -47,6 +51,9 @@ const T = {
     `Built on the principal's list (${LIST.count} materials, checked ${LIST.checked}). Change anything about any material or rule, add or hide materials, and set each part's recommended and default materials. The original is never altered: "Restore" goes back to the list's own value. Changes reach the 3D space, rules and documents, pre-press checks, the job sheet and AI generation.`,
   ),
   materials: P("材料", "Materials"),
+  prices: P("价格库", "Price book"),
+  stocksOf: P("可订购料号与参考价（在价格库改）", "Stocks you can order in it, with reference prices (edit them in the price book)"),
+  noStocks: P("价格库里还没有这种材料的料号：可在价格库新增，并选这个材料编号。", "No stock in the price book is made of this yet: add one on the price book tab and pick this material."),
   rules: P("规则", "Rules"),
   recommend: P("部件推荐", "Part recommendations"),
   limits: P("核算限值", "Check limits"),
@@ -137,7 +144,7 @@ export function LibraryEditor({ initial, lang, saveUrl, onSave, historyUrl, hist
   const [lib, setLib] = useState<Library>(() => normalizeLibrary(initial));
   setLibrary(lib);
   const [status, setStatus] = useState<Status>("idle");
-  const [tab, setTab] = useState<"materials" | "rules" | "recommend" | "limits" | "history">("materials");
+  const [tab, setTab] = useState<"materials" | "prices" | "rules" | "recommend" | "limits" | "history">(() => (typeof location !== "undefined" && location.hash === "#prices" ? "prices" : "materials"));
   const [note, setNote] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const first = useRef(true);
@@ -234,7 +241,7 @@ export function LibraryEditor({ initial, lang, saveUrl, onSave, historyUrl, hist
       ) : null}
 
       <div className="lib-tabs" role="tablist">
-        {(histApi ? (["materials", "rules", "recommend", "limits", "history"] as const) : (["materials", "rules", "recommend", "limits"] as const)).map((t) => (
+        {(histApi ? (["materials", "prices", "rules", "recommend", "limits", "history"] as const) : (["materials", "prices", "rules", "recommend", "limits"] as const)).map((t) => (
           <button key={t} type="button" role="tab" aria-selected={tab === t} className={tab === t ? "lib-tab is-active" : "lib-tab"} onClick={() => setTab(t)}>
             {one(T[t], lang)}
           </button>
@@ -242,6 +249,7 @@ export function LibraryEditor({ initial, lang, saveUrl, onSave, historyUrl, hist
       </div>
 
       {tab === "materials" ? <MaterialsTab lib={lib} update={update} lang={lang} /> : null}
+      {tab === "prices" ? <PriceBookEditor lib={lib} update={update} lang={lang} /> : null}
       {tab === "rules" ? <RulesTab lib={lib} update={update} lang={lang} /> : null}
       {tab === "recommend" ? <RecommendTab lib={lib} update={update} lang={lang} /> : null}
       {tab === "limits" ? <LimitsTab lib={lib} update={update} lang={lang} /> : null}
@@ -391,6 +399,32 @@ function RuleChecks({ value, onChange, lang, only }: { value: string[]; onChange
   );
 }
 
+/** The stocks ordered in this material, with their prices (edited on the price book tab). */
+function StocksOf({ id, lang }: { id: string; lang: Lang }) {
+  const list = allStocks().filter((s) => s.mid === id && !s.hidden);
+  return (
+    <div className="lib-field">
+      <span className="lib-label">{one(T.stocksOf, lang)}</span>
+      {list.length ? (
+        <ul className="lib-stocks">
+          {list.map((s) => (
+            <li key={s.id}>
+              <span>{one(s.name, lang)}</span>
+              <b>
+                {s.price === null ? "≈ " : ""}
+                {priceOf(s).toLocaleString("en-US", { maximumFractionDigits: s.basis === "ton" ? 0 : 2 })} {one(BASIS_UNIT[s.basis], lang)}
+              </b>
+              <em className={`sp-badge sp-badge-${s.conf}`}>{one(CONFIDENCE_LABELS[s.conf], lang).split("，")[0].split(",")[0]}{s.asOf ? ` · ${s.asOf}` : ""}</em>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <span className="lib-base">{one(T.noStocks, lang)}</span>
+      )}
+    </div>
+  );
+}
+
 function MaterialForm({ m, lib, update, lang, onRemoved }: { m: Material; lib: Library; update: Update; lang: Lang; onRemoved: () => void }) {
   const base = m.custom ? undefined : BASE.get(m.id);
   const set = (k: keyof MaterialEdit, v: unknown) => update((l) => setField(l, m, k, v));
@@ -442,6 +476,7 @@ function MaterialForm({ m, lib, update, lang, onRemoved }: { m: Material; lib: L
       </label>
 
       <PairInput label={T.name} value={m.name} base={base?.name} onChange={(v) => set("name", v)} lang={lang} />
+      <StocksOf id={m.id} lang={lang} />
       <Field label={one(T.trade, lang)} base={base && base.trade !== m.trade ? `${one(T.baseValue, lang)}：${base.trade}` : undefined}>
         <input value={m.trade} onChange={(e) => set("trade", e.currentTarget.value)} />
       </Field>

@@ -9,6 +9,7 @@ import type { PackSpec } from "@/lib/pack";
 import { rolesOf, type ArtInput } from "./art";
 import { band, box, disc, insertGeometry, lathe, liftOff, mmOf, pin, RAD, ribbed, smooth, splitMesh, springAt, U, V, type Built, type Holds } from "./common";
 import type { InsertKind, Kit } from "./kit";
+import { wallMm } from "@/lib/spec/wall";
 
 const mm = U;
 
@@ -160,7 +161,7 @@ export function buildBlister(spec: PackSpec, k: Kit): Built {
   const W = spec.w * U;
   const H = spec.h * U;
   const D = spec.d * U;
-  const t = 0.6 * mm;
+  const t = wallMm(spec, "card", 0.6) * mm;
   const root = new THREE.Group();
   const card = new THREE.Group();
   root.add(card);

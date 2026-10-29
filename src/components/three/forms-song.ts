@@ -10,6 +10,7 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import type { PackSpec } from "@/lib/pack";
 import { box, insertGeometry, mmOf, pin, RAD, smooth, springAt, U, V, type Built, type Holds } from "./common";
 import type { InsertKind, Kit } from "./kit";
+import { wallMm } from "@/lib/spec/wall";
 
 const mm = U;
 type Six = [THREE.Material, THREE.Material, THREE.Material, THREE.Material, THREE.Material, THREE.Material];
@@ -28,7 +29,7 @@ export function buildBrocade(spec: PackSpec, k: Kit, holds?: Holds, insertKind: 
   const W = spec.w * U;
   const H = spec.h * U;
   const D = spec.d * U;
-  const T = 2.2 * mm; // greyboard and brocade
+  const T = (wallMm(spec, "core", 1.85) + 0.35) * mm; // greyboard and brocade
   const lidH = Math.min(40 * mm, Math.max(14 * mm, H * 0.32));
   const hb = H - lidH;
   const wh = hb - T;

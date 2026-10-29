@@ -10,6 +10,7 @@ import type { Pair } from "../i18n";
 import { comboLayout, isRound, outerSize, type PackSpec } from "../pack";
 import { printLayout, pieceArea } from "../print/layout";
 import { innerSpecOf, usesOf, type Use } from "../materials";
+import { DEFAULT_QTY, quoteAt } from "../spec/quote";
 import type { FamilyId, Material } from "../materials/catalog";
 
 export type Recyclable = "yes" | "partly" | "no";
@@ -211,11 +212,21 @@ export function estimate(spec: PackSpec, category: string): Estimate {
   };
 }
 
-export const DEFAULT_TIERS = [3000, 5000, 10000];
-
-/** Price per package at each order quantity: the parts' unit cost plus the one-off costs spread over the run. */
-export function quote(spec: PackSpec, category: string): { qty: number; perUnit: number; total: number }[] {
-  const e = estimate(spec, category);
-  const setup = spec.content?.setup ?? 0;
-  return (spec.content?.tiers ?? DEFAULT_TIERS).map((qty) => ({ qty, perUnit: e.cost + setup / qty, total: e.cost * qty + setup }));
+/**
+ * The packaging cost GB 23350 counts (every layer but the one touching the contents), per pack,
+ * from the quote at the order's first quantity of 3,000 or more (else its largest): the share of
+ * the quoted price the outer layers make up, with VAT as the seller pays it.
+ */
+export function outerCost(spec: PackSpec, category: string): { cost: number; qty: number } | null {
+  const qtys = spec.order?.qty?.length ? spec.order.qty : DEFAULT_QTY;
+  const qty = qtys.find((q) => q >= 3000) ?? qtys[qtys.length - 1];
+  const q = quoteAt(spec, category, qty);
+  const uses = usesOf(spec, category);
+  const packTouches = !spec.inner && uses.some((x) => x.kind === "part" && x.contact === "direct");
+  // a pack on its own that touches the contents is itself the first layer: only a shipper is outer
+  const isFirst = (key: string) => (spec.inner ? key.startsWith("inner.") : packTouches ? key !== "shipper" && key !== "job" : false);
+  const all = q.comps.reduce((a, c) => a + c.total, 0);
+  if (!all) return null;
+  const outer = q.comps.filter((c) => !isFirst(c.comp.key)).reduce((a, c) => a + c.total, 0);
+  return { cost: Math.round(((outer / all) * q.unit) * 100) / 100, qty };
 }

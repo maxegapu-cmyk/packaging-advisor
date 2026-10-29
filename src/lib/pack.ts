@@ -7,6 +7,7 @@
 import type { Pair } from "./i18n";
 import { isCategory, type Category } from "./categories";
 import { normalizeLibrary, type Library } from "./materials/library";
+import { SOLUTIONS } from "./spec/solutions";
 
 export const FORMS = ["carton", "gift", "bookBox", "mailer", "drawer", "paperTube", "bag", "aseptic", "pouch", "bottle", "tube", "blister", "jar", "glassBottle", "tin", "can", "ceramic", "woodBox", "brocade"] as const;
 export type Form = (typeof FORMS)[number];
@@ -70,6 +71,42 @@ export type MaterialPick = {
   /** the part's cost per package (yuan) and mass per package (g), when known: they override the estimates */
   unitCost?: number;
   mass?: number;
+  /** the stock ordered for the part (src/lib/spec/stocks.ts), which sets the material number and grammage */
+  stock?: string;
+  /** printing: colours on the outside and inside (a spot colour counts as one), and how many are spots */
+  cf?: number;
+  cb?: number;
+  spots?: number;
+  /** area per package (cm²) of foil and of embossing, when the part carries them */
+  foil?: number;
+  emboss?: number;
+  /**
+   * How the part is made, where there is a choice: a corrugated part's printed facing mounted on
+   * flute (litho) or printed direct on the board; a pouch printed by gravure or digitally
+   */
+  route?: "litho" | "direct" | "gravure" | "digital";
+  /** a bought-in container in a size of its own (a new mould), not a stock size */
+  mould?: boolean;
+  /** how a folding carton is glued */
+  glue?: "straight" | "crash" | "hand" | "none";
+  /** a die-cut window with a clear patch */
+  window?: boolean;
+};
+
+/**
+ * What is being ordered: the quantities to quote, a shipping carton the packs go out in, how many
+ * designs (SKUs) share one run, and the terms (freight, VAT invoice).
+ */
+export type Order = {
+  qty?: number[];
+  shipper?: { per: number; stock?: string; colours?: number } | null;
+  designs?: number;
+  freight?: boolean;
+  /** quote with VAT (a special invoice); false quotes net */
+  vat?: boolean;
+  /** the margin and overhead to use for this quote, %, where they differ from the price book */
+  margin?: number;
+  overhead?: number;
 };
 /** A part the seller adds (a sticker, a ribbon, a desiccant sachet…), made of a listed material. */
 export type ExtraPart = { key: string; label: string; id: string; inner?: boolean } & Omit<MaterialPick, "id">;
@@ -102,10 +139,6 @@ export type ContentInfo = {
   /** planned sealing tape, mm; and its width, mm */
   tape?: number;
   tapeWidth?: number;
-  /** one-off costs for a print run (dies, plates, set-up), yuan */
-  setup?: number;
-  /** order quantities to quote */
-  tiers?: number[];
 };
 
 /** A project's materials frozen at sign-off: the library as it was then, kept with the pack. */
@@ -115,7 +148,7 @@ export type Frozen = { at: string; library: Library; note?: string };
  * `materials` holds the seller's picks by part ("wrap", "insert", "inner.body", "process.film",
  * "off.magnets"…); parts not named use their defaults. `extraParts` are parts the seller added.
  */
-export type PackSpec = { form: Form; w: number; h: number; d: number; finish: Finish; effects?: Effect[]; inner?: InnerSpec | null; materials?: Record<string, MaterialPick>; extraParts?: ExtraPart[]; usage?: PackUsage; content?: ContentInfo; frozen?: Frozen };
+export type PackSpec = { form: Form; w: number; h: number; d: number; finish: Finish; effects?: Effect[]; inner?: InnerSpec | null; materials?: Record<string, MaterialPick>; extraParts?: ExtraPart[]; usage?: PackUsage; content?: ContentInfo; order?: Order; frozen?: Frozen };
 
 /** Turns an effect on or off, keeping a single foil and a single pressing. */
 export function withEffect(spec: PackSpec, e: Effect, on: boolean): PackSpec {
@@ -288,8 +321,15 @@ export const isRound = (f: Form) => ROUND_FORMS.includes(f);
 export const isOuter = (f: Form): f is OuterForm => (OUTER_FORMS as readonly string[]).includes(f);
 export const isInner = (f: string): f is InnerForm => (INNER_FORMS as readonly string[]).includes(f);
 
+/**
+ * A new product's package: the first of its category's standard solutions (the packaging the trade
+ * ships it in, with its stocks, print and finish), else the category's structure.
+ */
 export function defaultPack(category: string): PackSpec {
-  const p = CATEGORY_PACK[isCategory(category) ? category : "other"];
+  const cat = isCategory(category) ? category : "other";
+  const sol = SOLUTIONS.find((s) => s.cat === cat);
+  if (sol) return normalizePack(sol.spec, CATEGORY_PACK[cat]);
+  const p = CATEGORY_PACK[cat];
   return { ...p, ...(p.inner ? { inner: { ...p.inner } } : {}) };
 }
 
@@ -323,6 +363,51 @@ function pickFields(v: unknown): MaterialPick | null {
   ] as const) {
     const n = o[k];
     if (typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= max) out[k] = n;
+  }
+  if (typeof o.stock === "string" && /^[a-zA-Z][A-Za-z0-9]{0,23}$/.test(o.stock)) out.stock = o.stock;
+  for (const [k, max] of [
+    ["cf", 8],
+    ["cb", 8],
+    ["spots", 4],
+  ] as const) {
+    const n = o[k];
+    if (typeof n === "number" && Number.isInteger(n) && n >= 0 && n <= max) out[k] = n;
+  }
+  for (const k of ["foil", "emboss"] as const) {
+    const n = o[k];
+    if (typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 20000) out[k] = Math.round(n * 10) / 10;
+  }
+  if (o.route === "litho" || o.route === "direct" || o.route === "gravure" || o.route === "digital") out.route = o.route;
+  if (typeof o.mould === "boolean") out.mould = o.mould;
+  if (o.glue === "straight" || o.glue === "crash" || o.glue === "hand" || o.glue === "none") out.glue = o.glue;
+  if (typeof o.window === "boolean") out.window = o.window;
+  return Object.keys(out).length ? out : null;
+}
+
+function normalizeOrder(v: unknown): Order | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  const out: Order = {};
+  if (Array.isArray(o.qty)) {
+    const t = [...new Set(o.qty.filter((x): x is number => typeof x === "number" && Number.isInteger(x) && x > 0 && x <= 1e8))].sort((a, b) => a - b).slice(0, 6);
+    if (t.length) out.qty = t;
+  }
+  if (o.shipper === null) out.shipper = null;
+  else if (o.shipper && typeof o.shipper === "object") {
+    const sh = o.shipper as Record<string, unknown>;
+    const per = typeof sh.per === "number" && Number.isInteger(sh.per) && sh.per >= 1 && sh.per <= 500 ? sh.per : null;
+    if (per) {
+      out.shipper = { per };
+      if (typeof sh.stock === "string" && /^[a-zA-Z][A-Za-z0-9]{0,23}$/.test(sh.stock)) out.shipper.stock = sh.stock;
+      if (typeof sh.colours === "number" && Number.isInteger(sh.colours) && sh.colours >= 0 && sh.colours <= 4) out.shipper.colours = sh.colours;
+    }
+  }
+  if (typeof o.designs === "number" && Number.isInteger(o.designs) && o.designs >= 1 && o.designs <= 50) out.designs = o.designs;
+  if (typeof o.freight === "boolean") out.freight = o.freight;
+  if (typeof o.vat === "boolean") out.vat = o.vat;
+  for (const k of ["margin", "overhead"] as const) {
+    const n = o[k];
+    if (typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 200) out[k] = n;
   }
   return Object.keys(out).length ? out : null;
 }
@@ -358,11 +443,6 @@ function normalizeContent(v: unknown): ContentInfo | null {
   set("courierExtra", n(o.courierExtra, 10) !== undefined ? Math.round(o.courierExtra as number) : undefined);
   set("tape", n(o.tape, 1e6));
   set("tapeWidth", n(o.tapeWidth, 1000));
-  set("setup", n(o.setup, 1e8));
-  if (Array.isArray(o.tiers)) {
-    const t = [...new Set(o.tiers.filter((x): x is number => typeof x === "number" && Number.isInteger(x) && x > 0 && x <= 1e8))].sort((a, b) => a - b).slice(0, 6);
-    if (t.length) out.tiers = t;
-  }
   return Object.keys(out).length ? out : null;
 }
 
@@ -429,6 +509,8 @@ export function normalizePack(v: unknown, fallback: PackSpec = DEFAULT_PACK): Pa
   }
   const content = normalizeContent(o.content);
   if (content) base.content = content;
+  const order = normalizeOrder(o.order);
+  if (order) base.order = order;
   if (o.frozen && typeof o.frozen === "object") {
     const f = o.frozen as Record<string, unknown>;
     const at = typeof f.at === "string" ? f.at.slice(0, 40) : "";

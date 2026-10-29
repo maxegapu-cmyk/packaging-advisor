@@ -91,7 +91,8 @@ function combo(c: BuildCtx): Built {
   const spec = c.spec;
   const L = comboLayout(spec)!;
   const inner = spec.inner!;
-  const outerSpec: PackSpec = { form: spec.form, w: L.outer.w, h: L.outer.h, d: L.outer.d, finish: spec.finish, effects: spec.effects };
+  // the outer pack keeps its parts' picks, so its board is drawn at the stock's thickness
+  const outerSpec: PackSpec = { form: spec.form, w: L.outer.w, h: L.outer.h, d: L.outer.d, finish: spec.finish, effects: spec.effects, materials: spec.materials };
   const n = L.n;
   const fw = L.foot.w * U;
   const fd = L.foot.d * U;

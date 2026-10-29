@@ -2,7 +2,8 @@
  * The print file: a PDF a printer can work from.
  *
  * Page 1 is the job sheet (parts, sizes, materials, colors, checks); page 2 its materials and
- * compliance, from the principal's material list. Then one page per printed
+ * compliance, from the principal's material list; page 3 the specification to order against and
+ * the reference price at each quantity. Then one page per printed
  * part at 1:1: artwork at 300 dpi with 3 mm bleed, cut lines in a spot color named
  * "CutContour" and creases in "Crease" (the names cutting tables and RIPs look for), crop
  * marks and a slug line. A foil finish adds a foil plate page per part.
@@ -12,7 +13,10 @@
 import type { Artwork } from "@/lib/artwork";
 import type { Board } from "@/lib/board/schema";
 import type { Lang } from "@/lib/i18n";
-import { EFFECT_LABELS, finishText, FORM_LABELS, type Effect, type PackSpec } from "@/lib/pack";
+import { EFFECT_LABELS, finishText, FORM_LABELS, outerSize, type Effect, type PackSpec } from "@/lib/pack";
+import { quoteTiers, yuan } from "@/lib/spec/quote";
+import { impositionText } from "@/lib/spec/impose";
+import { perPackText, postText, printText, stockText } from "@/lib/spec/describe";
 import { cmykText } from "@/lib/print/color";
 import { BLEED, type PrintLayout, type Sheet } from "@/lib/print/layout";
 import type { Check } from "@/lib/print/preflight";
@@ -413,7 +417,8 @@ function jobSheet(inp: PdfInput): HTMLCanvasElement {
   text(inp.lang === "en" ? "Package" : "包装  Package", 14, y, 3.6, 700);
   y += 7;
   const dims = (s: { w: number; h: number; d: number }) => `${s.w} × ${s.h} × ${s.d} mm`;
-  text(`${two(FORM_LABELS[spec.form])}   ${dims(spec)}   ${inp.lang === "en" ? finishText(spec, "en") : finishText(spec, "zh")}`, 14, y, 3.1);
+  // a combination's outer pack is sized to its contents, as the 3D and the dies are
+  text(`${two(FORM_LABELS[spec.form])}   ${dims(outerSize(spec))}   ${inp.lang === "en" ? finishText(spec, "en") : finishText(spec, "zh")}`, 14, y, 3.1);
   if (spec.inner) {
     y += 5.5;
     text(`${inp.lang === "en" ? "Inside" : "内装"}: ${spec.inner.count} × ${two(FORM_LABELS[spec.inner.form])}  ${dims(spec.inner)}`, 14, y, 3.1);
@@ -477,6 +482,74 @@ function jobSheet(inp: PdfInput): HTMLCanvasElement {
   return c;
 }
 
+/**
+ * Page 3: the specification to order against (each component's stock, grammage, print,
+ * finishing, quantity per pack and imposition) and the reference price at each quantity.
+ */
+function specSheet(inp: PdfInput): HTMLCanvasElement {
+  const dpm = 150 / 25.4;
+  const W = Math.round(210 * dpm);
+  const H = Math.round(297 * dpm);
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext("2d")!;
+  const mm = (v: number) => v * dpm;
+  const en = inp.lang === "en";
+  const lang = en ? "en" : "zh";
+  const text = (t: string, x: number, y: number, size: number, weight = 400, color = "#111", align: CanvasTextAlign = "left") => {
+    ctx.font = `${weight} ${mm(size).toFixed(1)}px ${SANS}`;
+    ctx.fillStyle = color;
+    ctx.textAlign = align;
+    ctx.fillText(t, mm(x), mm(y));
+    ctx.textAlign = "left";
+  };
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = rolesOf(inp.art.d).key;
+  ctx.fillRect(0, 0, W, mm(6));
+  const quotes = quoteTiers(inp.spec, inp.board.meta.category);
+  const ref = quotes.find((q) => q.qty >= 3000) ?? quotes[quotes.length - 1];
+  text(en ? "Specification and quote" : "规格与报价  Specification and quote", 14, 22, 7, 700);
+  let y = para(ctx, en ? "What to order each part in, and a reference price worked out the way packaging factories quote. A reference estimate, not a factory quote: suppliers' quotes govern." : "每个部件的订购规格，以及按包装厂报价方法测算的参考价。这是参考测算，不是工厂报价：以供应商报价为准。", 14, 31, 3, 182, mm, "#555");
+  y += 9;
+  const bottom = 282;
+  for (const cq of ref.comps.filter((x) => x.comp.key !== "job")) {
+    if (y > bottom - 20) break;
+    text(en ? cq.comp.label.en : cq.comp.label.zh, 14, y, 3.2, 700);
+    text(`¥${yuan(cq.total / ref.qty, 3)}`, 196, y, 3.2, 600, "#111", "right");
+    y += 5;
+    y = para(ctx, `${stockText(cq, lang)}  ·  ${en ? "print" : "印刷"} ${printText(cq, lang)}  ·  ${postText(cq, lang)}`, 18, y, 2.7, 170, mm, "#333");
+    y += 4.4;
+    y = para(ctx, `${perPackText(cq, lang)}${cq.imposition ? `  ·  ${impositionText(cq.imposition, lang)}` : ""}`, 18, y, 2.6, 170, mm, "#666");
+    y += 7;
+  }
+  // the price at each quantity
+  y += 2;
+  text(en ? `Price per pack${ref.withVat ? " (incl. 13% VAT)" : " (net of VAT)"}` : `每套单价${ref.withVat ? "（含 13% 增值税）" : "（不含税）"}`, 14, y, 3.6, 700);
+  y += 7;
+  const colW = 182 / (quotes.length + 1);
+  text(en ? "Quantity" : "订量", 14, y, 2.8, 600, "#555");
+  quotes.forEach((q, i) => text(q.qty.toLocaleString("en-US"), 14 + colW * (i + 2), y, 2.8, 600, "#555", "right"));
+  const row = (label: string, f: (q: (typeof quotes)[number]) => string, weight = 400) => {
+    y += 5.6;
+    text(label, 14, y, 2.9, weight);
+    quotes.forEach((q, i) => text(f(q), 14 + colW * (i + 2), y, 2.9, weight, "#111", "right"));
+  };
+  row(en ? "Unit price" : "单价", (q) => `¥${yuan(q.unit)}`, 700);
+  row(en ? "One-off costs" : "一次性费用", (q) => `¥${yuan(q.setup, 0)}`);
+  row(en ? "Total" : "总价", (q) => `¥${yuan(q.gross, 0)}`);
+  if (ref.warnings.length) {
+    y += 8;
+    for (const w of ref.warnings.slice(0, 4)) {
+      y = para(ctx, `! ${en ? w.en : w.zh}`, 14, y, 2.7, 182, mm, "#B25E00");
+      y += 4.6;
+    }
+  }
+  text(en ? "Made with Packaging Advisor. Prices are references dated in the price book." : "由包装视觉顾问生成。价格为价格库中注明日期的参考价。", 14, 290, 2.5, 400, "#777");
+  return c;
+}
+
 /** Builds the PDF. pdf-lib is loaded on demand. */
 export async function buildPrintPdf(inp: PdfInput): Promise<Uint8Array> {
   const L = await import("pdf-lib");
@@ -489,7 +562,7 @@ export async function buildPrintPdf(inp: PdfInput): Promise<Uint8Array> {
   doc.setProducer("Packaging Advisor (pdf-lib)");
   const font = await doc.embedFont(L.StandardFonts.Helvetica);
   const fx = inp.spec.effects ?? [];
-  const total = 2 + inp.layout.sheets.reduce((n, s) => n + 1 + (s.process === "print" ? fx.length : 0), 0);
+  const total = 3 + inp.layout.sheets.reduce((n, s) => n + 1 + (s.process === "print" ? fx.length : 0), 0);
   let done = 0;
   const tick = () => inp.onProgress?.(++done, total);
 
@@ -500,6 +573,9 @@ export async function buildPrintPdf(inp: PdfInput): Promise<Uint8Array> {
   tick();
   const ms = await doc.embedJpg(await toJpeg(materialSheet(inp), 0.9));
   doc.addPage([210 * PT, 297 * PT]).drawImage(ms, { x: 0, y: 0, width: 210 * PT, height: 297 * PT });
+  tick();
+  const ss = await doc.embedJpg(await toJpeg(specSheet(inp), 0.9));
+  doc.addPage([210 * PT, 297 * PT]).drawImage(ss, { x: 0, y: 0, width: 210 * PT, height: 297 * PT });
   tick();
 
   const slug = `${inp.artwork.brand} ${inp.artwork.headline}`.trim() || "Packaging Advisor";

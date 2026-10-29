@@ -263,9 +263,24 @@ export function innerSpecOf(spec: PackSpec): PackSpec | null {
   return { form: i.form, w: i.w, h: i.h, d: i.d, finish: spec.finish, effects: spec.effects };
 }
 
+/** Corrugated boards on the list (single, double and triple wall, micro flute). */
+const FLUTED = new Set(["M012", "M013", "M014", "M015"]);
+/**
+ * A corrugated pack printed the usual way: four-colour on a board facing, mounted on the flute
+ * (litho-lam). Then the facing is a part of its own; a pack printed direct on the flute has none.
+ */
+export function lithoLam(spec: PackSpec): boolean {
+  if (spec.form !== "mailer" && spec.form !== "carton") return false;
+  const body = spec.materials?.body;
+  if (body?.route === "direct") return false;
+  return spec.form === "mailer" || FLUTED.has(body?.id ?? "");
+}
+const FACING: Slot = { id: "facing", label: P("彩印面纸（裱坑）", "Printed facing (litho-lam)"), options: ["M002", "M001", "M003", "M020"], contact: "outer", print: "board", grade: P("250 g，四色印刷后裱瓦楞", "250 gsm, printed four-colour and mounted on flute"), gsm: 250 };
+
 /** A structure's own parts (and its insert). */
 function ownParts(spec: PackSpec): Slot[] {
   const out = slotsOf(spec.form);
+  if (lithoLam(spec)) out.splice(1, 0, FACING);
   const ins = insertSlot(spec);
   return ins ? [...out, ins] : out;
 }

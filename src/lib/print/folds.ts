@@ -118,8 +118,7 @@ function carton(w: number, h: number, d: number): FoldSet {
  * Roll-end front-tuck mailer (FEFCO 0427), as the 3D view builds it: base, a rolled double
  * front wall, a back wall, rolled double side walls, and a lid with a tuck and two dust ears.
  */
-function mailer(w: number, h: number, d: number): FoldSet {
-  const T = 3;
+function mailer(w: number, h: number, d: number, T = 3): FoldSet {
   const tk = Math.min(h * 0.7, 40);
   const earH = Math.min(h - 2 * T, 26);
   const earD = d * 0.42;
@@ -399,13 +398,16 @@ function woodBox(w: number, h: number, d: number): FoldSet {
 
 export type FoldForm = Form | "rsc";
 
-/** The fold description of a form at a size, or null for forms that are not folded from a flat sheet. */
-export function foldsFor(form: FoldForm, w: number, h: number, d: number): FoldSet | null {
+/**
+ * The fold description of a form at a size, or null for forms that are not folded from a flat
+ * sheet. `t` is the board's thickness where the die allows for it (a mailer's flute, mm).
+ */
+export function foldsFor(form: FoldForm, w: number, h: number, d: number, t?: number): FoldSet | null {
   switch (form) {
     case "carton":
       return carton(w, h, d);
     case "mailer":
-      return mailer(w, h, d);
+      return mailer(w, h, d, t);
     case "rsc":
       return rsc(w, h, d);
     case "gift":

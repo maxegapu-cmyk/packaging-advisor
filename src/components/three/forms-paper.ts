@@ -8,6 +8,7 @@ import type { PackSpec } from "@/lib/pack";
 import { rolesOf, type ArtInput } from "./art";
 import { box, disc, insertGeometry, liftOff, mmOf, pin, RAD, smooth, splitMesh, springAt, tubeWall, U, V, type Built, type Holds } from "./common";
 import type { InsertKind, Kit } from "./kit";
+import { wallMm } from "@/lib/spec/wall";
 
 const mm = U;
 
@@ -29,7 +30,7 @@ export function buildMailer(spec: PackSpec, k: Kit, holds?: Holds, insertKind: I
   const W = spec.w * U;
   const H = spec.h * U;
   const D = spec.d * U;
-  const T = 3 * mm;
+  const T = wallMm(spec, "body", 3) * mm;
   const K = k.kraft;
   const wallH = H - T;
   const fW = k.flute(spec.w);
@@ -94,7 +95,7 @@ export function buildMailer(spec: PackSpec, k: Kit, holds?: Holds, insertKind: I
     pin(1, "盒盖", "Lid", `${S.w} × ${S.d} mm，外面印刷，内面牛皮原色`, `${S.w} × ${S.d} mm, printed outside, plain kraft inside`, lid, V(-W * 0.2, T, D * 0.55), V(0, 1, 0)),
     pin(2, "卷边前墙", "Rolled front wall", "双层，顶边卷折，开箱时手感圆润", "two layers rolled over at the top, so the edge is smooth to the hand", base, V(W * 0.25, wallH * 0.55, D / 2), V(0, 0, 1)),
     pin(3, "插舌", "Tuck flap", `深 ${mmOf(tuckH)} mm，插进前墙内侧锁住盒盖`, `${mmOf(tuckH)} mm deep, tucks behind the front wall to lock the lid`, tuck, V(W * 0.2, -tuckH * 0.5, 0), V(0, 0, 1), true),
-    pin(4, "瓦楞边", "Flute edge", "{body}，3 mm E/B 楞，抗压、轻，可回收", "{body}, 3 mm E/B flute: crush-resistant, light and recyclable", base, V(-W / 2, wallH * 0.5, D * 0.2), V(-1, 0, 0)),
+    pin(4, "瓦楞边", "Flute edge", `{body}，约 ${(T / U).toFixed(1)} mm（含面纸），抗压、轻，可回收`, `{body}, about ${(T / U).toFixed(1)} mm with its facing: crush-resistant, light and recyclable`, base, V(-W / 2, wallH * 0.5, D * 0.2), V(-1, 0, 0)),
     pin(5, "防尘耳", "Dust ears", `高 ${mmOf(earH)} mm，折进侧墙内`, `${mmOf(earH)} mm high, fold inside the side walls`, lid, V(W / 2 - 2.5 * T, -earH * 0.5, D * 0.5), V(1, 0, 0), true),
     pin(6, "内衬", "Insert", holds ? `高 ${mmOf(insH)} mm，{insert}，按产品开孔定位` : "{insert}垫底", holds ? `${mmOf(insH)} mm high, {insert}, cut to locate each product` : "a pad of {insert} on the floor", insert, V(inW * 0.38, insH, inD * 0.3), V(0, 1, 0)),
   ];
@@ -108,7 +109,7 @@ export function buildDrawer(spec: PackSpec, k: Kit, holds?: Holds, insertKind: I
   const W = spec.w * U;
   const H = spec.h * U;
   const D = spec.d * U;
-  const T = 1.5 * mm;
+  const T = wallMm(spec, "core", 1.5) * mm;
   const L = k.lining;
   const P = k.plain();
   const root = new THREE.Group();
@@ -123,7 +124,8 @@ export function buildDrawer(spec: PackSpec, k: Kit, holds?: Holds, insertKind: I
   const tw = W - 2 * T - 2 * gap;
   const th = H - 2 * T - 2 * gap;
   const td = D - T;
-  const t = 1.2 * mm;
+  // the tray is a little thinner than the sleeve
+  const t = T * 0.8;
   const tray = new THREE.Group();
   root.add(tray);
   const closedZ = D / 2 - td / 2;
@@ -181,7 +183,7 @@ export function buildBookBox(spec: PackSpec, k: Kit, holds?: Holds, insertKind: 
   const W = spec.w * U;
   const H = spec.h * U;
   const D = spec.d * U;
-  const T = 2 * mm;
+  const T = wallMm(spec, "core", 2) * mm;
   const L = k.lining;
   const P = k.plain();
   const root = new THREE.Group();
@@ -253,7 +255,7 @@ export function buildBookBox(spec: PackSpec, k: Kit, holds?: Holds, insertKind: 
 export function buildPaperTube(spec: PackSpec, k: Kit, category: string): Built {
   const R = (spec.w / 2) * U;
   const H = spec.h * U;
-  const T = 1.8 * mm;
+  const T = wallMm(spec, "body", 1.8) * mm;
   const lidH = Math.max(24 * mm, H * 0.28);
   const yBody = H - lidH;
   const circ = 2 * Math.PI * R;
@@ -327,7 +329,7 @@ export function buildBag(spec: PackSpec, k: Kit, a: ArtInput): Built {
   const W = spec.w * U;
   const H = spec.h * U;
   const D = spec.d * U;
-  const t = 0.35 * mm;
+  const t = wallMm(spec, "body", 0.35) * mm;
   const I = k.inside;
   const E = k.edge;
   const root = new THREE.Group();

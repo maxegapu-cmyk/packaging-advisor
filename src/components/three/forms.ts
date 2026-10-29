@@ -7,13 +7,15 @@ import type { PackSpec } from "@/lib/pack";
 import { drawSeal, fiberTexture, rolesOf, type ArtInput } from "./art";
 import { box, boardPanel, insertGeometry, liftOff, mmOf, RAD, restOnFloor, splitMesh, springAt, tw, U, type Built, type Holds, type Pin } from "./common";
 import type { InsertKind, Kit } from "./kit";
+import { wallMm } from "@/lib/spec/wall";
 
 /** Tuck carton with hinged panels, staged fold (sides → back → flaps → top/bottom). */
 export function buildCarton(spec: PackSpec, k: Kit): Built {
   const w = spec.w * U;
   const h = spec.h * U;
   const d = spec.d * U;
-  const t = 0.45 * U;
+  // the board's real thickness: 0.45 mm for 350 g card, more for corrugated
+  const t = wallMm(spec, "body", 0.45) * U;
   const g = Math.max(8, Math.min(spec.d * 0.32, 18)) * U;
   const tuck = Math.max(10, Math.min(spec.d * 0.55, 34)) * U;
   const dust = Math.max(8, Math.min(spec.d * 0.7, spec.w * 0.45)) * U;
@@ -170,7 +172,7 @@ export function buildCarton(spec: PackSpec, k: Kit): Built {
   };
   const S = spec;
   const pins: Pin[] = [
-    { n: 1, label: { zh: "正面", en: "Front panel" }, detail: { zh: `${S.w} × ${S.h} mm，{body}，厚约 0.45 mm，四色印刷`, en: `${S.w} × ${S.h} mm, {body}, about 0.45 mm, four-colour print` }, obj: frontG, at: new THREE.Vector3(-w * 0.18, h * 0.12, 0.001), normal: new THREE.Vector3(0, 0, 1) },
+    { n: 1, label: { zh: "正面", en: "Front panel" }, detail: { zh: `${S.w} × ${S.h} mm，{body}，厚约 ${(t / U).toFixed(2)} mm，四色印刷`, en: `${S.w} × ${S.h} mm, {body}, about ${(t / U).toFixed(2)} mm, four-colour print` }, obj: frontG, at: new THREE.Vector3(-w * 0.18, h * 0.12, 0.001), normal: new THREE.Vector3(0, 0, 1) },
     { n: 2, label: { zh: "侧面", en: "Side panel" }, detail: { zh: `${S.d} × ${S.h} mm，压痕折成 90°`, en: `${S.d} × ${S.h} mm, creased and folded to 90°` }, obj: rightH, at: new THREE.Vector3(d / 2, -h * 0.2, 0.001), normal: new THREE.Vector3(0, 0, 1) },
     { n: 3, label: { zh: "顶盖", en: "Top panel" }, detail: { zh: `${S.w} × ${S.d} mm，开合的盖`, en: `${S.w} × ${S.d} mm, the opening lid` }, obj: topH, at: new THREE.Vector3(-w * 0.25, d / 2, 0.001), normal: new THREE.Vector3(0, 0, 1) },
     { n: 4, label: { zh: "插舌", en: "Tuck flap" }, detail: { zh: `深 ${mmOf(tuck)} mm，插进盒内把盖锁住`, en: `${mmOf(tuck)} mm deep, tucks inside to lock the lid` }, obj: tuckT, at: new THREE.Vector3(w * 0.2, tuck * 0.55, 0.001), normal: new THREE.Vector3(0, 0, 1) },
@@ -197,7 +199,7 @@ export function buildGift(spec: PackSpec, k: Kit, holds?: Holds, insertKind: Ins
   const W = spec.w * U;
   const H = spec.h * U;
   const D = spec.d * U;
-  const T = 1.5 * U;
+  const T = wallMm(spec, "core", 1.5) * U;
   const lidH = Math.max(12, spec.h * 0.34) * U;
   const gap = 0.6 * U;
   const bw = W - 2 * (T + gap);

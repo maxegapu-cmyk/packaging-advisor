@@ -43,6 +43,9 @@ import { Orbit, REST_ANGLE, reducedMotion, VIEWS, type Angle } from "./orbit";
 import { Stage3D } from "./Stage3D";
 import { FormGlyph } from "./FormGlyph";
 import { MaterialPanel } from "./MaterialPanel";
+import { SpecPanel } from "../spec/SpecPanel";
+import { QuoteSheet } from "../spec/QuoteSheet";
+import { SolutionPicker } from "../spec/SolutionPicker";
 import { CompliancePanel } from "../compliance/CompliancePanel";
 import { memoryDocStore, urlDocStore, type DocStore } from "../compliance/docStore";
 import { pruneMaterials, setLibrary, type Library } from "@/lib/materials";
@@ -94,6 +97,7 @@ const S = {
   tabLook: { zh: "外观", en: "Look" },
   tabCheck: { zh: "尺寸", en: "Size" },
   tabMaterials: { zh: "材料", en: "Materials" },
+  tabQuote: { zh: "报价", en: "Quote" },
   tabCompliance: { zh: "合规", en: "Compliance" },
   refH: { zh: "放个东西对比大小", en: "Compare with something familiar" },
   refNote: { zh: "常见物品按真实尺寸放在包装旁边，一眼看出包装有多大。", en: "Everyday objects at their real size, beside the package, so you can see how big it is." },
@@ -136,7 +140,7 @@ const BACKDROPS: { id: Backdrop; label: Pair; hint: Pair }[] = [
   { id: "brand", label: { zh: "品牌色", en: "Brand" }, hint: { zh: "包装的主色", en: "The pack's key colour" } },
 ];
 
-type PanelTab = "pack" | "materials" | "compliance" | "look" | "check";
+type PanelTab = "pack" | "quote" | "materials" | "compliance" | "look" | "check";
 
 type Detail = { id: string; label: Pair; angle: Angle; zoom: number; open?: boolean; text: (d: Direction) => Pair };
 
@@ -381,6 +385,8 @@ export function Studio({
   const [hint, setHint] = useState(true);
   const [panel, setPanel] = useState(false);
   const [tab, setTab] = useState<PanelTab>("pack");
+  const [sheet, setSheet] = useState(false);
+  const [tier, setTier] = useState(2);
   const [views, setViews] = useState(false);
   const [matGroup, setMatGroup] = useState(() => MATERIAL_GROUPS.find((g) => g.forms.includes(initialPack.form))?.id ?? "paper");
   const [anatomy, setAnatomy] = useState(false);
@@ -546,6 +552,7 @@ export function Studio({
 
   const panelTabs: { id: PanelTab; label: Pair }[] = [
     { id: "pack", label: S.tabPack },
+    { id: "quote", label: S.tabQuote },
     { id: "materials", label: S.tabMaterials },
     { id: "compliance", label: S.tabCompliance },
     { id: "look", label: S.tabLook },
@@ -803,6 +810,7 @@ export function Studio({
 
         {tab === "pack" ? (
           <div className="st-tabpanel" role="tabpanel">
+            <SolutionPicker spec={spec} category={board.meta.category} lang={lang} onChange={setSpec} disabled={!!spec.frozen} />
             <section className="st-sec">
               <L p={S.structure} lang={lang} className="st-label" />
               <div className="st-mats seg" role="tablist" aria-label={both(S.material, lang)}>
@@ -909,6 +917,8 @@ export function Studio({
           </div>
         ) : null}
 
+        {tab === "quote" ? <SpecPanel spec={spec} category={board.meta.category} lang={lang} onChange={setSpec} onOpenSheet={() => setSheet(true)} priceBookHref={libraryHref ? `${libraryHref}#prices` : undefined} tier={tier} onTier={setTier} /> : null}
+
         {tab === "materials" ? (
           <MaterialPanel
             spec={spec}
@@ -921,6 +931,7 @@ export function Studio({
             librarySave={libSave}
             frozen={!!spec.frozen}
             onCompliance={() => setTab("compliance")}
+            onQuote={() => setTab("quote")}
           />
         ) : null}
 
@@ -1036,6 +1047,7 @@ export function Studio({
         {saveNote ? <p className={`st-save${saveState === "error" ? " is-error" : ""}`}>{both(saveNote, lang)}</p> : null}
         <p className="st-small st-disclaimer">{both(S.disclaimer, lang)}</p>
       </aside>
+      {sheet ? <QuoteSheet spec={spec} category={board.meta.category} product={one(board.meta.product, lang)} lang={lang} onClose={() => setSheet(false)} tier={tier} /> : null}
     </div>
   );
 }

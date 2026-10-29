@@ -14,6 +14,7 @@ import { coverage, coverageSummary, type SupplierDoc } from "../compliance/docum
 import { contrast, deltaE } from "./color";
 import { checkEan13, EAN_NOMINAL } from "./ean13";
 import { artSize, infoPanels, printLayout, wrapBack } from "./layout";
+import { componentsOf } from "../spec/build";
 
 type Pair = { zh: string; en: string };
 export type Level = "error" | "warn" | "ok" | "info";
@@ -123,6 +124,11 @@ export function preflight(a: Artwork, board: Board, spec: PackSpec, docs: Suppli
   out.push(C("mat-list", "ok", `材料均来自委托方清单（${listed} 种）`, `All materials from the principal's list (${listed})`, `清单核对日期 ${LIST.checked}；所需资料见印刷工单第 2 页。`, `List checked ${LIST.checked}; the documents needed are on page 2 of the job sheet.`));
 
   // always
+  // the quote: how much of it rests on prices still to be confirmed with suppliers
+  const comps = componentsOf(spec, board.meta.category);
+  const unconfirmed = [...new Set(comps.filter((c) => c.stock && c.unitCost === undefined && (c.stock.conf === "trade" || c.stock.conf === "derived")).map((c) => c.stock!.name))];
+  if (unconfirmed.length) out.push(C("prices", "info", `报价中有 ${unconfirmed.length} 个料号用的是行业经验价`, `${unconfirmed.length} stock${unconfirmed.length > 1 ? "s" : ""} in the quote use trade-range prices`, `下单前请供应商确认：${unconfirmed.map((x) => x.zh).join("、")}。可在价格库填入供应商价格，或在「报价」里填你的采购价。`, `Confirm with suppliers before ordering: ${unconfirmed.map((x) => x.en).join(", ")}. Enter supplier prices in the price book, or your buying price under Quote.`));
+  else out.push(C("prices", "ok", "报价所用价格均有行情或供应商依据", "Every price in the quote has a market or supplier basis"));
   out.push(C("die", "info", "刀模以印厂为准", "Your printer's die line wins", "结构尺寸是标准做法；开模前请印厂核对。", "Structural sizes are standard practice; have the printer check before cutting."));
   out.push(C("proof", "info", "正式印刷前请打样", "Proof before the print run", "屏幕颜色和印刷颜色会有差异。", "Screen and print colors differ."));
   return out;

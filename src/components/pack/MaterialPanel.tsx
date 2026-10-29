@@ -37,10 +37,15 @@ import {
   type Library,
   type Use,
 } from "@/lib/materials";
+import { priceOf, type BookStock } from "@/lib/spec/book";
+import { stockFor } from "@/lib/spec/build";
+import { BASIS_UNIT } from "@/lib/spec/stocks";
 
 const T = {
   lead: { zh: "所有材料都可以改：每个部件可选清单里任一材料（推荐的排在前面），可填规格、颜色、供应商和备注，也可以新增部件。只能选委托方材料清单里的材料。", en: "Everything here can be changed: any listed material for any part (recommended ones first), with your own grade, colour, supplier and note, and parts of your own. Only materials on the principal's list can be chosen." },
   use: { zh: "用途", en: "Use" },
+  ordered: { zh: "订购料号", en: "Ordered as" },
+  toQuote: { zh: "在「报价」里换料号", en: "Change it under Quote" },
   courier: { zh: "作为快递包装寄递", en: "Shipped as a courier box" },
   bag: { zh: "作为购物袋使用", en: "Used as a shopping bag" },
   auto: { zh: "按盒型自动判断", en: "set by the structure" },
@@ -150,7 +155,10 @@ export function MaterialPanel({
   librarySave = "idle",
   frozen = false,
   onCompliance,
+  onQuote,
 }: {
+  /** switches to the Quote tab, where the part's stock is ordered */
+  onQuote?: () => void;
   /** the pack's materials are frozen at sign-off: shown, not changed */
   frozen?: boolean;
   onCompliance?: () => void;
@@ -192,6 +200,7 @@ export function MaterialPanel({
   const labelOf = (key: string) => all.find((u) => u.key === key)?.label;
 
   const parts = all.filter((u) => !u.process);
+  const stocks = useMemo(() => new Map(partsOf(spec).map((p) => [p.key, stockFor(spec, p.key, p.slot, category)])), [spec, category]);
   const groups: { title: Pair; items: Use[]; process?: boolean }[] = [{ title: { zh: `${T.outer.zh} · ${FORM_LABELS[spec.form].zh}`, en: `${T.outer.en}: ${FORM_LABELS[spec.form].en}` }, items: parts.filter((u) => !u.inner) }];
   if (spec.inner) groups.push({ title: { zh: `内装 · ${FORM_LABELS[spec.inner.form].zh}`, en: `Inside: ${FORM_LABELS[spec.inner.form].en}` }, items: parts.filter((u) => u.inner) });
   groups.push({ title: T.process, items: all.filter((u) => u.process), process: true });
@@ -264,7 +273,7 @@ export function MaterialPanel({
           {g.process ? <span className="st-small">{one(T.processNote, lang)}</span> : null}
           <div className="mat-list">
             {g.items.map((u) => (
-              <MaterialRow key={u.key} u={u} spec={spec} lang={lang} rules={rules.filter((r) => r.by.includes(u.key)).map((r) => r.rule.id)} onChange={onChange} ctl={u.kind === "part" || u.process ? ctl : null} libraryHref={libraryHref} />
+              <MaterialRow stock={stocks.get(u.key)} onQuote={onQuote} key={u.key} u={u} spec={spec} lang={lang} rules={rules.filter((r) => r.by.includes(u.key)).map((r) => r.rule.id)} onChange={onChange} ctl={u.kind === "part" || u.process ? ctl : null} libraryHref={libraryHref} />
             ))}
           </div>
         </section>
@@ -361,7 +370,7 @@ export function MaterialPanel({
   );
 }
 
-function MaterialRow({ u, spec, lang, rules, onChange, ctl, libraryHref }: { u: Use; spec: PackSpec; lang: Lang; rules: string[]; onChange: (s: PackSpec) => void; ctl: LibCtl | null; libraryHref?: string }) {
+function MaterialRow({ u, spec, lang, rules, onChange, ctl, libraryHref, stock, onQuote }: { u: Use; spec: PackSpec; lang: Lang; rules: string[]; onChange: (s: PackSpec) => void; ctl: LibCtl | null; libraryHref?: string; stock?: BookStock; onQuote?: () => void }) {
   const id = `mat-${u.key.replace(/\./g, "-")}`;
   const extraKey = u.kind === "extra" ? u.key.slice("extra.".length) : null;
   // a change to one of this part's own fields
@@ -401,6 +410,18 @@ function MaterialRow({ u, spec, lang, rules, onChange, ctl, libraryHref }: { u: 
         <MaterialOptions first={u.kind === "part" ? u.options : u.process ? [u.defaultId] : []} firstLabel={u.process ? T.usual : T.recommended} lang={lang} none={!!u.process} />
       </select>
       {u.removed ? <p className="mat-hint">{one(T.removed, lang)}</p> : null}
+      {stock && stock.id !== "included" && u.kind === "part" ? (
+        <p className="mat-meta mat-stock">
+          <span>{one(T.ordered, lang)}</span>
+          {one(stock.name, lang)}
+          {u.choice.gsm ?? (stock.kind !== "flute" && stock.basis !== "piece" ? stock.gsm : undefined) ? ` ${u.choice.gsm ?? stock.gsm} g` : ""} · ¥{priceOf(stock).toLocaleString("en-US", { maximumFractionDigits: stock.basis === "ton" ? 0 : 2 })} {one(BASIS_UNIT[stock.basis], lang)}
+          {onQuote ? (
+            <button type="button" className="st-link" onClick={onQuote}>
+              {one(T.toQuote, lang)}
+            </button>
+          ) : null}
+        </p>
+      ) : null}
       {u.note && !u.removed ? <p className="mat-meta">{lang === "en" ? `As ${u.note.en}` : `即${u.note.zh}`}</p> : null}
       {!recommended ? <p className="mat-hint">{one(T.notRecommended, lang)}</p> : null}
       {!u.drawn && !u.removed ? <p className="mat-hint">{one(T.sketch, lang)}</p> : null}
