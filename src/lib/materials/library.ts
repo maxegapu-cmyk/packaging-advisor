@@ -314,3 +314,9 @@ export function diffText(d: LibraryDiff, lang: "zh" | "en"): string {
 
 /** One saved version of the library, kept so changes can be traced and undone. */
 export type HistoryEntry = { at: string; by: string; summary: { zh: string; en: string }; library: Library };
+
+/** The version before the first recorded change (stamped just before it). */
+export function baseline(before: Library, firstAt: string): HistoryEntry {
+  const at = new Date(new Date(firstAt).getTime() - 1).toISOString();
+  return { at, by: "", summary: { zh: "首次修改前的材料库", en: "The library before the first change" }, library: before };
+}

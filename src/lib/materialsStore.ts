@@ -6,7 +6,7 @@
  * Server-only.
  */
 import { getDb, now } from "./db";
-import { diffLibraries, diffText, normalizeLibrary, setLibrary, type HistoryEntry, type Library } from "./materials";
+import { baseline, diffLibraries, diffText, normalizeLibrary, setLibrary, type HistoryEntry, type Library } from "./materials";
 
 const KEY = "material_library";
 const HISTORY = "material_library_history";
@@ -50,7 +50,10 @@ export function saveLibrary(v: unknown, by = ""): Library {
   write(KEY, JSON.stringify(lib));
   if (d.count) {
     const entry: HistoryEntry = { at: lib.updatedAt, by: by.slice(0, 60), summary: { zh: diffText(d, "zh"), en: diffText(d, "en") }, library: lib };
-    write(HISTORY, JSON.stringify([entry, ...loadHistory()].slice(0, KEEP)));
+    const past = loadHistory();
+    // the first change also keeps the library as it was before, so it can be gone back to
+    if (!past.length) past.push(baseline(before, lib.updatedAt));
+    write(HISTORY, JSON.stringify([entry, ...past].slice(0, KEEP)));
   }
   setLibrary(lib);
   return lib;
